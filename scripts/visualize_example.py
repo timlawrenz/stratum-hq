@@ -121,25 +121,38 @@ def render_pose_overlay(img: Image.Image, pose: np.ndarray) -> Image.Image:
 
 
 def render_caption_panel(img: Image.Image, caption: str) -> Image.Image:
-    """Image with caption text panel below."""
-    panel_h = 160
-    result = Image.new("RGB", (img.width, img.height + panel_h), (30, 30, 30))
-    result.paste(img, (0, 0))
-
-    draw = ImageDraw.Draw(result)
+    """Image with caption text panel below, sized to fit the full text."""
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 15)
     except OSError:
         font = ImageFont.load_default()
 
-    wrapped = textwrap.fill(caption, width=80)
-    draw.multiline_text((16, img.height + 12), wrapped, fill=(240, 240, 240), font=font,
-                        spacing=4)
+    margin = 16
+    spacing = 4
+    wrap_width = max(60, int(img.width / 9.5))
+    wrapped = textwrap.fill(caption, width=wrap_width)
+
+    # Measure text height
+    tmp = Image.new("RGB", (1, 1))
+    tmp_draw = ImageDraw.Draw(tmp)
+    bbox = tmp_draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=spacing)
+    text_h = bbox[3] - bbox[1]
+    panel_h = text_h + margin * 2
+
+    result = Image.new("RGB", (img.width, img.height + panel_h), (30, 30, 30))
+    result.paste(img, (0, 0))
+    draw = ImageDraw.Draw(result)
+    draw.multiline_text((margin, img.height + margin), wrapped, fill=(240, 240, 240),
+                        font=font, spacing=spacing)
     return result
 
 
 def render_dino_heatmap(img: Image.Image, cls_emb: np.ndarray, patch_emb: np.ndarray) -> Image.Image:
-    """Overlay DINOv3 CLS-to-patch cosine similarity as a heatmap."""
+    """Overlay DINOv3 CLS-to-patch cosine similarity as a heatmap.
+
+    Uses percentile-based normalization for better contrast and a stronger
+    blend so the heatmap is clearly visible over the face.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -160,27 +173,28 @@ def render_dino_heatmap(img: Image.Image, cls_emb: np.ndarray, patch_emb: np.nda
         similarity = padded
     heatmap = similarity.reshape(grid_size, grid_size)
 
-    # Normalize to [0, 1]
-    heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
+    # Percentile-based normalization for better contrast
+    lo = np.percentile(heatmap, 2)
+    hi = np.percentile(heatmap, 98)
+    heatmap = np.clip((heatmap - lo) / (hi - lo + 1e-8), 0, 1)
 
     # Apply colormap and resize to image dimensions
-    colored = cm.inferno(heatmap)[:, :, :3]  # drop alpha
+    colored = cm.inferno(heatmap)[:, :, :3]
     colored_uint8 = (colored * 255).astype(np.uint8)
     heatmap_img = Image.fromarray(colored_uint8).resize((img.width, img.height), Image.BILINEAR)
 
-    # Blend with original
-    overlay = Image.blend(img.convert("RGB"), heatmap_img, alpha=0.45)
+    # Stronger blend so the heatmap reads clearly
+    overlay = Image.blend(img.convert("RGB"), heatmap_img, alpha=0.6)
 
     # Add colorbar legend
     fig, ax = plt.subplots(figsize=(0.4, 4), dpi=100)
     norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap="inferno"), cax=ax)
-    ax.set_ylabel("CLS similarity", fontsize=9)
+    ax.set_ylabel("CLS→patch similarity (normalized)", fontsize=8)
     ax.tick_params(labelsize=7)
     fig.subplots_adjust(left=0.05, right=0.55, top=0.95, bottom=0.05)
     fig.canvas.draw()
 
-    # Convert colorbar to PIL and paste
     bar_arr = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
     bar_arr = bar_arr.reshape(fig.canvas.get_width_height()[::-1] + (4,))
     bar_img = Image.fromarray(bar_arr[:, :, :3])
@@ -194,11 +208,18 @@ def render_dino_heatmap(img: Image.Image, cls_emb: np.ndarray, patch_emb: np.nda
     return result
 
 
-def render_t5_mask_chart(img: Image.Image, t5_mask: np.ndarray, caption: str) -> Image.Image:
-    """Bar chart showing T5 attention mask (real tokens vs padding)."""
+def render_t5_mask_chart(img: Image.Image, t5_mask: np.ndarray, caption: str,
+                         t5_hidden: np.ndarray | None = None) -> Image.Image:
+    """Visualize T5 encoding: per-token hidden-state magnitudes and mask boundary.
+
+    When *t5_hidden* is provided, shows the L2 norm of each token's hidden state
+    as a bar chart — real tokens in colour (viridis), padding in dark grey.
+    Falls back to a simple mask bar chart if hidden states are unavailable.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
 
     n_real = int(t5_mask.sum())
     n_pad = len(t5_mask) - n_real
@@ -207,21 +228,40 @@ def render_t5_mask_chart(img: Image.Image, t5_mask: np.ndarray, caption: str) ->
     fig.patch.set_facecolor("#1e1e1e")
     ax.set_facecolor("#1e1e1e")
 
-    colors = ["#4CAF50" if m else "#333333" for m in t5_mask]
-    ax.bar(range(len(t5_mask)), t5_mask.astype(float), color=colors, width=1.0, edgecolor="none")
+    if t5_hidden is not None:
+        norms = np.linalg.norm(t5_hidden.astype(np.float32), axis=1)
+
+        # Colour real tokens by magnitude, padding in grey
+        real_norms = norms[:n_real]
+        lo, hi = real_norms.min(), real_norms.max()
+        norm_scaled = (real_norms - lo) / (hi - lo + 1e-8)
+        cmap = matplotlib.colormaps["viridis"]
+        colors = [cmap(v) for v in norm_scaled] + ["#2a2a2a"] * n_pad
+
+        ax.bar(range(len(norms)), norms, color=colors, width=1.0, edgecolor="none")
+        ax.axvline(x=n_real - 0.5, color="#ff5555", linewidth=1.5, linestyle="--", alpha=0.8)
+        ax.text(n_real + 2, norms[:n_real].max() * 0.95, "← padding",
+                color="#ff5555", fontsize=9, verticalalignment="top")
+        ax.set_ylabel("Token hidden-state ‖h‖₂", color="white", fontsize=10)
+        ax.set_title(f"T5 Encoding — {n_real} real tokens, {n_pad} padding  (hidden-state magnitudes)",
+                     color="white", fontsize=11, pad=10)
+    else:
+        colors = ["#4CAF50" if m else "#333333" for m in t5_mask]
+        ax.bar(range(len(t5_mask)), t5_mask.astype(float), color=colors, width=1.0, edgecolor="none")
+        ax.set_ylim(0, 1.3)
+        ax.set_title(f"T5 Attention Mask — {n_real} real tokens, {n_pad} padding",
+                     color="white", fontsize=11, pad=10)
+
     ax.set_xlim(0, len(t5_mask))
-    ax.set_ylim(0, 1.3)
     ax.set_xlabel("Token position", color="white", fontsize=10)
-    ax.set_title(f"T5 Attention Mask — {n_real} real tokens, {n_pad} padding",
-                 color="white", fontsize=11, pad=10)
     ax.tick_params(colors="white", labelsize=8)
     for spine in ax.spines.values():
         spine.set_color("#555555")
 
-    # Show first few words of caption
     short_caption = caption[:120] + ("..." if len(caption) > 120 else "")
-    ax.text(0.02, 1.15, f'"{short_caption}"', transform=ax.transAxes,
-            fontsize=8, color="#aaaaaa", style="italic", verticalalignment="top")
+    ax.text(0.02, 0.97, f'"{short_caption}"', transform=ax.transAxes,
+            fontsize=8, color="#aaaaaa", style="italic", verticalalignment="top",
+            wrap=True)
 
     fig.tight_layout()
     fig.canvas.draw()
@@ -300,12 +340,14 @@ def main():
     dinov3_cls = np.load(sd / "dinov3_cls.npy")
     dinov3_patches = np.load(sd / "dinov3_patches.npy")
     t5_mask = np.load(sd / "t5_mask.npy")
+    t5_hidden_path = sd / "t5_hidden.npy"
+    t5_hidden = np.load(t5_hidden_path) if t5_hidden_path.exists() else None
 
     # Render panels
     pose_img = render_pose_overlay(img, pose)
     caption_img = render_caption_panel(img, caption)
     dino_img = render_dino_heatmap(img, dinov3_cls, dinov3_patches)
-    t5_img = render_t5_mask_chart(img, t5_mask, caption)
+    t5_img = render_t5_mask_chart(img, t5_mask, caption, t5_hidden)
 
     # Combined
     combined = render_combined_panel(pose_img, caption_img, dino_img, t5_img)
