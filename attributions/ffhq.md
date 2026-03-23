@@ -25,6 +25,24 @@ The following artifacts were generated from each FFHQ image using
 
 No original pixel data is distributed in this dataset.
 
+### Caption generation
+
+Captions were generated with
+[**Gemma 3 27B**](https://huggingface.co/google/gemma-3-27b-it) served locally
+via [Ollama](https://ollama.com/) (`gemma3:27b`). Each image was captioned with
+the following system prompt:
+
+> Generate a single, dense paragraph describing this image for a text-to-image
+> training dataset. Write in a strictly dry, objective, and descriptive tone.
+> Do not use flowery language, subjective interpretations, or lists.
+> Describe only what is visible: subject (including specific body build, muscle
+> definition, skin texture, and visible anatomical landmarks), precise pose
+> (mechanics of limb positioning, hand placement), clothing/accessories, lighting,
+> background, composition/framing, and camera angle.
+> Do not guess measurements (height, weight) or internal anatomy not visible.
+> Do not include any conversational filler, preambles (like 'The image shows...'),
+> or meta-commentary. Start the description immediately.
+
 ### Example Overlays
 
 The images below illustrate each data layer by overlaying it on a sample face.
