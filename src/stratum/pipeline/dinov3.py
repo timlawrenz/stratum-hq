@@ -60,10 +60,13 @@ def compute_dinov3_both(
         and *patches* is an ``(num_patches, 1024)`` float32 array (or ``None``
         when running the pipeline fallback).
 
-    DINOv3 token sequence: ``[CLS, patch_1, …, patch_N, reg_1, …, reg_4]``.
-    CLS is at index 0; the last 4 tokens are register tokens and are excluded.
+    DINOv3 token sequence: ``[CLS, reg_1, …, reg_4, patch_1, …, patch_N]``.
+    CLS is at index 0; the next 4 tokens are register tokens.  Spatial
+    patches start at index 5.
     """
     import torch
+
+    NUM_REGISTERS = 4
 
     if dino["kind"] == "pipeline":
         feats = dino["feature_extractor"](image)
@@ -104,10 +107,9 @@ def compute_dinov3_both(
 
     cls_list = cls_emb.detach().cpu().float().tolist()
 
-    # Patch tokens: skip CLS (idx 0) and 4 register tokens at the tail
-    total_tokens = outputs.last_hidden_state.shape[1]
-    num_patches = total_tokens - 5  # exclude CLS + 4 registers
-    patches = outputs.last_hidden_state[0, 1 : num_patches + 1, :]
+    # Patch tokens: skip CLS (idx 0) and 4 register tokens (idx 1-4).
+    # Spatial patches begin at index 5.
+    patches = outputs.last_hidden_state[0, 1 + NUM_REGISTERS :, :]
     patches_np = patches.detach().cpu().float().numpy()
 
     return cls_list, patches_np

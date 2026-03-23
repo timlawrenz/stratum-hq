@@ -152,11 +152,24 @@ def render_dino_heatmap(img: Image.Image, cls_emb: np.ndarray, patch_emb: np.nda
 
     Uses percentile-based normalization for better contrast and a stronger
     blend so the heatmap is clearly visible over the face.
+
+    Automatically detects and strips leading register tokens (DINOv3 places
+    4 register tokens before the spatial patches).
     """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.cm as cm
+
+    # Detect register tokens: if the first 4 patches have significantly
+    # higher norms than the rest, they are register tokens and should be
+    # stripped before spatial reshaping.
+    norms = np.linalg.norm(patch_emb, axis=1)
+    if len(patch_emb) > 8:
+        head_mean = norms[:4].mean()
+        rest_mean = norms[4:].mean()
+        if head_mean > rest_mean * 1.4:
+            patch_emb = patch_emb[4:]
 
     # Cosine similarity: CLS vs each patch
     cls_norm = cls_emb / (np.linalg.norm(cls_emb) + 1e-8)
