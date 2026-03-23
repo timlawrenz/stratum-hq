@@ -178,10 +178,19 @@ def render_dino_heatmap(img: Image.Image, cls_emb: np.ndarray, patch_emb: np.nda
     hi = np.percentile(heatmap, 98)
     heatmap = np.clip((heatmap - lo) / (hi - lo + 1e-8), 0, 1)
 
-    # Apply colormap and resize to image dimensions
+    # Expand heatmap to image dimensions using block repetition so each
+    # patch maps exactly to its 16×16 pixel region (no interpolation shift).
+    patch_h = img.height // grid_size
+    patch_w = img.width // grid_size
     colored = cm.inferno(heatmap)[:, :, :3]
     colored_uint8 = (colored * 255).astype(np.uint8)
-    heatmap_img = Image.fromarray(colored_uint8).resize((img.width, img.height), Image.BILINEAR)
+    # Repeat each row/col by the patch size
+    full = np.repeat(np.repeat(colored_uint8, patch_h, axis=0), patch_w, axis=1)
+    # Handle rounding remainder (e.g. 1024 not perfectly divisible)
+    if full.shape[0] != img.height or full.shape[1] != img.width:
+        heatmap_img = Image.fromarray(full).resize((img.width, img.height), Image.NEAREST)
+    else:
+        heatmap_img = Image.fromarray(full)
 
     # Stronger blend so the heatmap reads clearly
     overlay = Image.blend(img.convert("RGB"), heatmap_img, alpha=0.6)
