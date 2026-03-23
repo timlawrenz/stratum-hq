@@ -18,12 +18,31 @@ The following artifacts were generated from each FFHQ image using
 |----------|-------------|-------|
 | `dinov3_cls.npy` | Global image embedding (1024-d, float32) | DINOv3 ViT-L/16 |
 | `dinov3_patches.npy` | Per-patch embeddings (N×1024, float32) | DINOv3 ViT-L/16 |
+| `pose.npy` | 133 COCO-WholeBody keypoints (133×3, float16) | DWPose |
+| `caption.txt` | Natural-language image description | Gemma 3 27B via Ollama |
 | `t5_hidden.npy` | Text encoder hidden states (512×1024, float16) | T5-Large |
 | `t5_mask.npy` | T5 attention mask (512, uint8) | T5-Large |
-| `caption.txt` | Natural-language image description | Gemma 3 27B via Ollama |
-| `pose.npy` | 133 COCO-WholeBody keypoints (133×3, float16) | DWPose |
 
 No original pixel data is distributed in this dataset.
+
+### Example Overlays
+
+The images below illustrate each data layer by overlaying it on a sample face.
+These visualizations were generated with
+[`scripts/visualize_example.py`](https://github.com/timlawrenz/stratum-hq/blob/main/scripts/visualize_example.py).
+
+| Layer | Overlay |
+|-------|---------|
+| **Pose** (COCO-WholeBody skeleton) | ![pose overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_pose.png) |
+| **Caption** (Gemma 3 27B) | ![caption overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_caption.png) |
+| **DINOv3** (CLS→patch attention) | ![dino heatmap](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_dino.png) |
+| **T5** (token attention mask) | ![t5 mask chart](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_t5.png) |
+
+**Combined panel** (all four layers on three diverse FFHQ subjects):
+
+| | | |
+|---|---|---|
+| ![combined 00028](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined.png) | ![combined 01000](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/01000_combined.png) | ![combined 00010](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00010_combined.png) |
 
 ### Per-image licensing
 
