@@ -289,10 +289,12 @@ def publish_to_hub(
                 n = _write_caption_parquet(records, image_dirs, parquet_path)
                 uploads.append((parquet_path, f"captions/{range_label}.parquet"))
 
-                layer_info = manifest["layers"].get("caption", {"count": 0, "format": "parquet", "chunks": []})
-                layer_info["count"] = layer_info.get("count", 0) + n
-                if range_label not in layer_info.get("chunks", []):
-                    layer_info.setdefault("chunks", []).append(range_label)
+                layer_info = manifest["layers"].get("caption", {"format": "parquet", "chunks": {}})
+                layer_info["chunks"] = layer_info.get("chunks", {})
+                if isinstance(layer_info["chunks"], list):
+                    layer_info["chunks"] = {}
+                layer_info["chunks"][range_label] = n
+                layer_info["count"] = sum(layer_info["chunks"].values())
                 manifest["layers"]["caption"] = layer_info
                 eprint(f"  captions: {n} records -> captions/{range_label}.parquet")
             else:
@@ -301,10 +303,12 @@ def publish_to_hub(
                 n = _pack_npy_tar(image_dirs, records, layer, tar_path)
                 uploads.append((tar_path, tar_name))
 
-                layer_info = manifest["layers"].get(layer, {"count": 0, "format": "npy_tar", "chunks": []})
-                layer_info["count"] = layer_info.get("count", 0) + n
-                if range_label not in layer_info.get("chunks", []):
-                    layer_info.setdefault("chunks", []).append(range_label)
+                layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
+                layer_info["chunks"] = layer_info.get("chunks", {})
+                if isinstance(layer_info["chunks"], list):
+                    layer_info["chunks"] = {}
+                layer_info["chunks"][range_label] = n
+                layer_info["count"] = sum(layer_info["chunks"].values())
                 manifest["layers"][layer] = layer_info
                 eprint(f"  {layer}: {n} images -> {tar_name}")
 
