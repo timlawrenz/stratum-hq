@@ -274,22 +274,28 @@ def publish_to_hub(
         tmp = Path(tmpdir)
         uploads: list[tuple[Path, str]] = []
 
-        # Always upload metadata parquet
-        meta_parquet = tmp / "metadata.parquet"
+        # Metadata parquet — range-labeled for incremental uploads
+        range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
+
+        meta_parquet = tmp / f"metadata_{range_label}.parquet"
         n = _write_metadata_parquet(records, meta_parquet)
-        uploads.append((meta_parquet, "metadata/metadata.parquet"))
-        eprint(f"  metadata: {n} records")
+        uploads.append((meta_parquet, f"metadata/{range_label}.parquet"))
+        eprint(f"  metadata: {n} records -> metadata/{range_label}.parquet")
         manifest["total_images"] = max(manifest.get("total_images", 0), offset + len(image_dirs))
 
         for layer in layers:
             if layer == "caption":
-                parquet_path = tmp / "captions.parquet"
+                parquet_path = tmp / f"captions_{range_label}.parquet"
                 n = _write_caption_parquet(records, image_dirs, parquet_path)
-                uploads.append((parquet_path, "captions/captions.parquet"))
-                manifest["layers"]["caption"] = {"count": n, "format": "parquet"}
-                eprint(f"  captions: {n} records -> parquet")
+                uploads.append((parquet_path, f"captions/{range_label}.parquet"))
+
+                layer_info = manifest["layers"].get("caption", {"count": 0, "format": "parquet", "chunks": []})
+                layer_info["count"] = layer_info.get("count", 0) + n
+                if range_label not in layer_info.get("chunks", []):
+                    layer_info.setdefault("chunks", []).append(range_label)
+                manifest["layers"]["caption"] = layer_info
+                eprint(f"  captions: {n} records -> captions/{range_label}.parquet")
             else:
-                range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
                 tar_name = f"{layer}/{range_label}.tar"
                 tar_path = tmp / f"{layer}_{range_label}.tar"
                 n = _pack_npy_tar(image_dirs, records, layer, tar_path)
