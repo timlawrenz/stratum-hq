@@ -182,6 +182,15 @@ tags:
   - dataset-enrichment
 size_categories:
   - 10K<n<100K
+configs:
+  - config_name: captions
+    data_files:
+      - split: train
+        path: captions/*.parquet
+  - config_name: metadata
+    data_files:
+      - split: train
+        path: metadata/*.parquet
 ---
 
 # {hub_repo.split('/')[-1]}
