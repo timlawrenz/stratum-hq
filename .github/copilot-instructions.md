@@ -2,110 +2,146 @@
 
 ## What this project is
 
-stratum-hq builds an enriched human image dataset that complements FFHQ. It extracts and extends the dataset generation pipeline originally developed in [prx-tg](https://github.com/timlawrenz/prx-tg).
+stratum-hq is a **dataset-agnostic** image enrichment pipeline. Given any directory of images, it produces per-image artifact directories with multi-modal embeddings (DINOv3, T5, pose keypoints, captions). The output is designed for publishing to HuggingFace and for training diffusion models.
 
-The pipeline takes approved human photos as input and produces a rich, multi-modal dataset: JSONL metadata plus pre-computed embeddings stored as `.npy` files. The output is designed for training diffusion models (the training code itself lives in prx-tg, not here).
+The project originated from [prx-tg](https://github.com/timlawrenz/prx-tg) but is intentionally decoupled from any specific image source.
+
+## Build and run
+
+```bash
+# Install (core only — no GPU deps)
+pip install -e .
+
+# Install with GPU support
+pip install -e ".[gpu]"
+
+# Install everything
+pip install -e ".[all]"
+
+# Run the CLI
+stratum process ./images/ --output ./dataset/ --passes all --device cuda
+stratum status ./dataset/
+stratum verify ./dataset/
+```
+
+Torch must be installed separately for your platform (CUDA/ROCm) before installing `[gpu]`.
 
 ## Architecture
 
-### Data pipeline (multi-pass, incremental)
-
-The core script processes images through independent passes that can be run individually or together via `--pass`:
-
-1. **dinov3** — DINOv3-ViT-L/16 visual embeddings (CLS token + spatial patch tokens) and Ollama-based captioning (Gemma3:27b)
-2. **t5** — T5-Large text encoder hidden states from captions
-3. **image** — Pixel-space bucketed RGB crops
-4. **pose** — DWPose whole-body keypoints (133 COCO-WholeBody joints, ONNX inference)
-5. **migrate** — Format migration (Stage 1 → Stage 2)
-
-Each pass is idempotent and resumable. The script writes to a `.tmp` file and does an atomic merge on completion. Ctrl+C triggers a graceful merge of partial progress.
-
-### Dataset format (Stage 2)
-
-**JSONL record** (one per image in `approved_image_dataset.jsonl`):
-```json
-{
-  "image_path": "data/approved/IMG_001.jpg",
-  "image_id": "IMG_001",
-  "width": 1920, "height": 1440,
-  "aspect_bucket": "1216x832",
-  "caption": "A fair-skinned woman with slender build...",
-  "t5_attention_mask": [1, 1, ..., 0, 0],
-  "format_version": 2
-}
-```
-
-**External `.npy` files** (keyed by `image_id`):
-
-| Directory | Shape | Dtype | Contents |
-|-----------|-------|-------|----------|
-| `dinov3/` | `(1024,)` | float32 | CLS token (global style) |
-| `dinov3_patches/` | `(num_patches, 1024)` | float32 | Spatial patch embeddings (varies by bucket) |
-| `t5_hidden/` | `(512, 1024)` | float16 | T5 text encoder hidden states |
-| `images/` | `(3, H, W)` | float16 | Pixel RGB in [0,1] |
-| `pose/` | `(133, 3)` | float16 | Keypoints: [x_norm, y_norm, confidence] in [-1,1] |
-
-### Aspect ratio bucketing
-
-All images are assigned to the closest bucket (~1 megapixel each, dims divisible by 64):
+### Package layout
 
 ```
-1024×1024  1.00   Square
- 832×1216  0.68   Portrait
-1216×832   1.46   Landscape
- 768×1280  0.60   Tall portrait
-1280×768   1.67   Wide landscape
- 704×1344  0.52   Very tall
-1344×704   1.91   Very wide
+src/stratum/
+├── cli.py              # CLI entry point (stratum command)
+├── config.py           # Constants: model IDs, bucket defs, artifact filenames
+├── discovery.py        # Image scanning, image_id derivation, sharding
+├── verify.py           # Dataset integrity checks
+├── publish.py          # HuggingFace Hub publishing (stub)
+├── pipeline/
+│   ├── __init__.py     # Orchestrator: loads models, runs passes over images
+│   ├── bucket.py       # Aspect ratio bucketing, bucketed image loading
+│   ├── caption.py      # Ollama-based captioning (pluggable backend)
+│   ├── dinov3.py       # DINOv3 CLS + patch extraction
+│   ├── t5.py           # T5-Large hidden state encoding
+│   ├── pixel.py        # Bucketed RGB crops (opt-in)
+│   └── pose.py         # DWPose whole-body keypoints
+└── dwpose/
+    └── detector.py     # DWPose ONNX detector (standalone, no mmpose)
 ```
 
-Images are resize-to-cover + center-crop to exact bucket dimensions. DINOv3 patches use the same bucket dimensions but skip center-crop (`do_center_crop=False`) to preserve spatial alignment.
+### Per-image directory format
 
-### Image source
+Output mirrors the source directory structure. No central JSONL — the filesystem is the state.
 
-Approved photos are synced from `https://crawlr.lawrenz.com/photos.json` via `sync_approved_photos.py`. Raw files go to `data/raw/`, symlinks with detected extensions go to `data/approved/`.
+```
+source/ffhq/batch1/00001.png  →  output/ffhq/batch1/00001/
+                                    ├── metadata.json
+                                    ├── caption.txt
+                                    ├── dinov3_cls.npy        (1024,) float32
+                                    ├── dinov3_patches.npy    (N, 1024) float32
+                                    ├── t5_hidden.npy         (512, 1024) float16
+                                    ├── t5_mask.npy           (512,) uint8
+                                    ├── pose.npy              (133, 3) float16
+                                    └── pixel.npy             (3, H, W) float16  [opt-in]
+```
+
+### Pipeline passes
+
+Each pass is independent, idempotent, and parallel-safe:
+
+| Pass | Artifacts produced | GPU needed |
+|------|--------------------|------------|
+| `caption` | `caption.txt` | No (Ollama API) |
+| `dinov3` | `dinov3_cls.npy`, `dinov3_patches.npy` | Yes |
+| `t5` | `t5_hidden.npy`, `t5_mask.npy` | Yes |
+| `pose` | `pose.npy` | No (ONNX) |
+| `pixel` | `pixel.npy` | No |
+
+`--passes all` runs caption, dinov3, t5, pose. Pixel is **opt-in only** (excluded from `all`).
+
+### Parallel execution
+
+Sharding is per-pass. Multiple GPUs each run one pass on a subset:
+
+```bash
+stratum process ./images/ --output ./dataset/ --passes dinov3 --shard 0/4 --device cuda:0
+stratum process ./images/ --output ./dataset/ --passes dinov3 --shard 1/4 --device cuda:1
+```
+
+No coordination needed — each worker writes to different image directories.
 
 ## Key conventions
 
-### Embeddings live on disk, not inline
+### Per-image pipeline function signature
 
-Stage 2 records reference embeddings by `image_id`. Inline embeddings in JSONL are a Stage 1 artifact — always extract to `.npy` and remove from the record during migration.
+Each pipeline module exposes a `process()` function that returns `bool` (success/failure). The orchestrator in `pipeline/__init__.py` calls them and handles model loading.
 
 ### stderr for logging, stdout for data
 
-All progress/warning/diagnostic output goes to `stderr` via `eprint()`. Structured data output (JSONL, summaries) goes to `stdout` or files.
+All progress/warning/diagnostic output uses `eprint()` (stderr). Never print diagnostics to stdout.
 
-### Graceful degradation over hard failures
+### Graceful degradation
 
-Functions return `None` on error rather than raising exceptions. The caller checks `if result is not None:` and continues. Individual image failures don't halt the pipeline — they're logged as warnings and skipped.
+Pipeline `process()` functions return `False` on error (never raise). Individual image failures are logged and skipped — they don't halt the pipeline.
+
+### Completeness = file existence
+
+An artifact is "done" when its file exists with correct shape/dtype. No central registry. `stratum status` counts files; `stratum verify` validates shapes.
 
 ### DINOv3 specifics
 
-- Uses RoPE positional embeddings with variable-length sequences
-- Patch count = `(H÷16) × (W÷16)` — varies per aspect bucket (typically 3600–5500)
-- Token sequence: `[CLS, patch_1, ..., patch_N, reg_1, ..., reg_4]` — exclude CLS (index 0) and 4 register tokens (tail)
-- Single forward pass for both CLS + patches via `compute_dinov3_both()`
+- RoPE positional embeddings, variable-length sequences
+- Patch count = `(H÷16) × (W÷16)`, varies per bucket (3600–5500)
+- Token layout: `[CLS, patch_1, ..., patch_N, reg_1, ..., reg_4]` — extract indices 1 through N
+- Single forward pass for CLS + patches via `compute_dinov3_both()`
+- `do_center_crop=False` to preserve spatial alignment
 
-### Pose keypoint normalization
+### Pose normalization
 
-Coordinates are normalized to `[-1, 1]` relative to bucket dimensions (not original image dimensions), so the downstream model learns scale-invariant geometry.
-
-### Constants
-
+Keypoints normalized to `[-1, 1]` relative to **bucket dimensions** (not original image):
 ```python
-NUM_POSE_KEYPOINTS = 133       # COCO-WholeBody
-DINO_MODEL_ID = "facebook/dinov3-vitl16-pretrain-lvd1689m"
-T5_MODEL_ID   = "t5-large"
+x_norm = (2.0 * x_pixel / bucket_w) - 1.0
 ```
 
-Caption generation uses a local Ollama server (Gemma3:27b), not the HuggingFace API.
+### Constants (in `config.py`)
+
+```python
+DINO_MODEL_ID = "facebook/dinov3-vitl16-pretrain-lvd1689m"
+T5_MODEL_ID   = "t5-large"
+NUM_POSE_KEYPOINTS = 133  # COCO-WholeBody
+```
+
+### Aspect ratio buckets
+
+7 default buckets (~1 megapixel, dims divisible by 64). Configurable. Images are resize-to-cover + center-crop to exact bucket dimensions.
 
 ## Dependencies
 
-Core dependencies (see `requirements-approved-image-embeddings.txt`):
+Defined in `pyproject.toml` with optional extras:
+- Core: `numpy`, `Pillow`, `requests`
+- `[gpu]`: `transformers>=4.54.0`, `accelerate`, `safetensors`
+- `[pose]`: `onnxruntime>=1.16.0`, `opencv-python>=4.5.0`
+- `[publish]`: `huggingface-hub`, `pyarrow`
+- `[all]`: everything above
 
-- Python 3.13+
-- `transformers>=4.54.0` (DINOv3 support)
-- `torch` (install separately for ROCm/CUDA)
-- `pillow`, `numpy`, `requests`
-- `onnxruntime>=1.16.0`, `opencv-python>=4.5.0` (DWPose)
+Torch is not a declared dependency — install separately for your platform.
