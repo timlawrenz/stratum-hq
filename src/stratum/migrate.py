@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import time
@@ -50,7 +51,7 @@ def migrate_dataset(
     1. Creates ``output_dir/{image_id}/``
     2. Writes ``metadata.json`` from record fields
     3. Writes ``caption.txt`` from record's ``caption`` field
-    4. Copies ``.npy`` files from modality directories
+    4. Hardlinks ``.npy`` files from modality directories (falls back to copy)
     5. Converts ``t5_attention_mask`` list to ``t5_mask.npy``
 
     Returns exit code (0 on success).
@@ -139,17 +140,22 @@ def migrate_dataset(
             if caption:
                 (img_out / CAPTION_FILE).write_text(caption, encoding="utf-8")
 
-            # 3. Copy npy files from modality dirs
+            # 3. Link or copy npy files from modality dirs
             for modality_dir, artifact_name in _MODALITY_MAP:
                 src = derived_dir / modality_dir / f"{image_id}.npy"
                 dst = img_out / artifact_name
                 if src.exists():
                     try:
-                        shutil.copy2(str(src), str(dst))
+                        os.link(str(src), str(dst))
                         npy_copied += 1
-                    except Exception as e:
-                        eprint(f"warning: {image_id}: failed to copy {src.name} → {artifact_name}: {e}")
-                        errors += 1
+                    except OSError:
+                        # Cross-filesystem — fall back to copy
+                        try:
+                            shutil.copy2(str(src), str(dst))
+                            npy_copied += 1
+                        except Exception as e:
+                            eprint(f"warning: {image_id}: failed to copy {src.name} → {artifact_name}: {e}")
+                            errors += 1
                 elif verbose:
                     eprint(f"  {image_id}: missing {modality_dir}/{image_id}.npy")
 
@@ -169,7 +175,7 @@ def migrate_dataset(
     elapsed = time.time() - started
     eprint(
         f"\ndone: {migrated} migrated, {skipped} skipped, {errors} errors, "
-        f"{npy_copied} npy files copied in {elapsed:.1f}s"
+        f"{npy_copied} npy files linked/copied in {elapsed:.1f}s"
     )
     if dry_run:
         eprint("(dry run — no files were written)")
