@@ -53,6 +53,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pub.add_argument("--limit", type=int, default=None, help="Max images to publish")
     pub.add_argument("--offset", type=int, default=0, help="Skip first N images")
 
+    # --- migrate ---
+    mig = sub.add_parser("migrate", help="Convert old prx-tg per-modality dataset to stratum per-image format")
+    mig.add_argument("jsonl_path", type=Path, help="Path to approved_image_dataset.jsonl")
+    mig.add_argument("--derived-dir", type=Path, default=None,
+                     help="Directory containing modality subdirs (dinov3/, t5_hidden/, etc.). Defaults to parent of jsonl_path.")
+    mig.add_argument("--output", type=Path, required=True, help="Output dataset directory")
+    mig.add_argument("--dry-run", action="store_true", help="Preview without writing files")
+    mig.add_argument("--progress-every", type=int, default=1000, help="Print progress every N records")
+    mig.add_argument("--verbose", action="store_true")
+
     return p.parse_args(argv)
 
 
@@ -142,6 +152,20 @@ def cmd_publish(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_migrate(args: argparse.Namespace) -> int:
+    from stratum.migrate import migrate_dataset
+
+    derived_dir = args.derived_dir or args.jsonl_path.parent
+    return migrate_dataset(
+        jsonl_path=args.jsonl_path,
+        derived_dir=derived_dir,
+        output_dir=args.output,
+        dry_run=args.dry_run,
+        progress_every=args.progress_every,
+        verbose=args.verbose,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
@@ -150,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": cmd_status,
         "verify": cmd_verify,
         "publish": cmd_publish,
+        "migrate": cmd_migrate,
     }
 
     try:
