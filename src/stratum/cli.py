@@ -50,6 +50,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pub.add_argument("dataset_dir", type=Path, help="Dataset directory")
     pub.add_argument("--hub-repo", required=True, help="HuggingFace repo (e.g., user/stratum-ffhq)")
     pub.add_argument("--layers", required=True, help="Comma-separated layers to publish (caption,dinov3,t5,pose)")
+    pub.add_argument("--license", default="cc-by-nc-sa-4.0",
+                     help="SPDX license identifier for the dataset card (default: cc-by-nc-sa-4.0)")
+    pub.add_argument("--attribution-file", type=Path, default=None,
+                     help="Markdown file with attribution/provenance text to include in the dataset card")
     pub.add_argument("--limit", type=int, default=None, help="Max images to publish")
     pub.add_argument("--offset", type=int, default=0, help="Skip first N images")
 
@@ -143,10 +147,15 @@ def cmd_publish(args: argparse.Namespace) -> int:
     from stratum.publish import publish_to_hub
 
     layers = [l.strip() for l in args.layers.split(",")]
+    attribution = None
+    if args.attribution_file:
+        attribution = args.attribution_file.read_text(encoding="utf-8")
     return publish_to_hub(
         dataset_dir=args.dataset_dir,
         hub_repo=args.hub_repo,
         layers=layers,
+        license_id=args.license,
+        attribution=attribution,
         limit=args.limit,
         offset=args.offset,
     )
