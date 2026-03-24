@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [{ name = "Tim Lawrenz" }]
-keywords = ["dataset", "embeddings", "diffusion", "ffhq", "dinov3", "t5", "pose"]
+keywords = ["dataset", "embeddings", "diffusion", "ffhq", "dinov3", "t5", "pose", "segmentation", "depth", "normals", "sapiens"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -35,12 +35,16 @@ pose = [
     "onnxruntime>=1.16.0",
     "opencv-python>=4.5.0",
 ]
+sapiens = [
+    "huggingface-hub>=0.20.0",
+    "opencv-python>=4.5.0",
+]
 publish = [
     "huggingface-hub>=0.20.0",
     "pyarrow>=14.0.0",
 ]
 all = [
-    "stratum-hq[gpu,pose,publish]",
+    "stratum-hq[gpu,pose,sapiens,publish]",
 ]
 
 [project.scripts]

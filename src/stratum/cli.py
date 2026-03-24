@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 
-DEFAULT_PASSES = ["caption", "dinov3", "t5", "pose"]
-ALL_PASSES = ["caption", "dinov3", "t5", "pose", "pixel"]
+DEFAULT_PASSES = ["caption", "dinov3", "t5", "pose", "seg", "depth", "normal"]
+ALL_PASSES = ["caption", "dinov3", "t5", "pose", "seg", "depth", "normal", "pixel"]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -25,7 +25,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     proc.add_argument(
         "--passes",
         default="all",
-        help="Comma-separated list of passes to run (caption,dinov3,t5,pose,pixel) or 'all' (excludes pixel)",
+        help="Comma-separated list of passes to run (caption,dinov3,t5,pose,seg,depth,normal,pixel) or 'all' (excludes pixel)",
     )
     proc.add_argument("--device", default="auto", help="Compute device: auto, cpu, cuda, cuda:0, etc.")
     proc.add_argument("--shard", default=None, help="Worker shard as N/M (e.g., 0/4 = worker 0 of 4)")
@@ -49,7 +49,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pub = sub.add_parser("publish", help="Publish dataset to HuggingFace Hub")
     pub.add_argument("dataset_dir", type=Path, help="Dataset directory")
     pub.add_argument("--hub-repo", required=True, help="HuggingFace repo (e.g., user/stratum-ffhq)")
-    pub.add_argument("--layers", required=True, help="Comma-separated layers to publish (caption,dinov3,t5,pose)")
+    pub.add_argument("--layers", required=True, help="Comma-separated layers to publish (caption,dinov3,t5,pose,seg,depth,normal)")
     pub.add_argument("--license", default="cc-by-nc-sa-4.0",
                      help="SPDX license identifier for the dataset card (default: cc-by-nc-sa-4.0)")
     pub.add_argument("--attribution-file", type=Path, default=None,

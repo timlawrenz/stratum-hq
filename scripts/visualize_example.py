@@ -7,13 +7,15 @@ Usage:
         --stratum-dir /path/to/stratum/00028 \\
         --output examples/00028_combined.png
 
-Produces a 2×2 panel: pose overlay, caption panel, DINOv3 heatmap, T5 mask chart.
+Produces a 2-column grid of available panels: pose overlay, caption panel,
+DINOv3 heatmap, T5 mask chart, segmentation overlay, depth heatmap, normal map.
 Individual overlays can also be saved with --save-individual.
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 import textwrap
 from pathlib import Path
 
@@ -62,6 +64,26 @@ COLOR_HAND_L = (255, 128, 128)
 COLOR_HAND_R = (128, 200, 255)
 
 CONF_THRESHOLD = 0.3
+
+# Sapiens Goliath segmentation class palette (28 classes)
+SEG_CLASSES = [
+    "Background", "Apparel", "Face_Neck", "Hair", "Left_Foot", "Left_Hand",
+    "Left_Lower_Arm", "Left_Lower_Leg", "Left_Shoe", "Left_Sock",
+    "Left_Upper_Arm", "Left_Upper_Leg", "Lower_Clothing", "Right_Foot",
+    "Right_Hand", "Right_Lower_Arm", "Right_Lower_Leg", "Right_Shoe",
+    "Right_Sock", "Right_Upper_Arm", "Right_Upper_Leg", "Torso",
+    "Upper_Clothing", "Lower_Lip", "Upper_Lip", "Lower_Teeth",
+    "Upper_Teeth", "Tongue",
+]
+
+SEG_PALETTE = [
+    (0, 0, 0), (128, 0, 0), (255, 178, 102), (51, 51, 255), (255, 51, 255),
+    (255, 102, 178), (0, 255, 128), (0, 153, 153), (163, 163, 194), (192, 192, 192),
+    (0, 204, 0), (204, 255, 153), (0, 0, 204), (255, 51, 255), (255, 102, 178),
+    (0, 255, 128), (0, 153, 153), (163, 163, 194), (192, 192, 192), (0, 204, 0),
+    (204, 255, 153), (255, 128, 0), (51, 153, 255), (204, 0, 0), (255, 51, 51),
+    (255, 255, 255), (224, 224, 224), (255, 0, 128),
+]
 
 
 def denormalize(pose: np.ndarray, w: int, h: int) -> np.ndarray:
@@ -296,14 +318,71 @@ def render_t5_mask_chart(img: Image.Image, t5_mask: np.ndarray, caption: str,
     return result
 
 
-def render_combined_panel(pose_img: Image.Image, caption_img: Image.Image,
-                          dino_img: Image.Image, t5_img: Image.Image,
+def render_seg_overlay(img: Image.Image, seg: np.ndarray, opacity: float = 0.5) -> Image.Image:
+    """Overlay body-part segmentation with colored regions."""
+    seg_resized = np.array(Image.fromarray(seg).resize((img.width, img.height), Image.NEAREST))
+    mask = np.zeros((img.height, img.width, 3), dtype=np.uint8)
+    for label in np.unique(seg_resized):
+        if label == 0:
+            continue
+        if label < len(SEG_PALETTE):
+            mask[seg_resized == label] = SEG_PALETTE[label]
+    img_arr = np.array(img)
+    blended = (img_arr * (1 - opacity) + mask * opacity).astype(np.uint8)
+    blended[seg_resized == 0] = img_arr[seg_resized == 0]
+    return Image.fromarray(blended)
+
+
+def render_depth_heatmap(img: Image.Image, depth: np.ndarray) -> Image.Image:
+    """Overlay depth map as an inferno colormap."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.cm as cm
+
+    depth_resized = np.array(Image.fromarray(depth.astype(np.float32)).resize(
+        (img.width, img.height), Image.BILINEAR))
+    fg_mask = depth_resized > 0
+    colored = np.full((img.height, img.width, 3), 30, dtype=np.uint8)
+    if fg_mask.any():
+        fg_vals = depth_resized[fg_mask]
+        lo, hi = fg_vals.min(), fg_vals.max()
+        normalized = np.zeros_like(depth_resized)
+        normalized[fg_mask] = (fg_vals - lo) / (hi - lo + 1e-8)
+        rgb = (cm.inferno(normalized)[:, :, :3] * 255).astype(np.uint8)
+        colored[fg_mask] = rgb[fg_mask]
+    depth_img = Image.fromarray(colored)
+    overlay = Image.blend(img.convert("RGB"), depth_img, alpha=0.6)
+    return overlay
+
+
+def render_normal_map(img: Image.Image, normal: np.ndarray) -> Image.Image:
+    """Visualize surface normals as RGB image (XYZ → RGB)."""
+    normal_resized = np.array(Image.fromarray(
+        ((normal + 1) / 2 * 255).clip(0, 255).astype(np.uint8)
+    ).resize((img.width, img.height), Image.BILINEAR))
+    fg_mask = np.any(normal != 0, axis=-1)
+    fg_resized = np.array(Image.fromarray(fg_mask.astype(np.uint8) * 255).resize(
+        (img.width, img.height), Image.NEAREST)) > 127
+    bg = np.full((img.height, img.width, 3), 30, dtype=np.uint8)
+    bg[fg_resized] = normal_resized[fg_resized]
+    normal_img = Image.fromarray(bg)
+    overlay = Image.blend(img.convert("RGB"), normal_img, alpha=0.7)
+    return overlay
+
+
+def render_combined_panel(panels: list[tuple[str, Image.Image]],
                           target_size: int = 1024) -> Image.Image:
-    """Assemble 4 panels into a 2×2 grid with labels."""
+    """Assemble panels into a grid with labels.
+    
+    Uses a 2-column layout, adding rows as needed.
+    """
     cell_w = target_size
     cell_h = target_size
     padding = 4
     label_h = 28
+
+    n_cols = 2
+    n_rows = (len(panels) + n_cols - 1) // n_cols
 
     def fit(img: Image.Image) -> Image.Image:
         """Resize to fit cell while preserving aspect ratio, center on black."""
@@ -315,15 +394,8 @@ def render_combined_panel(pose_img: Image.Image, caption_img: Image.Image,
         cell.paste(resized, ((cell_w - new_w) // 2, (cell_h - new_h) // 2))
         return cell
 
-    panels = [
-        ("Pose Keypoints (COCO-WholeBody)", pose_img),
-        ("Caption (Gemma 3 27B)", caption_img),
-        ("DINOv3 Patch Attention", dino_img),
-        ("T5 Attention Mask", t5_img),
-    ]
-
-    grid_w = cell_w * 2 + padding * 3
-    grid_h = (cell_h + label_h) * 2 + padding * 3
+    grid_w = cell_w * n_cols + padding * (n_cols + 1)
+    grid_h = (cell_h + label_h) * n_rows + padding * (n_rows + 1)
     result = Image.new("RGB", (grid_w, grid_h), (20, 20, 20))
     draw = ImageDraw.Draw(result)
 
@@ -332,8 +404,9 @@ def render_combined_panel(pose_img: Image.Image, caption_img: Image.Image,
     except OSError:
         font = ImageFont.load_default()
 
-    positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
-    for (col, row), (label, img) in zip(positions, panels):
+    for idx, (label, img) in enumerate(panels):
+        col = idx % n_cols
+        row = idx // n_cols
         x = padding + col * (cell_w + padding)
         y = padding + row * (cell_h + label_h + padding)
         draw.text((x + 8, y + 4), label, fill=(200, 200, 200), font=font)
@@ -356,23 +429,61 @@ def main():
     img = Image.open(args.image).convert("RGB")
     sd = args.stratum_dir
 
-    # Load artifacts
-    pose = np.load(sd / "pose.npy")
-    caption = (sd / "caption.txt").read_text(encoding="utf-8").strip()
-    dinov3_cls = np.load(sd / "dinov3_cls.npy")
-    dinov3_patches = np.load(sd / "dinov3_patches.npy")
-    t5_mask = np.load(sd / "t5_mask.npy")
-    t5_hidden_path = sd / "t5_hidden.npy"
-    t5_hidden = np.load(t5_hidden_path) if t5_hidden_path.exists() else None
+    panels: list[tuple[str, Image.Image]] = []
 
-    # Render panels
-    pose_img = render_pose_overlay(img, pose)
-    caption_img = render_caption_panel(img, caption)
-    dino_img = render_dino_heatmap(img, dinov3_cls, dinov3_patches)
-    t5_img = render_t5_mask_chart(img, t5_mask, caption, t5_hidden)
+    # Pose overlay
+    pose_path = sd / "pose.npy"
+    if pose_path.exists():
+        pose = np.load(pose_path)
+        panels.append(("Pose Keypoints (COCO-WholeBody)", render_pose_overlay(img, pose)))
+
+    # Caption panel
+    caption_path = sd / "caption.txt"
+    caption = ""
+    if caption_path.exists():
+        caption = caption_path.read_text(encoding="utf-8").strip()
+        panels.append(("Caption (Gemma 3 27B)", render_caption_panel(img, caption)))
+
+    # DINOv3 heatmap
+    dinov3_cls_path = sd / "dinov3_cls.npy"
+    dinov3_patches_path = sd / "dinov3_patches.npy"
+    if dinov3_cls_path.exists() and dinov3_patches_path.exists():
+        dinov3_cls = np.load(dinov3_cls_path)
+        dinov3_patches = np.load(dinov3_patches_path)
+        panels.append(("DINOv3 Patch Attention", render_dino_heatmap(img, dinov3_cls, dinov3_patches)))
+
+    # T5 mask chart
+    t5_mask_path = sd / "t5_mask.npy"
+    if t5_mask_path.exists():
+        t5_mask = np.load(t5_mask_path)
+        t5_hidden_path = sd / "t5_hidden.npy"
+        t5_hidden = np.load(t5_hidden_path) if t5_hidden_path.exists() else None
+        panels.append(("T5 Attention Mask", render_t5_mask_chart(img, t5_mask, caption, t5_hidden)))
+
+    # Segmentation overlay
+    seg_path = sd / "seg.npy"
+    if seg_path.exists():
+        seg = np.load(seg_path)
+        panels.append(("Body-Part Segmentation (Sapiens)", render_seg_overlay(img, seg)))
+
+    # Depth heatmap
+    depth_path = sd / "depth.npy"
+    if depth_path.exists():
+        depth = np.load(depth_path)
+        panels.append(("Depth Estimation (Sapiens)", render_depth_heatmap(img, depth)))
+
+    # Normal map
+    normal_path = sd / "normal.npy"
+    if normal_path.exists():
+        normal = np.load(normal_path)
+        panels.append(("Surface Normals (Sapiens)", render_normal_map(img, normal)))
+
+    if not panels:
+        print("No artifacts found.", file=sys.stderr)
+        return
 
     # Combined
-    combined = render_combined_panel(pose_img, caption_img, dino_img, t5_img)
+    combined = render_combined_panel(panels)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     combined.save(args.output, quality=95)
     print(f"Saved combined panel: {args.output} ({combined.width}×{combined.height})")
@@ -380,8 +491,8 @@ def main():
     if args.save_individual:
         stem = args.output.stem
         parent = args.output.parent
-        for name, panel in [("pose", pose_img), ("caption", caption_img),
-                            ("dino", dino_img), ("t5", t5_img)]:
+        for label, panel in panels:
+            name = label.split("(")[0].strip().lower().replace(" ", "_").replace("-", "_")
             path = parent / f"{stem}_{name}.png"
             panel.save(path, quality=95)
             print(f"  {name}: {path}")

@@ -9,11 +9,14 @@ from pathlib import Path
 
 from stratum.config import (
     CAPTION_FILE,
+    DEPTH_FILE,
     DINOV3_CLS_FILE,
     DINOV3_PATCHES_FILE,
     METADATA_FILE,
+    NORMAL_FILE,
     PIXEL_FILE,
     POSE_FILE,
+    SEG_FILE,
     T5_HIDDEN_FILE,
     T5_MASK_FILE,
 )
@@ -96,6 +99,9 @@ def run_passes(
     run_dinov3 = "dinov3" in passes
     run_t5 = "t5" in passes
     run_pose = "pose" in passes
+    run_seg = "seg" in passes
+    run_depth = "depth" in passes
+    run_normal = "normal" in passes
     run_pixel = "pixel" in passes
 
     # Load models lazily based on which passes are requested
@@ -104,9 +110,12 @@ def run_passes(
     t5_tokenizer = None
     t5_encoder = None
     pose_model = None
+    seg_model = None
+    depth_model = None
+    normal_model = None
     torch_device = None
 
-    if run_dinov3 or run_t5:
+    if run_dinov3 or run_t5 or run_seg or run_depth or run_normal:
         torch_device = _pick_device(device)
         eprint(f"device: {torch_device}")
 
@@ -135,6 +144,27 @@ def run_passes(
 
         eprint("loading DWPose ONNX model...")
         pose_model = DWPoseDetector(device=device if device != "auto" else "cpu")
+
+    if run_seg:
+        from stratum.config import SAPIENS_SEG_FILENAME, SAPIENS_SEG_REPO
+        from stratum.sapiens import load_sapiens_model
+
+        eprint("loading Sapiens segmentation model...")
+        seg_model = load_sapiens_model(SAPIENS_SEG_REPO, SAPIENS_SEG_FILENAME, device=str(torch_device))
+
+    if run_depth:
+        from stratum.config import SAPIENS_DEPTH_FILENAME, SAPIENS_DEPTH_REPO
+        from stratum.sapiens import load_sapiens_model
+
+        eprint("loading Sapiens depth model...")
+        depth_model = load_sapiens_model(SAPIENS_DEPTH_REPO, SAPIENS_DEPTH_FILENAME, device=str(torch_device))
+
+    if run_normal:
+        from stratum.config import SAPIENS_NORMAL_FILENAME, SAPIENS_NORMAL_REPO
+        from stratum.sapiens import load_sapiens_model
+
+        eprint("loading Sapiens normal model...")
+        normal_model = load_sapiens_model(SAPIENS_NORMAL_REPO, SAPIENS_NORMAL_FILENAME, device=str(torch_device))
 
     # Process images
     counters = {"processed": 0, "skipped": 0, "errors": 0}
@@ -198,6 +228,45 @@ def run_passes(
                 did_work = True
             else:
                 counters["errors"] += 1
+
+        # Segmentation pass
+        if run_seg and _needs(out_dir, SEG_FILE):
+            from stratum.pipeline.seg import process as seg_process
+
+            if verbose:
+                eprint(f"  seg {meta['image_id']}...")
+            if seg_process(image_path, out_dir, seg_model, torch_device, aspect_bucket):
+                did_work = True
+            else:
+                counters["errors"] += 1
+
+        # Depth pass (requires seg.npy to exist)
+        if run_depth and _needs(out_dir, DEPTH_FILE):
+            if (out_dir / SEG_FILE).exists():
+                from stratum.pipeline.depth import process as depth_process
+
+                if verbose:
+                    eprint(f"  depth {meta['image_id']}...")
+                if depth_process(image_path, out_dir, depth_model, torch_device, aspect_bucket):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+            elif verbose:
+                eprint(f"  depth skipped {meta['image_id']} (no seg)")
+
+        # Normal pass (requires seg.npy to exist)
+        if run_normal and _needs(out_dir, NORMAL_FILE):
+            if (out_dir / SEG_FILE).exists():
+                from stratum.pipeline.normal import process as normal_process
+
+                if verbose:
+                    eprint(f"  normal {meta['image_id']}...")
+                if normal_process(image_path, out_dir, normal_model, torch_device, aspect_bucket):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+            elif verbose:
+                eprint(f"  normal skipped {meta['image_id']} (no seg)")
 
         # Pixel pass (opt-in)
         if run_pixel and aspect_bucket and _needs(out_dir, PIXEL_FILE):

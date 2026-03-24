@@ -1,6 +1,6 @@
 # stratum-hq
 
-A dataset-agnostic image enrichment pipeline. Given any directory of images, stratum produces per-image artifact directories containing multi-modal embeddings, captions, and pose keypoints — ready for publishing to HuggingFace or training diffusion models.
+A dataset-agnostic image enrichment pipeline. Given any directory of images, stratum produces per-image artifact directories containing multi-modal embeddings, captions, pose keypoints, body-part segmentation, depth maps, and surface normals — ready for publishing to HuggingFace or training diffusion models.
 
 ## Quick start
 
@@ -30,7 +30,10 @@ source/ffhq/00001.png  →  dataset/ffhq/00001/
                              ├── dinov3_patches.npy
                              ├── t5_hidden.npy
                              ├── t5_mask.npy
-                             └── pose.npy
+                             ├── pose.npy
+                             ├── seg.npy
+                             ├── depth.npy
+                             └── normal.npy
 ```
 
 | Artifact | Shape | Dtype | Description |
@@ -42,6 +45,9 @@ source/ffhq/00001.png  →  dataset/ffhq/00001/
 | `t5_hidden.npy` | `(512, 1024)` | float16 | T5-Large text encoder hidden states |
 | `t5_mask.npy` | `(512,)` | uint8 | T5 attention mask (1=valid, 0=padding) |
 | `pose.npy` | `(133, 3)` | float16 | DWPose whole-body keypoints: [x, y, confidence] in [-1, 1] |
+| `seg.npy` | `(H, W)` | uint8 | Sapiens 28-class body-part segmentation (class IDs 0–27) |
+| `depth.npy` | `(H, W)` | float16 | Sapiens relative depth, foreground-masked and normalised to [0, 1] |
+| `normal.npy` | `(H, W, 3)` | float16 | Sapiens per-pixel surface normals (XYZ), L2-normalised, foreground-masked |
 | `pixel.npy` | `(3, H, W)` | float16 | Bucketed RGB crop in [0, 1] *(opt-in only)* |
 
 ## Installation
@@ -57,6 +63,9 @@ pip install -e ".[gpu]"
 
 # With pose estimation
 pip install -e ".[pose]"
+
+# With Sapiens segmentation, depth, and normals
+pip install -e ".[sapiens]"
 
 # With HuggingFace publishing
 pip install -e ".[publish]"
@@ -77,9 +86,12 @@ Each pass runs independently and is idempotent — if the output file already ex
 | `dinov3` | Extracts DINOv3-ViT-L/16 CLS and patch embeddings | `dinov3_cls.npy`, `dinov3_patches.npy` | GPU + `[gpu]` |
 | `t5` | Encodes caption text with T5-Large | `t5_hidden.npy`, `t5_mask.npy` | GPU + `[gpu]`, caption |
 | `pose` | Extracts 133 whole-body keypoints via DWPose | `pose.npy` | `[pose]` |
+| `seg` | 28-class body-part segmentation via Sapiens-1B | `seg.npy` | GPU + `[sapiens]` |
+| `depth` | Relative depth estimation via Sapiens-1B | `depth.npy` | GPU + `[sapiens]`, seg |
+| `normal` | Surface normal prediction via Sapiens-1B | `normal.npy` | GPU + `[sapiens]`, seg |
 | `pixel` | Saves bucketed RGB crop as numpy array | `pixel.npy` | — |
 
-`--passes all` runs caption, dinov3, t5, and pose. The pixel pass is **opt-in** — request it explicitly with `--passes pixel` to avoid bundling raw image data in published datasets.
+`--passes all` runs caption, dinov3, t5, pose, seg, depth, and normal. The pixel pass is **opt-in** — request it explicitly with `--passes pixel` to avoid bundling raw image data in published datasets. Depth and normal depend on seg (for the foreground mask), similar to how t5 depends on caption.
 
 ## CLI reference
 
@@ -93,7 +105,7 @@ stratum process <input_dir> --output <output_dir> [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--passes` | `all` | Comma-separated passes or `all` (caption,dinov3,t5,pose) |
+| `--passes` | `all` | Comma-separated passes or `all` (caption,dinov3,t5,pose,seg,depth,normal) |
 | `--device` | `auto` | Compute device: `auto`, `cpu`, `cuda`, `cuda:0`, etc. |
 | `--shard N/M` | — | Process every M-th image starting at offset N |
 | `--image-list` | — | File with explicit image paths (one per line) |
@@ -240,6 +252,19 @@ stratum process ./images/ --output ./dataset/ --passes caption \
 - Coordinates normalized to `[-1, 1]` relative to bucket dimensions
 - Models auto-download from HuggingFace to `~/.cache/dwpose/`
 - Standalone — requires only `onnxruntime` and `opencv-python`, no mmpose
+
+### Sapiens segmentation, depth, and surface normals
+
+- **Models**: Sapiens-1B TorchScript checkpoints from [facebook/sapiens](https://huggingface.co/facebook/sapiens) (1.17B parameters each)
+- **License**: CC-BY-NC 4.0 (non-commercial)
+- **Input resolution**: 1024×768 (H×W) — Sapiens' native resolution
+- **Preprocessing**: Normalised with mean=[123.5, 116.5, 103.5], std=[58.5, 57.0, 57.5]
+- **Segmentation**: 28 Goliath body-part classes (background, face/neck, hands, torso, clothing, etc.)
+- **Depth**: Relative depth per pixel, normalised to [0, 1] over foreground region
+- **Surface normals**: Per-pixel XYZ unit vectors, L2-normalised
+- **Foreground masking**: Depth and normal outputs use the segmentation mask to zero out background
+- **Output resolution**: Interpolated to aspect bucket dimensions (not 1024×768) for consistency with other artifacts
+- Models auto-download from HuggingFace to `~/.cache/sapiens/`
 
 ### Per-image directories
 

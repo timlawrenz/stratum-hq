@@ -8,10 +8,13 @@ from pathlib import Path
 
 from stratum.config import (
     DEFAULT_ASPECT_BUCKETS,
+    DEPTH_FILE,
     METADATA_FILE,
     CAPTION_FILE,
     DINOV3_CLS_FILE,
+    NORMAL_FILE,
     POSE_FILE,
+    SEG_FILE,
 )
 from stratum.discovery import (
     discover_images,
@@ -158,3 +161,58 @@ def test_parse_args_status():
     args = parse_args(["status", "./dataset"])
     assert args.command == "status"
     assert args.dataset_dir == Path("./dataset")
+
+
+# --- sapiens integration tests ---
+
+def test_resolve_passes_all_includes_sapiens():
+    passes = resolve_passes("all")
+    assert "seg" in passes
+    assert "depth" in passes
+    assert "normal" in passes
+    assert "pixel" not in passes  # pixel remains opt-in
+
+
+def test_resolve_passes_sapiens_specific():
+    passes = resolve_passes("seg,depth,normal")
+    assert passes == ["seg", "depth", "normal"]
+
+
+def test_scan_dataset_status_sapiens_artifacts():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        d1 = tmp / "img1"
+        d1.mkdir()
+        (d1 / METADATA_FILE).write_text('{"image_id": "img1"}')
+        (d1 / SEG_FILE).write_bytes(b"fake")
+        (d1 / DEPTH_FILE).write_bytes(b"fake")
+        (d1 / NORMAL_FILE).write_bytes(b"fake")
+
+        status = scan_dataset_status(tmp)
+        assert status["total"] == 1
+        assert status["seg"] == 1
+        assert status["depth"] == 1
+        assert status["normal"] == 1
+
+
+def test_config_sapiens_constants():
+    from stratum.config import (
+        SAPIENS_SEG_REPO,
+        SAPIENS_DEPTH_REPO,
+        SAPIENS_NORMAL_REPO,
+        NUM_SEG_CLASSES,
+        SAPIENS_INPUT_HEIGHT,
+        SAPIENS_INPUT_WIDTH,
+    )
+    assert NUM_SEG_CLASSES == 28
+    assert SAPIENS_INPUT_HEIGHT == 1024
+    assert SAPIENS_INPUT_WIDTH == 768
+    assert "facebook" in SAPIENS_SEG_REPO
+    assert "facebook" in SAPIENS_DEPTH_REPO
+    assert "facebook" in SAPIENS_NORMAL_REPO
+
+
+def test_parse_args_process_with_sapiens_passes():
+    args = parse_args(["process", "./images", "--output", "./out", "--passes", "seg,depth,normal"])
+    assert args.command == "process"
+    assert args.passes == "seg,depth,normal"

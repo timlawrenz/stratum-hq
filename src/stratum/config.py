@@ -9,6 +9,17 @@ T5_MODEL_ID = "t5-large"
 # --- Pose ---
 NUM_POSE_KEYPOINTS = 133  # COCO-WholeBody: 17 body + 6 feet + 68 face + 42 hands
 
+# --- Sapiens (segmentation, depth, surface normals) ---
+SAPIENS_SEG_REPO = "facebook/sapiens-seg-1b-torchscript"
+SAPIENS_SEG_FILENAME = "sapiens_1b_goliath_best_goliath_mIoU_7994_epoch_151_torchscript.pt2"
+SAPIENS_DEPTH_REPO = "facebook/sapiens-depth-1b-torchscript"
+SAPIENS_DEPTH_FILENAME = "sapiens_1b_render_people_epoch_88_torchscript.pt2"
+SAPIENS_NORMAL_REPO = "facebook/sapiens-normal-1b-torchscript"
+SAPIENS_NORMAL_FILENAME = "sapiens_1b_normal_render_people_epoch_115_torchscript.pt2"
+NUM_SEG_CLASSES = 28
+SAPIENS_INPUT_HEIGHT = 1024
+SAPIENS_INPUT_WIDTH = 768
+
 # --- Aspect ratio buckets ---
 # All ~1 megapixel, all dims divisible by 64.
 DEFAULT_ASPECT_BUCKETS: list[tuple[int, int]] = [
@@ -44,6 +55,9 @@ T5_HIDDEN_FILE = "t5_hidden.npy"
 T5_MASK_FILE = "t5_mask.npy"
 PIXEL_FILE = "pixel.npy"
 POSE_FILE = "pose.npy"
+SEG_FILE = "seg.npy"
+DEPTH_FILE = "depth.npy"
+NORMAL_FILE = "normal.npy"
 
 # --- Supported image extensions ---
 IMAGE_EXTENSIONS = frozenset({

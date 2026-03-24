@@ -10,12 +10,15 @@ import numpy as np
 
 from stratum.config import (
     CAPTION_FILE,
+    DEPTH_FILE,
     DINOV3_CLS_FILE,
     DINOV3_PATCHES_FILE,
     METADATA_FILE,
+    NORMAL_FILE,
     NUM_POSE_KEYPOINTS,
     PIXEL_FILE,
     POSE_FILE,
+    SEG_FILE,
     T5_HIDDEN_FILE,
     T5_MASK_FILE,
 )
@@ -110,6 +113,36 @@ def verify_image_dir(img_dir: Path) -> list[str]:
     if err and err != "missing":
         issues.append(f"pose: {err}")
 
+    # Segmentation — shape depends on bucket
+    seg_path = img_dir / SEG_FILE
+    if seg_path.exists() and aspect_bucket:
+        dims = parse_bucket_dims(aspect_bucket)
+        if dims:
+            bw, bh = dims
+            err = _check_npy(seg_path, (bh, bw), np.uint8)
+            if err:
+                issues.append(f"seg: {err}")
+
+    # Depth — shape depends on bucket
+    depth_path = img_dir / DEPTH_FILE
+    if depth_path.exists() and aspect_bucket:
+        dims = parse_bucket_dims(aspect_bucket)
+        if dims:
+            bw, bh = dims
+            err = _check_npy(depth_path, (bh, bw), np.float16)
+            if err:
+                issues.append(f"depth: {err}")
+
+    # Normal — shape depends on bucket
+    normal_path = img_dir / NORMAL_FILE
+    if normal_path.exists() and aspect_bucket:
+        dims = parse_bucket_dims(aspect_bucket)
+        if dims:
+            bw, bh = dims
+            err = _check_npy(normal_path, (bh, bw, 3), np.float16)
+            if err:
+                issues.append(f"normal: {err}")
+
     return issues
 
 
@@ -145,6 +178,9 @@ def verify_dataset(dataset_dir: Path, fix: bool = False) -> int:
                         "t5_mask": T5_MASK_FILE,
                         "pixel": PIXEL_FILE,
                         "pose": POSE_FILE,
+                        "seg": SEG_FILE,
+                        "depth": DEPTH_FILE,
+                        "normal": NORMAL_FILE,
                     }
                     filename = artifact_map.get(artifact_name)
                     if filename:

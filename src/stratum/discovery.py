@@ -7,12 +7,15 @@ from pathlib import Path
 
 from stratum.config import (
     CAPTION_FILE,
+    DEPTH_FILE,
     DINOV3_CLS_FILE,
     DINOV3_PATCHES_FILE,
     IMAGE_EXTENSIONS,
     METADATA_FILE,
+    NORMAL_FILE,
     PIXEL_FILE,
     POSE_FILE,
+    SEG_FILE,
     T5_HIDDEN_FILE,
     T5_MASK_FILE,
 )
@@ -27,6 +30,9 @@ ARTIFACT_FILES: dict[str, str] = {
     "t5_mask": T5_MASK_FILE,
     "pixel": PIXEL_FILE,
     "pose": POSE_FILE,
+    "seg": SEG_FILE,
+    "depth": DEPTH_FILE,
+    "normal": NORMAL_FILE,
 }
 
 
