@@ -153,6 +153,8 @@ Publish layers to a HuggingFace dataset repository.
 stratum publish <dataset_dir> --hub-repo <user/repo> --layers <layers> [--limit N] [--offset N]
 ```
 
+Uploads are atomic — each batch is a single HuggingFace commit, so a stalled upload leaves no partial state. Automatic retry with exponential backoff handles HTTP 429 rate limits.
+
 Supports incremental publishing — add layers (width) or more images (depth) over time:
 
 ```bash
@@ -167,6 +169,23 @@ stratum publish ./dataset/ --hub-repo user/stratum-ffhq --layers dinov3 --offset
 ```
 
 Each publish updates a `manifest.json` tracking what's available and auto-generates a dataset card.
+
+### `stratum reconcile`
+
+Rebuild the HuggingFace manifest from actual repo files. Fixes count drift caused by interrupted publishes.
+
+```bash
+stratum reconcile --hub-repo <user/repo> [--dry-run]
+```
+
+Lists files in the HuggingFace repo, parses range labels from the deterministic filenames (`data/00000-09999.parquet`, `t5/00000-00999.tar`), recomputes per-layer counts, and uploads a corrected manifest and dataset card.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--hub-repo` | *(required)* | HuggingFace repo to reconcile |
+| `--dry-run` | off | Print the corrected manifest without uploading |
+| `--license` | `cc-by-nc-sa-4.0` | SPDX license for the dataset card |
+| `--attribution-file` | — | Markdown file with provenance text |
 
 ## Multi-GPU parallelism
 
