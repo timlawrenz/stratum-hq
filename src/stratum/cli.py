@@ -57,6 +57,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pub.add_argument("--limit", type=int, default=None, help="Max images to publish")
     pub.add_argument("--offset", type=int, default=0, help="Skip first N images")
 
+    # --- reconcile ---
+    rec = sub.add_parser("reconcile", help="Reconcile HuggingFace manifest with actual repo files")
+    rec.add_argument("--hub-repo", required=True, help="HuggingFace repo (e.g., user/stratum-ffhq)")
+    rec.add_argument("--dry-run", action="store_true", help="Show reconciled manifest without uploading")
+    rec.add_argument("--license", default="cc-by-nc-sa-4.0",
+                     help="SPDX license identifier for the dataset card (default: cc-by-nc-sa-4.0)")
+    rec.add_argument("--attribution-file", type=Path, default=None,
+                     help="Markdown file with attribution/provenance text to include in the dataset card")
+
     # --- migrate ---
     mig = sub.add_parser("migrate", help="Convert old prx-tg per-modality dataset to stratum per-image format")
     mig.add_argument("jsonl_path", type=Path, help="Path to approved_image_dataset.jsonl")
@@ -161,6 +170,20 @@ def cmd_publish(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    from stratum.publish import reconcile_hub_manifest
+
+    attribution = None
+    if args.attribution_file:
+        attribution = args.attribution_file.read_text(encoding="utf-8")
+    return reconcile_hub_manifest(
+        hub_repo=args.hub_repo,
+        license_id=args.license,
+        attribution=attribution,
+        dry_run=args.dry_run,
+    )
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     from stratum.migrate import migrate_dataset
 
@@ -183,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": cmd_status,
         "verify": cmd_verify,
         "publish": cmd_publish,
+        "reconcile": cmd_reconcile,
         "migrate": cmd_migrate,
     }
 

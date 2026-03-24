@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +42,41 @@ LAYER_ARTIFACTS: dict[str, list[str]] = {
 }
 
 MANIFEST_FILE = "manifest.json"
+
+MAX_RETRIES = 5
+INITIAL_BACKOFF = 10  # seconds
+
+
+def _parse_range_label(filename: str) -> tuple[int, int] | None:
+    """Extract (start, end) from a range-labeled filename like '00000-09999.parquet'."""
+    m = re.match(r"(\d+)-(\d+)\.", filename)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """Check if an exception is an HTTP 429 rate-limit response."""
+    # huggingface_hub raises HfHubHTTPError with response attached
+    response = getattr(exc, "response", None)
+    if response is not None and getattr(response, "status_code", None) == 429:
+        return True
+    # Fall back to checking the string representation
+    return "429" in str(exc)
+
+
+def _retry_on_429(fn, *args, **kwargs):
+    """Call *fn* with retry + exponential backoff on HTTP 429."""
+    backoff = INITIAL_BACKOFF
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            if not _is_rate_limited(exc) or attempt == MAX_RETRIES:
+                raise
+            eprint(f"  rate-limited (429), retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})...")
+            time.sleep(backoff)
+            backoff *= 2
 
 
 def _collect_image_dirs(dataset_dir: Path, offset: int, limit: int | None) -> list[Path]:
@@ -224,13 +261,17 @@ def publish_to_hub(
     attribution: str | None = None,
     limit: int | None = None,
     offset: int = 0,
+    _api=None,
 ) -> int:
     """Publish dataset layers to HuggingFace Hub. Returns exit code."""
-    try:
-        from huggingface_hub import HfApi
-    except ImportError:
-        eprint("error: huggingface-hub not installed. Install with: pip install stratum-hq[publish]")
-        return 1
+    if _api is None:
+        try:
+            from huggingface_hub import HfApi
+        except ImportError:
+            eprint("error: huggingface-hub not installed. Install with: pip install stratum-hq[publish]")
+            return 1
+        _api = HfApi()
+    api = _api
 
     try:
         import pyarrow  # noqa: F401
@@ -252,8 +293,6 @@ def publish_to_hub(
 
     eprint(f"Publishing {len(image_dirs)} images, layers: {layers} to {hub_repo}")
 
-    api = HfApi()
-
     # Ensure repo exists
     try:
         api.create_repo(repo_id=hub_repo, repo_type="dataset", exist_ok=True)
@@ -271,14 +310,14 @@ def publish_to_hub(
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
-        uploads: list[tuple[Path, str]] = []
 
         # Unified data parquet — range-labeled for incremental uploads
         range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
 
-        data_parquet = tmp / f"data_{range_label}.parquet"
+        data_dir = tmp / "data"
+        data_dir.mkdir()
+        data_parquet = data_dir / f"{range_label}.parquet"
         n = _write_data_parquet(records, image_dirs, data_parquet)
-        uploads.append((data_parquet, f"data/{range_label}.parquet"))
         eprint(f"  data: {n} records -> data/{range_label}.parquet")
         manifest["total_images"] = max(manifest.get("total_images", 0), offset + len(image_dirs))
 
@@ -293,10 +332,10 @@ def publish_to_hub(
                 manifest["layers"]["caption"] = layer_info
                 eprint(f"  captions: {n} included in data parquet")
             else:
-                tar_name = f"{layer}/{range_label}.tar"
-                tar_path = tmp / f"{layer}_{range_label}.tar"
+                layer_dir = tmp / layer
+                layer_dir.mkdir(exist_ok=True)
+                tar_path = layer_dir / f"{range_label}.tar"
                 n = _pack_npy_tar(image_dirs, records, layer, tar_path)
-                uploads.append((tar_path, tar_name))
 
                 layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
                 layer_info["chunks"] = layer_info.get("chunks", {})
@@ -305,7 +344,7 @@ def publish_to_hub(
                 layer_info["chunks"][range_label] = n
                 layer_info["count"] = sum(layer_info["chunks"].values())
                 manifest["layers"][layer] = layer_info
-                eprint(f"  {layer}: {n} images -> {tar_name}")
+                eprint(f"  {layer}: {n} images -> {layer}/{range_label}.tar")
 
         # Update manifest
         manifest["version"] = _bump_version(manifest)
@@ -315,19 +354,137 @@ def publish_to_hub(
         manifest_path = tmp / MANIFEST_FILE
         with manifest_path.open("w") as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
-        uploads.append((manifest_path, MANIFEST_FILE))
 
         # Generate dataset card
         card_path = tmp / "README.md"
         _write_dataset_card(manifest, hub_repo, card_path,
                             license_id=license_id, attribution=attribution)
-        uploads.append((card_path, "README.md"))
 
-        # Upload all files
-        eprint(f"Uploading {len(uploads)} files to {hub_repo}...")
-        for local_path, remote_path in uploads:
+        # Atomic upload — single commit for all files
+        eprint(f"Uploading to {hub_repo} (single commit)...")
+        try:
+            _retry_on_429(
+                api.upload_folder,
+                folder_path=str(tmp),
+                repo_id=hub_repo,
+                repo_type="dataset",
+                commit_message=f"stratum publish {range_label} layers={','.join(layers)}",
+            )
+        except Exception as e:
+            eprint(f"error uploading to {hub_repo}: {e}")
+            return 1
+
+    eprint(f"Published successfully. Manifest version: {manifest['version']}")
+    return 0
+
+
+def reconcile_hub_manifest(
+    hub_repo: str,
+    license_id: str = "cc-by-nc-sa-4.0",
+    attribution: str | None = None,
+    dry_run: bool = False,
+    _api=None,
+) -> int:
+    """Reconcile manifest.json with actual files on HuggingFace Hub.
+
+    Lists repo files, parses range labels from filenames, rebuilds
+    per-layer chunk counts, and uploads a corrected manifest and dataset card.
+    """
+    if _api is None:
+        try:
+            from huggingface_hub import HfApi
+        except ImportError:
+            eprint("error: huggingface-hub not installed. Install with: pip install stratum-hq[publish]")
+            return 1
+        _api = HfApi()
+    api = _api
+
+    try:
+        file_paths = api.list_repo_files(repo_id=hub_repo, repo_type="dataset")
+    except Exception as e:
+        eprint(f"error: could not list repo {hub_repo}: {e}")
+        return 1
+
+    # Parse data parquets → caption chunks
+    caption_chunks: dict[str, int] = {}
+    max_image_index = -1
+    for fp in file_paths:
+        if fp.startswith("data/") and fp.endswith(".parquet"):
+            rng = _parse_range_label(fp.split("/")[-1])
+            if rng:
+                start, end = rng
+                range_label = f"{start:05d}-{end:05d}"
+                caption_chunks[range_label] = end - start + 1
+                max_image_index = max(max_image_index, end)
+
+    # Parse layer tars → per-layer chunks
+    layer_chunks: dict[str, dict[str, int]] = {}
+    for fp in file_paths:
+        if not fp.endswith(".tar") or "/" not in fp:
+            continue
+        parts = fp.split("/")
+        if len(parts) != 2:
+            continue
+        layer_name, basename = parts
+        if layer_name == "data":
+            continue
+        rng = _parse_range_label(basename)
+        if rng:
+            start, end = rng
+            range_label = f"{start:05d}-{end:05d}"
+            layer_chunks.setdefault(layer_name, {})[range_label] = end - start + 1
+            max_image_index = max(max_image_index, end)
+
+    # Load existing manifest to preserve version lineage
+    manifest = _load_manifest(api, hub_repo)
+
+    # Rebuild layers entirely from the file listing
+    new_layers: dict[str, dict] = {}
+    if caption_chunks:
+        new_layers["caption"] = {
+            "format": "parquet",
+            "chunks": caption_chunks,
+            "count": sum(caption_chunks.values()),
+        }
+    for layer_name, chunks in sorted(layer_chunks.items()):
+        new_layers[layer_name] = {
+            "format": "npy_tar",
+            "chunks": chunks,
+            "count": sum(chunks.values()),
+        }
+    manifest["layers"] = new_layers
+
+    manifest["total_images"] = max_image_index + 1 if max_image_index >= 0 else 0
+    manifest["version"] = _bump_version(manifest)
+    manifest["created_with"] = f"stratum-hq v{__version__}"
+    manifest["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    # Report
+    eprint(f"Reconciled manifest for {hub_repo}:")
+    eprint(f"  total_images: {manifest['total_images']:,}")
+    for name, info in sorted(new_layers.items()):
+        eprint(f"  {name}: {info['count']:,} ({len(info['chunks'])} chunks)")
+
+    if dry_run:
+        eprint("\nDry run — manifest not uploaded.")
+        eprint(json.dumps(manifest, indent=2))
+        return 0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+
+        manifest_path = tmp / MANIFEST_FILE
+        with manifest_path.open("w") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+        card_path = tmp / "README.md"
+        _write_dataset_card(manifest, hub_repo, card_path,
+                            license_id=license_id, attribution=attribution)
+
+        for local_path, remote_path in [(manifest_path, MANIFEST_FILE), (card_path, "README.md")]:
             try:
-                api.upload_file(
+                _retry_on_429(
+                    api.upload_file,
                     path_or_fileobj=str(local_path),
                     path_in_repo=remote_path,
                     repo_id=hub_repo,
@@ -337,5 +494,5 @@ def publish_to_hub(
                 eprint(f"error uploading {remote_path}: {e}")
                 return 1
 
-    eprint(f"Published successfully. Manifest version: {manifest['version']}")
+    eprint("Manifest reconciled successfully.")
     return 0
