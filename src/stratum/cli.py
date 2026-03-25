@@ -56,6 +56,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                      help="Markdown file with attribution/provenance text to include in the dataset card")
     pub.add_argument("--limit", type=int, default=None, help="Max images to publish")
     pub.add_argument("--offset", type=int, default=0, help="Skip first N images")
+    pub.add_argument("--verbose", action="store_true", help="Log upload requests, responses, and file sizes")
 
     # --- reconcile ---
     rec = sub.add_parser("reconcile", help="Reconcile HuggingFace manifest with actual repo files")
@@ -65,6 +66,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                      help="SPDX license identifier for the dataset card (default: cc-by-nc-sa-4.0)")
     rec.add_argument("--attribution-file", type=Path, default=None,
                      help="Markdown file with attribution/provenance text to include in the dataset card")
+    rec.add_argument("--verbose", action="store_true", help="Log upload requests, responses, and file sizes")
 
     # --- migrate ---
     mig = sub.add_parser("migrate", help="Convert old prx-tg per-modality dataset to stratum per-image format")
@@ -167,6 +169,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
         attribution=attribution,
         limit=args.limit,
         offset=args.offset,
+        verbose=args.verbose,
     )
 
 
@@ -181,6 +184,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         license_id=args.license,
         attribution=attribution,
         dry_run=args.dry_run,
+        verbose=args.verbose,
     )
 
 

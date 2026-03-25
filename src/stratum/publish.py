@@ -65,17 +65,50 @@ def _is_rate_limited(exc: Exception) -> bool:
     return "429" in str(exc)
 
 
-def _retry_on_429(fn, *args, **kwargs):
-    """Call *fn* with retry + exponential backoff on HTTP 429."""
+def _get_retry_after(exc: Exception) -> int | None:
+    """Extract Retry-After seconds from a 429 response, if available."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return None
+    headers = getattr(response, "headers", {})
+    retry_after = headers.get("Retry-After") if headers else None
+    if retry_after is not None:
+        try:
+            return max(1, int(retry_after))
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _retry_on_429(fn, *args, verbose: bool = False, **kwargs):
+    """Call *fn* with retry + exponential backoff on HTTP 429.
+
+    Respects the ``Retry-After`` header when present; otherwise falls
+    back to exponential backoff starting at *INITIAL_BACKOFF* seconds.
+    """
     backoff = INITIAL_BACKOFF
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return fn(*args, **kwargs)
+            t0 = time.monotonic()
+            result = fn(*args, **kwargs)
+            if verbose:
+                elapsed = time.monotonic() - t0
+                eprint(f"  [verbose] {fn.__name__} succeeded in {elapsed:.1f}s")
+            return result
         except Exception as exc:
             if not _is_rate_limited(exc) or attempt == MAX_RETRIES:
+                if verbose:
+                    elapsed = time.monotonic() - t0
+                    status = getattr(getattr(exc, "response", None), "status_code", "?")
+                    eprint(f"  [verbose] {fn.__name__} failed after {elapsed:.1f}s — HTTP {status}: {exc}")
                 raise
-            eprint(f"  rate-limited (429), retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})...")
-            time.sleep(backoff)
+            wait = _get_retry_after(exc) or backoff
+            eprint(f"  rate-limited (429), retrying in {wait}s (attempt {attempt}/{MAX_RETRIES})...")
+            if verbose:
+                elapsed = time.monotonic() - t0
+                eprint(f"  [verbose] {fn.__name__} returned 429 after {elapsed:.1f}s, "
+                       f"Retry-After={_get_retry_after(exc) or 'not set'}")
+            time.sleep(wait)
             backoff *= 2
 
 
@@ -253,6 +286,28 @@ stratum publish ./dataset/ --hub-repo {hub_repo} --layers caption,dinov3,t5,pose
     output_path.write_text(card, encoding="utf-8")
 
 
+def _format_size(n_bytes: int) -> str:
+    """Human-readable file size."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if n_bytes < 1024:
+            return f"{n_bytes:.1f} {unit}" if unit != "B" else f"{n_bytes} {unit}"
+        n_bytes /= 1024
+    return f"{n_bytes:.1f} TB"
+
+
+def _log_upload_summary(folder: Path) -> None:
+    """Log every file under *folder* with its repo-relative path and size."""
+    eprint("  [verbose] files to upload:")
+    total = 0
+    for p in sorted(folder.rglob("*")):
+        if p.is_file():
+            size = p.stat().st_size
+            total += size
+            rel = p.relative_to(folder)
+            eprint(f"    {rel}  ({_format_size(size)})")
+    eprint(f"  [verbose] total upload: {_format_size(total)}")
+
+
 def publish_to_hub(
     dataset_dir: Path,
     hub_repo: str,
@@ -261,6 +316,7 @@ def publish_to_hub(
     attribution: str | None = None,
     limit: int | None = None,
     offset: int = 0,
+    verbose: bool = False,
     _api=None,
 ) -> int:
     """Publish dataset layers to HuggingFace Hub. Returns exit code."""
@@ -361,6 +417,8 @@ def publish_to_hub(
                             license_id=license_id, attribution=attribution)
 
         # Atomic upload — single commit for all files
+        if verbose:
+            _log_upload_summary(tmp)
         eprint(f"Uploading to {hub_repo} (single commit)...")
         try:
             _retry_on_429(
@@ -369,6 +427,7 @@ def publish_to_hub(
                 repo_id=hub_repo,
                 repo_type="dataset",
                 commit_message=f"stratum publish {range_label} layers={','.join(layers)}",
+                verbose=verbose,
             )
         except Exception as e:
             eprint(f"error uploading to {hub_repo}: {e}")
@@ -383,6 +442,7 @@ def reconcile_hub_manifest(
     license_id: str = "cc-by-nc-sa-4.0",
     attribution: str | None = None,
     dry_run: bool = False,
+    verbose: bool = False,
     _api=None,
 ) -> int:
     """Reconcile manifest.json with actual files on HuggingFace Hub.
@@ -482,6 +542,9 @@ def reconcile_hub_manifest(
                             license_id=license_id, attribution=attribution)
 
         for local_path, remote_path in [(manifest_path, MANIFEST_FILE), (card_path, "README.md")]:
+            if verbose:
+                size = local_path.stat().st_size
+                eprint(f"  [verbose] uploading {remote_path} ({size:,} bytes)")
             try:
                 _retry_on_429(
                     api.upload_file,
@@ -489,6 +552,7 @@ def reconcile_hub_manifest(
                     path_in_repo=remote_path,
                     repo_id=hub_repo,
                     repo_type="dataset",
+                    verbose=verbose,
                 )
             except Exception as e:
                 eprint(f"error uploading {remote_path}: {e}")

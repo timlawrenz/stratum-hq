@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from stratum.cli import parse_args
 from stratum.publish import (
+    _get_retry_after,
     _is_rate_limited,
     _parse_range_label,
     _retry_on_429,
@@ -64,6 +65,31 @@ def test_is_rate_limited_unrelated():
     assert _is_rate_limited(exc) is False
 
 
+# --- _get_retry_after ---
+
+def test_get_retry_after_from_header():
+    exc = Exception("429")
+    exc.response = MagicMock(status_code=429, headers={"Retry-After": "30"})
+    assert _get_retry_after(exc) == 30
+
+
+def test_get_retry_after_missing_header():
+    exc = Exception("429")
+    exc.response = MagicMock(status_code=429, headers={})
+    assert _get_retry_after(exc) is None
+
+
+def test_get_retry_after_no_response():
+    exc = Exception("429")
+    assert _get_retry_after(exc) is None
+
+
+def test_get_retry_after_clamps_to_1():
+    exc = Exception("429")
+    exc.response = MagicMock(status_code=429, headers={"Retry-After": "0"})
+    assert _get_retry_after(exc) == 1
+
+
 # --- _retry_on_429 ---
 
 def test_retry_on_429_succeeds_immediately():
@@ -113,6 +139,30 @@ def test_retry_on_429_non_429_raises_immediately():
     assert fn.call_count == 1
 
 
+@patch("stratum.publish.time.sleep")
+def test_retry_on_429_uses_retry_after_header(mock_sleep):
+    exc = Exception("429")
+    exc.response = MagicMock(status_code=429, headers={"Retry-After": "42"})
+    fn = MagicMock(side_effect=[exc, "ok"])
+
+    result = _retry_on_429(fn, "arg")
+    assert result == "ok"
+    mock_sleep.assert_called_once_with(42)
+
+
+@patch("stratum.publish.time.sleep")
+def test_retry_on_429_verbose_logs(mock_sleep, capsys):
+    exc = Exception("429")
+    exc.response = MagicMock(status_code=429, headers={})
+    fn = MagicMock(side_effect=[exc, "ok"])
+    fn.__name__ = "upload_folder"
+
+    _retry_on_429(fn, "arg", verbose=True)
+    captured = capsys.readouterr()
+    assert "[verbose] upload_folder" in captured.err
+    assert "succeeded" in captured.err
+
+
 # --- CLI parsing ---
 
 def test_parse_args_reconcile():
@@ -130,6 +180,16 @@ def test_parse_args_reconcile_dry_run():
 def test_parse_args_reconcile_with_license():
     args = parse_args(["reconcile", "--hub-repo", "u/d", "--license", "mit"])
     assert args.license == "mit"
+
+
+def test_parse_args_publish_verbose():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "caption", "--verbose"])
+    assert args.verbose is True
+
+
+def test_parse_args_reconcile_verbose():
+    args = parse_args(["reconcile", "--hub-repo", "u/d", "--verbose"])
+    assert args.verbose is True
 
 
 # --- reconcile_hub_manifest ---
