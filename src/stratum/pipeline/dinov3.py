@@ -57,7 +57,7 @@ def compute_dinov3_both(
 
     Returns:
         ``(cls_embedding, patches)`` where *cls_embedding* is a list of floats
-        and *patches* is an ``(num_patches, 1024)`` float32 array (or ``None``
+        and *patches* is an ``(num_patches, 1024)`` float16 array (or ``None``
         when running the pipeline fallback).
 
     DINOv3 token sequence: ``[CLS, reg_1, …, reg_4, patch_1, …, patch_N]``.
@@ -162,9 +162,9 @@ def process(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    np.save(output_dir / DINOV3_CLS_FILE, np.asarray(cls_list, dtype=np.float32))
+    np.save(output_dir / DINOV3_CLS_FILE, np.asarray(cls_list, dtype=np.float16))
 
     if patches_np is not None:
-        np.save(output_dir / DINOV3_PATCHES_FILE, patches_np.astype(np.float32))
+        np.save(output_dir / DINOV3_PATCHES_FILE, patches_np.astype(np.float16))
 
     return True

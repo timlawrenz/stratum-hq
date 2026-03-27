@@ -72,7 +72,7 @@ def verify_image_dir(img_dir: Path) -> list[str]:
     # Don't flag missing — it's just not generated yet
 
     # DINOv3 CLS
-    err = _check_npy(img_dir / DINOV3_CLS_FILE, (1024,), np.float32)
+    err = _check_npy(img_dir / DINOV3_CLS_FILE, (1024,), np.float16)
     if err and err != "missing":
         issues.append(f"dinov3_cls: {err}")
 
@@ -83,8 +83,8 @@ def verify_image_dir(img_dir: Path) -> list[str]:
             arr = np.load(patches_path, mmap_mode="r")
             if arr.ndim != 2 or arr.shape[1] != 1024:
                 issues.append(f"dinov3_patches: shape {arr.shape}, expected (N, 1024)")
-            if arr.dtype != np.float32:
-                issues.append(f"dinov3_patches: dtype {arr.dtype}, expected float32")
+            if arr.dtype != np.float16:
+                issues.append(f"dinov3_patches: dtype {arr.dtype}, expected float16")
         except Exception as e:
             issues.append(f"dinov3_patches: corrupt ({e})")
 

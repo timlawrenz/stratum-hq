@@ -40,8 +40,8 @@ source/ffhq/00001.png  →  dataset/ffhq/00001/
 |----------|-------|-------|-------------|
 | `metadata.json` | — | JSON | Image dimensions, aspect bucket, source path |
 | `caption.txt` | — | text | Dense objective description of the image |
-| `dinov3_cls.npy` | `(1024,)` | float32 | DINOv3 CLS token — global style/composition |
-| `dinov3_patches.npy` | `(N, 1024)` | float32 | DINOv3 spatial patch tokens (N varies by resolution) |
+| `dinov3_cls.npy` | `(1024,)` | float16 | DINOv3 CLS token — global style/composition |
+| `dinov3_patches.npy` | `(N, 1024)` | float16 | DINOv3 spatial patch tokens (N varies by resolution) |
 | `t5_hidden.npy` | `(512, 1024)` | float16 | T5-Large text encoder hidden states |
 | `t5_mask.npy` | `(512,)` | uint8 | T5 attention mask (1=valid, 0=padding) |
 | `pose.npy` | `(133, 3)` | float16 | DWPose whole-body keypoints: [x, y, confidence] in [-1, 1] |
@@ -251,6 +251,7 @@ stratum process ./images/ --output ./dataset/ --passes caption \
 - **Model**: `facebook/dinov3-vitl16-pretrain-lvd1689m` (ViT-L/16, 304M parameters)
 - **CLS token**: 1024-dim global representation (style, composition)
 - **Patch tokens**: `(H÷16) × (W÷16)` spatial tokens, each 1024-dim. Count varies by bucket (e.g., 1024×1024 → 4096 patches)
+- All embeddings stored as float16 for storage efficiency
 - Uses RoPE positional embeddings for variable-resolution support
 - Preprocessing uses `do_center_crop=False` to preserve spatial alignment
 - Single forward pass extracts both CLS and patches (`compute_dinov3_both`)
