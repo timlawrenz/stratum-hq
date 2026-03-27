@@ -41,7 +41,7 @@ def _check_npy(path: Path, expected_shape: tuple | None, expected_dtype: np.dtyp
     if expected_shape is not None and arr.shape != expected_shape:
         return f"shape {arr.shape}, expected {expected_shape}"
     if expected_dtype is not None and arr.dtype != expected_dtype:
-        return f"dtype {arr.dtype}, expected {expected_dtype}"
+        return f"dtype {arr.dtype}, expected {np.dtype(expected_dtype).name}"
     return None
 
 
@@ -84,7 +84,7 @@ def verify_image_dir(img_dir: Path) -> list[str]:
             if arr.ndim != 2 or arr.shape[1] != 1024:
                 issues.append(f"dinov3_patches: shape {arr.shape}, expected (N, 1024)")
             if arr.dtype != np.float16:
-                issues.append(f"dinov3_patches: dtype {arr.dtype}, expected float16")
+                issues.append(f"dinov3_patches: dtype {arr.dtype}, expected {np.dtype(np.float16).name}")
         except Exception as e:
             issues.append(f"dinov3_patches: corrupt ({e})")
 
@@ -146,6 +146,31 @@ def verify_image_dir(img_dir: Path) -> list[str]:
     return issues
 
 
+ARTIFACT_EXPECTED_DTYPE: dict[str, np.dtype] = {
+    "dinov3_cls": np.dtype(np.float16),
+    "dinov3_patches": np.dtype(np.float16),
+    "t5_hidden": np.dtype(np.float16),
+    "t5_mask": np.dtype(np.uint8),
+    "pixel": np.dtype(np.float16),
+    "pose": np.dtype(np.float16),
+    "seg": np.dtype(np.uint8),
+    "depth": np.dtype(np.float16),
+    "normal": np.dtype(np.float16),
+}
+
+ARTIFACT_FILE_MAP: dict[str, str] = {
+    "dinov3_cls": DINOV3_CLS_FILE,
+    "dinov3_patches": DINOV3_PATCHES_FILE,
+    "t5_hidden": T5_HIDDEN_FILE,
+    "t5_mask": T5_MASK_FILE,
+    "pixel": PIXEL_FILE,
+    "pose": POSE_FILE,
+    "seg": SEG_FILE,
+    "depth": DEPTH_FILE,
+    "normal": NORMAL_FILE,
+}
+
+
 def verify_dataset(dataset_dir: Path, fix: bool = False) -> int:
     """Verify all image directories in a dataset. Returns exit code."""
     dataset_dir = dataset_dir.resolve()
@@ -155,7 +180,8 @@ def verify_dataset(dataset_dir: Path, fix: bool = False) -> int:
 
     total = 0
     total_issues = 0
-    fixed = 0
+    converted = 0
+    deleted = 0
 
     for meta_path in sorted(dataset_dir.rglob(METADATA_FILE)):
         img_dir = meta_path.parent
@@ -168,31 +194,40 @@ def verify_dataset(dataset_dir: Path, fix: bool = False) -> int:
                 eprint(f"  {rel}: {issue}")
                 total_issues += 1
 
-                if fix and "corrupt" in issue:
-                    # Extract filename from issue prefix (before colon)
-                    artifact_name = issue.split(":")[0].strip()
-                    artifact_map = {
-                        "dinov3_cls": DINOV3_CLS_FILE,
-                        "dinov3_patches": DINOV3_PATCHES_FILE,
-                        "t5_hidden": T5_HIDDEN_FILE,
-                        "t5_mask": T5_MASK_FILE,
-                        "pixel": PIXEL_FILE,
-                        "pose": POSE_FILE,
-                        "seg": SEG_FILE,
-                        "depth": DEPTH_FILE,
-                        "normal": NORMAL_FILE,
-                    }
-                    filename = artifact_map.get(artifact_name)
-                    if filename:
-                        target = img_dir / filename
-                        if target.exists():
-                            target.unlink()
-                            eprint(f"    → deleted {target.name} for regeneration")
-                            fixed += 1
+                if not fix:
+                    continue
+
+                artifact_name = issue.split(":")[0].strip()
+                filename = ARTIFACT_FILE_MAP.get(artifact_name)
+                if not filename:
+                    continue
+                target = img_dir / filename
+                if not target.exists():
+                    continue
+
+                if "dtype" in issue:
+                    expected = ARTIFACT_EXPECTED_DTYPE.get(artifact_name)
+                    if expected is not None:
+                        try:
+                            arr = np.load(target)
+                            np.save(target, arr.astype(expected))
+                            eprint(f"    → converted {target.name} to {expected.name}")
+                            converted += 1
+                        except Exception as e:
+                            eprint(f"    → conversion failed for {target.name}: {e}")
+                elif "corrupt" in issue or "shape" in issue:
+                    target.unlink()
+                    eprint(f"    → deleted {target.name} for regeneration")
+                    deleted += 1
 
     eprint(f"\nVerified {total} images: {total_issues} issue(s) found", end="")
-    if fix and fixed:
-        eprint(f", {fixed} corrupt file(s) deleted for regeneration")
+    if fix and (converted or deleted):
+        parts = []
+        if converted:
+            parts.append(f"{converted} converted")
+        if deleted:
+            parts.append(f"{deleted} deleted for regeneration")
+        eprint(f", {', '.join(parts)}")
     else:
         eprint()
 

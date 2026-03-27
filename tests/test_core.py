@@ -6,12 +6,15 @@ import json
 import tempfile
 from pathlib import Path
 
+import numpy as np
+
 from stratum.config import (
     DEFAULT_ASPECT_BUCKETS,
     DEPTH_FILE,
     METADATA_FILE,
     CAPTION_FILE,
     DINOV3_CLS_FILE,
+    DINOV3_PATCHES_FILE,
     NORMAL_FILE,
     POSE_FILE,
     SEG_FILE,
@@ -216,3 +219,49 @@ def test_parse_args_process_with_sapiens_passes():
     args = parse_args(["process", "./images", "--output", "./out", "--passes", "seg,depth,normal"])
     assert args.command == "process"
     assert args.passes == "seg,depth,normal"
+
+
+# --- verify --fix dtype conversion tests ---
+
+def test_verify_fix_converts_dtype_in_place():
+    """verify --fix should convert float32 dinov3 files to float16 without deleting."""
+    from stratum.verify import verify_dataset
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        d = tmp / "img1"
+        d.mkdir()
+        (d / METADATA_FILE).write_text('{"image_id": "img1", "aspect_bucket": "1024x1024"}')
+
+        # Write float32 files (old format)
+        np.save(d / DINOV3_CLS_FILE, np.zeros(1024, dtype=np.float32))
+        np.save(d / DINOV3_PATCHES_FILE, np.zeros((4096, 1024), dtype=np.float32))
+
+        result = verify_dataset(tmp, fix=True)
+
+        # Files should still exist (converted, not deleted)
+        assert (d / DINOV3_CLS_FILE).exists()
+        assert (d / DINOV3_PATCHES_FILE).exists()
+
+        # They should now be float16
+        cls_arr = np.load(d / DINOV3_CLS_FILE)
+        assert cls_arr.dtype == np.float16
+        patches_arr = np.load(d / DINOV3_PATCHES_FILE)
+        assert patches_arr.dtype == np.float16
+        assert patches_arr.shape == (4096, 1024)
+
+
+def test_verify_fix_deletes_corrupt_files():
+    """verify --fix should delete truly corrupt files."""
+    from stratum.verify import verify_dataset
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        d = tmp / "img1"
+        d.mkdir()
+        (d / METADATA_FILE).write_text('{"image_id": "img1"}')
+        (d / DINOV3_CLS_FILE).write_bytes(b"not a valid npy file")
+
+        verify_dataset(tmp, fix=True)
+
+        assert not (d / DINOV3_CLS_FILE).exists()
