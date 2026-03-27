@@ -16,12 +16,15 @@ The following artifacts were generated from each FFHQ image using
 
 | Artifact | Description | Model |
 |----------|-------------|-------|
-| `dinov3_cls.npy` | Global image embedding (1024-d, float32) | DINOv3 ViT-L/16 |
-| `dinov3_patches.npy` | Per-patch embeddings (N×1024, float32) | DINOv3 ViT-L/16 |
+| `dinov3_cls.npy` | Global image embedding (1024-d, float16) | DINOv3 ViT-L/16 |
+| `dinov3_patches.npy` | Per-patch embeddings (N×1024, float16) | DINOv3 ViT-L/16 |
 | `pose.npy` | 133 COCO-WholeBody keypoints (133×3, float16) | DWPose |
 | `caption.txt` | Natural-language image description | Gemma 3 27B via Ollama |
 | `t5_hidden.npy` | Text encoder hidden states (512×1024, float16) | T5-Large |
 | `t5_mask.npy` | T5 attention mask (512, uint8) | T5-Large |
+| `seg.npy` | 28-class body-part segmentation (H×W, uint8) | Sapiens-1B |
+| `depth.npy` | Relative depth, foreground-masked (H×W, float16) | Sapiens-1B |
+| `normal.npy` | Surface normals (H×W×3, float16) | Sapiens-1B |
 
 No original pixel data is distributed in this dataset.
 
@@ -51,10 +54,13 @@ These visualizations were generated with
 
 | Layer | Overlay |
 |-------|---------|
-| **Pose** (COCO-WholeBody skeleton) | ![pose overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_pose.png) |
+| **Pose** (COCO-WholeBody skeleton) | ![pose overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_pose_keypoints.png) |
 | **Caption** (Gemma 3 27B) | ![caption overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_caption.png) |
-| **DINOv3** (CLS→patch attention) | ![dino heatmap](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_dino.png) |
-| **T5** (token attention mask) | ![t5 mask chart](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_t5.png) |
+| **DINOv3** (CLS→patch attention) | ![dino heatmap](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_dinov3_patch_attention.png) |
+| **T5** (token attention mask) | ![t5 mask chart](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_t5_attention_mask.png) |
+| **Segmentation** (Sapiens body parts) | ![segmentation overlay](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_body_part_segmentation.png) |
+| **Depth** (Sapiens depth estimation) | ![depth heatmap](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_depth_estimation.png) |
+| **Surface Normals** (Sapiens) | ![normal map](https://raw.githubusercontent.com/timlawrenz/stratum-hq/main/examples/00028_combined_surface_normals.png) |
 
 **Combined panel** (all four layers on three diverse FFHQ subjects):
 
