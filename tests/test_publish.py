@@ -365,11 +365,11 @@ def test_publish_splits_tar_with_max_tar_mb(tmp_path):
     mock_api.list_repo_files.return_value = []
     uploaded_paths = []
 
-    def capture_upload(*, folder_path, repo_id, repo_type, commit_message, verbose=False):
+    def capture_upload(*, folder_path, repo_id, repo_type):
         for p in Path(folder_path).rglob("*.tar"):
             uploaded_paths.append(str(p.relative_to(folder_path)))
 
-    mock_api.upload_folder.side_effect = capture_upload
+    mock_api.upload_large_folder.side_effect = capture_upload
     mock_api.create_repo.return_value = None
 
     # Set max_tar_mb=1 byte threshold (very small) to force splitting
