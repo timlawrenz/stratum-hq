@@ -56,6 +56,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                      help="Markdown file with attribution/provenance text to include in the dataset card")
     pub.add_argument("--limit", type=int, default=None, help="Max images to publish")
     pub.add_argument("--offset", type=int, default=0, help="Skip first N images")
+    pub.add_argument("--max-tar-mb", type=int, default=None,
+                     help="Split layer tars exceeding this size (MB). Each tar becomes a "
+                          "separate LFS blob — on retry only failed blobs are re-uploaded. "
+                          "Example: --max-tar-mb 50")
     pub.add_argument("--verbose", action="store_true", help="Log upload requests, responses, and file sizes")
 
     # --- reconcile ---
@@ -170,6 +174,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
         limit=args.limit,
         offset=args.offset,
         verbose=args.verbose,
+        max_tar_mb=args.max_tar_mb,
     )
 
 

@@ -65,6 +65,21 @@ def _is_rate_limited(exc: Exception) -> bool:
     return "429" in str(exc)
 
 
+def _is_transient_error(exc: Exception) -> bool:
+    """Check if an exception is a transient network error worth retrying."""
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+    try:
+        import requests.exceptions as reqexc
+
+        if isinstance(exc, (reqexc.ConnectionError, reqexc.Timeout,
+                            reqexc.ChunkedEncodingError)):
+            return True
+    except ImportError:
+        pass
+    return False
+
+
 def _get_retry_after(exc: Exception) -> int | None:
     """Extract Retry-After seconds from a 429 response, if available."""
     response = getattr(exc, "response", None)
@@ -80,8 +95,8 @@ def _get_retry_after(exc: Exception) -> int | None:
     return None
 
 
-def _retry_on_429(fn, *args, verbose: bool = False, **kwargs):
-    """Call *fn* with retry + exponential backoff on HTTP 429.
+def _retry_upload(fn, *args, verbose: bool = False, **kwargs):
+    """Call *fn* with retry + exponential backoff on HTTP 429 or transient network errors.
 
     Respects the ``Retry-After`` header when present; otherwise falls
     back to exponential backoff starting at *INITIAL_BACKOFF* seconds.
@@ -96,20 +111,31 @@ def _retry_on_429(fn, *args, verbose: bool = False, **kwargs):
                 eprint(f"  [verbose] {fn.__name__} succeeded in {elapsed:.1f}s")
             return result
         except Exception as exc:
-            if not _is_rate_limited(exc) or attempt == MAX_RETRIES:
+            rate_limited = _is_rate_limited(exc)
+            transient = _is_transient_error(exc)
+            retriable = rate_limited or transient
+            if not retriable or attempt == MAX_RETRIES:
                 if verbose:
                     elapsed = time.monotonic() - t0
                     status = getattr(getattr(exc, "response", None), "status_code", "?")
                     eprint(f"  [verbose] {fn.__name__} failed after {elapsed:.1f}s — HTTP {status}: {exc}")
                 raise
-            wait = _get_retry_after(exc) or backoff
-            eprint(f"  rate-limited (429), retrying in {wait}s (attempt {attempt}/{MAX_RETRIES})...")
+            if rate_limited:
+                wait = _get_retry_after(exc) or backoff
+                eprint(f"  rate-limited (429), retrying in {wait}s (attempt {attempt}/{MAX_RETRIES})...")
+            else:
+                wait = backoff
+                eprint(f"  network error ({type(exc).__name__}), retrying in {wait}s "
+                       f"(attempt {attempt}/{MAX_RETRIES})...")
             if verbose:
                 elapsed = time.monotonic() - t0
-                eprint(f"  [verbose] {fn.__name__} returned 429 after {elapsed:.1f}s, "
-                       f"Retry-After={_get_retry_after(exc) or 'not set'}")
+                eprint(f"  [verbose] {fn.__name__} failed after {elapsed:.1f}s: {exc}")
             time.sleep(wait)
             backoff *= 2
+
+
+# Keep old name as alias for backward compatibility
+_retry_on_429 = _retry_upload
 
 
 def _collect_image_dirs(dataset_dir: Path, offset: int, limit: int | None) -> list[Path]:
@@ -189,6 +215,39 @@ def _pack_npy_tar(image_dirs: list[Path], records: list[dict], layer: str, outpu
                 tar.add(str(src), arcname=arcname)
             count += 1
     return count
+
+
+def _plan_tar_splits(
+    image_dirs: list[Path], records: list[dict], layer: str, max_tar_bytes: int
+) -> list[tuple[list[Path], list[dict]]]:
+    """Group images so each group's tar stays under *max_tar_bytes*.
+
+    Returns a list of ``(group_dirs, group_records)`` tuples.  Images that
+    lack the layer's artifacts are silently skipped (they won't appear in
+    any group).
+    """
+    groups: list[tuple[list[Path], list[dict]]] = []
+    cur_dirs: list[Path] = []
+    cur_recs: list[dict] = []
+    cur_size = 0
+
+    for img_dir, rec in zip(image_dirs, records):
+        if not _image_has_layer(img_dir, layer):
+            continue
+        img_bytes = sum((img_dir / f).stat().st_size for f in LAYER_ARTIFACTS[layer])
+
+        if cur_dirs and cur_size + img_bytes > max_tar_bytes:
+            groups.append((cur_dirs, cur_recs))
+            cur_dirs, cur_recs, cur_size = [], [], 0
+
+        cur_dirs.append(img_dir)
+        cur_recs.append(rec)
+        cur_size += img_bytes
+
+    if cur_dirs:
+        groups.append((cur_dirs, cur_recs))
+
+    return groups
 
 
 def _load_manifest(api, hub_repo: str) -> dict:
@@ -317,6 +376,7 @@ def publish_to_hub(
     limit: int | None = None,
     offset: int = 0,
     verbose: bool = False,
+    max_tar_mb: int | None = None,
     _api=None,
 ) -> int:
     """Publish dataset layers to HuggingFace Hub. Returns exit code."""
@@ -363,6 +423,7 @@ def publish_to_hub(
         return 1
 
     manifest = _load_manifest(api, hub_repo)
+    max_tar_bytes = max_tar_mb * 1_000_000 if max_tar_mb else None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -390,17 +451,31 @@ def publish_to_hub(
             else:
                 layer_dir = tmp / layer
                 layer_dir.mkdir(exist_ok=True)
-                tar_path = layer_dir / f"{range_label}.tar"
-                n = _pack_npy_tar(image_dirs, records, layer, tar_path)
 
                 layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
                 layer_info["chunks"] = layer_info.get("chunks", {})
                 if isinstance(layer_info["chunks"], list):
                     layer_info["chunks"] = {}
-                layer_info["chunks"][range_label] = n
+
+                if max_tar_bytes:
+                    groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
+                else:
+                    groups = [(image_dirs, records)]
+
+                img_offset = offset
+                for group_dirs, group_recs in groups:
+                    # Find the index range this group covers in the original list
+                    first = image_dirs.index(group_dirs[0])
+                    last = image_dirs.index(group_dirs[-1])
+                    sub_label = f"{offset + first:05d}-{offset + last:05d}"
+
+                    tar_path = layer_dir / f"{sub_label}.tar"
+                    nc = _pack_npy_tar(group_dirs, group_recs, layer, tar_path)
+                    layer_info["chunks"][sub_label] = nc
+                    eprint(f"  {layer}: {nc} images -> {layer}/{sub_label}.tar")
+
                 layer_info["count"] = sum(layer_info["chunks"].values())
                 manifest["layers"][layer] = layer_info
-                eprint(f"  {layer}: {n} images -> {layer}/{range_label}.tar")
 
         # Update manifest
         manifest["version"] = _bump_version(manifest)
@@ -421,7 +496,7 @@ def publish_to_hub(
             _log_upload_summary(tmp)
         eprint(f"Uploading to {hub_repo} (single commit)...")
         try:
-            _retry_on_429(
+            _retry_upload(
                 api.upload_folder,
                 folder_path=str(tmp),
                 repo_id=hub_repo,
@@ -546,7 +621,7 @@ def reconcile_hub_manifest(
                 size = local_path.stat().st_size
                 eprint(f"  [verbose] uploading {remote_path} ({size:,} bytes)")
             try:
-                _retry_on_429(
+                _retry_upload(
                     api.upload_file,
                     path_or_fileobj=str(local_path),
                     path_in_repo=remote_path,

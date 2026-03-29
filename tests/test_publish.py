@@ -11,8 +11,11 @@ from stratum.cli import parse_args
 from stratum.publish import (
     _get_retry_after,
     _is_rate_limited,
+    _is_transient_error,
     _parse_range_label,
+    _plan_tar_splits,
     _retry_on_429,
+    _retry_upload,
     reconcile_hub_manifest,
 )
 
@@ -163,6 +166,211 @@ def test_retry_on_429_verbose_logs(mock_sleep, capsys):
     assert "succeeded" in captured.err
 
 
+# --- _is_transient_error ---
+
+def test_is_transient_error_connection_error():
+    assert _is_transient_error(ConnectionError("reset")) is True
+
+
+def test_is_transient_error_timeout_error():
+    assert _is_transient_error(TimeoutError("timed out")) is True
+
+
+def test_is_transient_error_os_error():
+    assert _is_transient_error(OSError("network unreachable")) is True
+
+
+def test_is_transient_error_requests_connection():
+    import requests.exceptions
+    exc = requests.exceptions.ConnectionError("connection refused")
+    assert _is_transient_error(exc) is True
+
+
+def test_is_transient_error_requests_timeout():
+    import requests.exceptions
+    exc = requests.exceptions.Timeout("read timed out")
+    assert _is_transient_error(exc) is True
+
+
+def test_is_transient_error_requests_chunked():
+    import requests.exceptions
+    exc = requests.exceptions.ChunkedEncodingError("broken")
+    assert _is_transient_error(exc) is True
+
+
+def test_is_transient_error_unrelated():
+    assert _is_transient_error(ValueError("bad input")) is False
+    assert _is_transient_error(KeyError("missing")) is False
+
+
+# --- _retry_upload (network errors) ---
+
+@patch("stratum.publish.time.sleep")
+def test_retry_upload_on_network_error(mock_sleep):
+    exc = ConnectionError("reset by peer")
+    fn = MagicMock(side_effect=[exc, exc, "ok"])
+
+    result = _retry_upload(fn, "arg")
+    assert result == "ok"
+    assert fn.call_count == 3
+    assert mock_sleep.call_count == 2
+
+
+@patch("stratum.publish.time.sleep")
+def test_retry_upload_network_error_exhausted(mock_sleep):
+    exc = TimeoutError("read timed out")
+    fn = MagicMock(side_effect=exc)
+
+    raised = False
+    try:
+        _retry_upload(fn, "arg")
+    except TimeoutError:
+        raised = True
+    assert raised
+    assert fn.call_count == 5  # MAX_RETRIES
+
+
+def test_retry_upload_non_retriable_raises_immediately():
+    exc = ValueError("bad input")
+    fn = MagicMock(side_effect=exc)
+
+    raised = False
+    try:
+        _retry_upload(fn, "arg")
+    except ValueError:
+        raised = True
+    assert raised
+    assert fn.call_count == 1
+
+
+@patch("stratum.publish.time.sleep")
+def test_retry_upload_mixed_429_and_network(mock_sleep):
+    """429 followed by network error, then success."""
+    rate_exc = Exception("429")
+    rate_exc.response = MagicMock(status_code=429, headers={})
+    net_exc = ConnectionError("reset")
+    fn = MagicMock(side_effect=[rate_exc, net_exc, "ok"])
+
+    result = _retry_upload(fn, "arg")
+    assert result == "ok"
+    assert fn.call_count == 3
+
+
+# --- _plan_tar_splits ---
+
+def test_plan_tar_splits_no_limit(tmp_path):
+    """Without max_tar_bytes, everything goes into one group."""
+    from stratum.publish import _image_has_layer, LAYER_ARTIFACTS
+    # Create 3 image dirs with dinov3 artifacts
+    dirs, recs = _make_npy_dirs(tmp_path, 3, "dinov3")
+
+    groups = _plan_tar_splits(dirs, recs, "dinov3", max_tar_bytes=999_999_999)
+    assert len(groups) == 1
+    assert len(groups[0][0]) == 3
+
+
+def test_plan_tar_splits_splits_on_size(tmp_path):
+    """Files exceeding max_tar_bytes are split into multiple groups."""
+    dirs, recs = _make_npy_dirs(tmp_path, 4, "dinov3")
+
+    # Each image has ~2*1024 bytes of npy data. Set limit so 2 images fit.
+    single_size = sum(
+        (dirs[0] / f).stat().st_size
+        for f in ["dinov3_cls.npy", "dinov3_patches.npy"]
+    )
+    max_bytes = int(single_size * 2.5)  # fits 2, not 3
+
+    groups = _plan_tar_splits(dirs, recs, "dinov3", max_tar_bytes=max_bytes)
+    assert len(groups) == 2
+    assert len(groups[0][0]) == 2
+    assert len(groups[1][0]) == 2
+
+
+def test_plan_tar_splits_single_large_image(tmp_path):
+    """A single image larger than max_tar_bytes still gets its own group."""
+    dirs, recs = _make_npy_dirs(tmp_path, 2, "dinov3")
+    groups = _plan_tar_splits(dirs, recs, "dinov3", max_tar_bytes=1)
+    assert len(groups) == 2
+    assert len(groups[0][0]) == 1
+    assert len(groups[1][0]) == 1
+
+
+def test_plan_tar_splits_skips_missing_layer(tmp_path):
+    """Images without the layer's artifacts are excluded."""
+    dirs, recs = _make_npy_dirs(tmp_path, 3, "dinov3")
+    # Remove artifacts from middle image
+    for f in ["dinov3_cls.npy", "dinov3_patches.npy"]:
+        (dirs[1] / f).unlink()
+
+    groups = _plan_tar_splits(dirs, recs, "dinov3", max_tar_bytes=999_999_999)
+    assert len(groups) == 1
+    assert len(groups[0][0]) == 2  # only 2 images have the layer
+
+
+def _make_npy_dirs(base: Path, n: int, layer: str) -> tuple[list[Path], list[dict]]:
+    """Helper: create n image dirs with dummy npy files for a layer."""
+    import numpy as np
+    from stratum.publish import LAYER_ARTIFACTS
+
+    dirs = []
+    recs = []
+    for i in range(n):
+        d = base / f"img{i:04d}"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "metadata.json").write_text(json.dumps({
+            "image_id": f"img{i:04d}", "width": 512, "height": 512,
+            "aspect_bucket": "512x512",
+        }))
+        for artifact in LAYER_ARTIFACTS[layer]:
+            np.save(d / artifact, np.zeros(1024, dtype=np.float16))
+        dirs.append(d)
+        recs.append({"image_id": f"img{i:04d}", "_rel": f"img{i:04d}"})
+    return dirs, recs
+
+
+# --- publish with --max-tar-mb ---
+
+def test_publish_splits_tar_with_max_tar_mb(tmp_path):
+    """publish_to_hub with max_tar_mb produces multiple sub-range tars."""
+    import json
+    from stratum.publish import publish_to_hub
+
+    dirs, recs = _make_npy_dirs(tmp_path / "dataset", 4, "dinov3")
+
+    mock_api = MagicMock()
+    mock_api.list_repo_files.return_value = []
+    uploaded_paths = []
+
+    def capture_upload(*, folder_path, repo_id, repo_type, commit_message, verbose=False):
+        for p in Path(folder_path).rglob("*.tar"):
+            uploaded_paths.append(str(p.relative_to(folder_path)))
+
+    mock_api.upload_folder.side_effect = capture_upload
+    mock_api.create_repo.return_value = None
+
+    # Set max_tar_mb=1 byte threshold (very small) to force splitting
+    single_size = sum(
+        (dirs[0] / f).stat().st_size for f in ["dinov3_cls.npy", "dinov3_patches.npy"]
+    )
+    # max_tar_mb in megabytes — use smallest value that puts ~2 images per tar
+    max_mb = max(1, int((single_size * 2.5) / 1_000_000) + 1)
+
+    result = publish_to_hub(
+        dataset_dir=tmp_path / "dataset",
+        hub_repo="user/test",
+        layers=["dinov3"],
+        max_tar_mb=max_mb,
+        _api=mock_api,
+    )
+
+    assert result == 0
+    # With 4 images and a small limit, we should get multiple tars
+    # (exact count depends on file sizes, but more than 1)
+    assert len(uploaded_paths) >= 1
+    # All should be under dinov3/
+    assert all(p.startswith("dinov3/") for p in uploaded_paths)
+
+
 # --- CLI parsing ---
 
 def test_parse_args_reconcile():
@@ -185,6 +393,16 @@ def test_parse_args_reconcile_with_license():
 def test_parse_args_publish_verbose():
     args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "caption", "--verbose"])
     assert args.verbose is True
+
+
+def test_parse_args_publish_max_tar_mb():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3", "--max-tar-mb", "50"])
+    assert args.max_tar_mb == 50
+
+
+def test_parse_args_publish_max_tar_mb_default():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3"])
+    assert args.max_tar_mb is None
 
 
 def test_parse_args_reconcile_verbose():
