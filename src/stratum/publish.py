@@ -77,6 +77,18 @@ def _is_transient_error(exc: Exception) -> bool:
             return True
     except ImportError:
         pass
+    # Check chained exceptions (e.g., HfHubHTTPError wrapping ConnectionError)
+    cause = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+    if cause is not None and cause is not exc:
+        if _is_transient_error(cause):
+            return True
+    # Fall back to string matching for wrapped errors
+    msg = str(exc).lower()
+    if any(needle in msg for needle in (
+        "connection reset", "connection abort", "broken pipe",
+        "timed out", "timeout", "errno 104", "errno 110", "errno 32",
+    )):
+        return True
     return False
 
 
@@ -389,12 +401,6 @@ def publish_to_hub(
         _api = HfApi()
     api = _api
 
-    try:
-        import pyarrow  # noqa: F401
-    except ImportError:
-        eprint("error: pyarrow not installed. Install with: pip install stratum-hq[publish]")
-        return 1
-
     dataset_dir = dataset_dir.resolve()
 
     for layer in layers:
@@ -424,58 +430,66 @@ def publish_to_hub(
 
     manifest = _load_manifest(api, hub_repo)
     max_tar_bytes = max_tar_mb * 1_000_000 if max_tar_mb else None
+    has_caption = "caption" in layers
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
 
-        # Unified data parquet — range-labeled for incremental uploads
         range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
-
-        data_dir = tmp / "data"
-        data_dir.mkdir()
-        data_parquet = data_dir / f"{range_label}.parquet"
-        n = _write_data_parquet(records, image_dirs, data_parquet)
-        eprint(f"  data: {n} records -> data/{range_label}.parquet")
         manifest["total_images"] = max(manifest.get("total_images", 0), offset + len(image_dirs))
+
+        # Data parquet — only when publishing captions
+        if has_caption:
+            try:
+                import pyarrow  # noqa: F401
+            except ImportError:
+                eprint("error: pyarrow not installed. Install with: pip install stratum-hq[publish]")
+                return 1
+
+            data_dir = tmp / "data"
+            data_dir.mkdir()
+            data_parquet = data_dir / f"{range_label}.parquet"
+            n = _write_data_parquet(records, image_dirs, data_parquet)
+            eprint(f"  data: {n} records -> data/{range_label}.parquet")
+
+            layer_info = manifest["layers"].get("caption", {"format": "parquet", "chunks": {}})
+            layer_info["chunks"] = layer_info.get("chunks", {})
+            if isinstance(layer_info["chunks"], list):
+                layer_info["chunks"] = {}
+            layer_info["chunks"][range_label] = n
+            layer_info["count"] = sum(layer_info["chunks"].values())
+            manifest["layers"]["caption"] = layer_info
+            eprint(f"  captions: {n} included in data parquet")
 
         for layer in layers:
             if layer == "caption":
-                layer_info = manifest["layers"].get("caption", {"format": "parquet", "chunks": {}})
-                layer_info["chunks"] = layer_info.get("chunks", {})
-                if isinstance(layer_info["chunks"], list):
-                    layer_info["chunks"] = {}
-                layer_info["chunks"][range_label] = n
-                layer_info["count"] = sum(layer_info["chunks"].values())
-                manifest["layers"]["caption"] = layer_info
-                eprint(f"  captions: {n} included in data parquet")
+                continue
+            layer_dir = tmp / layer
+            layer_dir.mkdir(exist_ok=True)
+
+            layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
+            layer_info["chunks"] = layer_info.get("chunks", {})
+            if isinstance(layer_info["chunks"], list):
+                layer_info["chunks"] = {}
+
+            if max_tar_bytes:
+                groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
             else:
-                layer_dir = tmp / layer
-                layer_dir.mkdir(exist_ok=True)
+                groups = [(image_dirs, records)]
 
-                layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
-                layer_info["chunks"] = layer_info.get("chunks", {})
-                if isinstance(layer_info["chunks"], list):
-                    layer_info["chunks"] = {}
+            for group_dirs, group_recs in groups:
+                # Find the index range this group covers in the original list
+                first = image_dirs.index(group_dirs[0])
+                last = image_dirs.index(group_dirs[-1])
+                sub_label = f"{offset + first:05d}-{offset + last:05d}"
 
-                if max_tar_bytes:
-                    groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
-                else:
-                    groups = [(image_dirs, records)]
+                tar_path = layer_dir / f"{sub_label}.tar"
+                nc = _pack_npy_tar(group_dirs, group_recs, layer, tar_path)
+                layer_info["chunks"][sub_label] = nc
+                eprint(f"  {layer}: {nc} images -> {layer}/{sub_label}.tar")
 
-                img_offset = offset
-                for group_dirs, group_recs in groups:
-                    # Find the index range this group covers in the original list
-                    first = image_dirs.index(group_dirs[0])
-                    last = image_dirs.index(group_dirs[-1])
-                    sub_label = f"{offset + first:05d}-{offset + last:05d}"
-
-                    tar_path = layer_dir / f"{sub_label}.tar"
-                    nc = _pack_npy_tar(group_dirs, group_recs, layer, tar_path)
-                    layer_info["chunks"][sub_label] = nc
-                    eprint(f"  {layer}: {nc} images -> {layer}/{sub_label}.tar")
-
-                layer_info["count"] = sum(layer_info["chunks"].values())
-                manifest["layers"][layer] = layer_info
+            layer_info["count"] = sum(layer_info["chunks"].values())
+            manifest["layers"][layer] = layer_info
 
         # Update manifest
         manifest["version"] = _bump_version(manifest)

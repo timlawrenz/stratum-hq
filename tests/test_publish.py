@@ -203,6 +203,30 @@ def test_is_transient_error_unrelated():
     assert _is_transient_error(KeyError("missing")) is False
 
 
+def test_is_transient_error_wrapped_string():
+    """Catches connection errors wrapped in non-standard exception types."""
+    exc = Exception("[Errno 104] Connection reset by peer")
+    assert _is_transient_error(exc) is True
+
+
+def test_is_transient_error_chained_cause():
+    """Catches transient errors via __cause__ chain."""
+    inner = ConnectionError("reset by peer")
+    outer = RuntimeError("upload failed")
+    outer.__cause__ = inner
+    assert _is_transient_error(outer) is True
+
+
+def test_is_transient_error_broken_pipe_string():
+    exc = Exception("Broken pipe")
+    assert _is_transient_error(exc) is True
+
+
+def test_is_transient_error_timeout_string():
+    exc = Exception("Read timed out")
+    assert _is_transient_error(exc) is True
+
+
 # --- _retry_upload (network errors) ---
 
 @patch("stratum.publish.time.sleep")
