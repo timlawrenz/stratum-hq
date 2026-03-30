@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import re
+import signal
 import sys
 import tempfile
 import time
@@ -505,19 +507,34 @@ def publish_to_hub(
         _write_dataset_card(manifest, hub_repo, card_path,
                             license_id=license_id, attribution=attribution)
 
-        # Upload — upload_large_folder commits in batches and resumes
+        # Upload — upload_large_folder commits in batches and resumes.
+        # Install a SIGINT handler that force-kills the process, because
+        # the HF library's worker threads swallow KeyboardInterrupt.
         if verbose:
             _log_upload_summary(tmp)
         eprint(f"Uploading to {hub_repo} (resumable multi-commit)...")
+
+        prev_handler = signal.getsignal(signal.SIGINT)
+
+        def _force_exit(signum, frame):
+            eprint("\nInterrupted. Already-committed files are on the Hub; "
+                   "re-run to resume.")
+            os._exit(130)
+
+        signal.signal(signal.SIGINT, _force_exit)
         try:
             api.upload_large_folder(
                 folder_path=str(tmp),
                 repo_id=hub_repo,
                 repo_type="dataset",
             )
+        except KeyboardInterrupt:
+            _force_exit(None, None)
         except Exception as e:
             eprint(f"error uploading to {hub_repo}: {e}")
             return 1
+        finally:
+            signal.signal(signal.SIGINT, prev_handler)
 
     eprint(f"Published successfully. Manifest version: {manifest['version']}")
     return 0
