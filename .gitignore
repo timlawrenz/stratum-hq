@@ -10,6 +10,7 @@ build/
 
 # Data (large files — do not commit)
 data/
+example-images/
 
 # Model weights
 *.pt
