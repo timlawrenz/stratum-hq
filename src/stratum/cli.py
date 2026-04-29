@@ -60,6 +60,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                      help="Split layer tars exceeding this size (MB). Each tar becomes a "
                           "separate LFS blob — on retry only failed blobs are re-uploaded. "
                           "Example: --max-tar-mb 50")
+    pub.add_argument("--tmp-dir", type=Path, default=None,
+                     help="Directory for temporary files (default: system temp). "
+                          "Useful when /tmp is too small (e.g., tmpfs).")
     pub.add_argument("--verbose", action="store_true", help="Log upload requests, responses, and file sizes")
 
     # --- reconcile ---
@@ -175,6 +178,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
         offset=args.offset,
         verbose=args.verbose,
         max_tar_mb=args.max_tar_mb,
+        tmp_dir=args.tmp_dir,
     )
 
 

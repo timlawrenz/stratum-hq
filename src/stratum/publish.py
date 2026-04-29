@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import datetime
 import json
 import os
 import re
+import shutil
 import signal
 import sys
 import tempfile
@@ -381,6 +383,89 @@ def _log_upload_summary(folder: Path) -> None:
     eprint(f"  [verbose] total upload: {_format_size(total)}")
 
 
+# --- Staging directory helpers ---
+
+STAGING_META_FILE = "_staging_meta.json"
+UPLOAD_TIMEOUT = 300  # seconds per file upload before considering it stalled
+
+
+def _staging_dir_for(tmp_dir: Path | None, hub_repo: str, offset: int, count: int,
+                     layers: list[str], max_tar_mb: int | None) -> Path:
+    """Return a deterministic staging directory path for this publish run."""
+    safe_repo = hub_repo.replace("/", "--")
+    range_label = f"{offset:05d}-{offset + count - 1:05d}"
+    base = tmp_dir if tmp_dir else Path(tempfile.gettempdir())
+    return base / "stratum-staging" / safe_repo / range_label
+
+
+def _staging_meta(hub_repo: str, offset: int, count: int,
+                  layers: list[str], max_tar_mb: int | None) -> dict:
+    """Build metadata dict describing this staging run's parameters."""
+    return {
+        "hub_repo": hub_repo,
+        "offset": offset,
+        "count": count,
+        "layers": sorted(layers),
+        "max_tar_mb": max_tar_mb,
+    }
+
+
+def _validate_staging(staging: Path, expected_meta: dict) -> bool:
+    """Check if an existing staging dir matches current parameters."""
+    meta_path = staging / STAGING_META_FILE
+    if not meta_path.exists():
+        return False
+    try:
+        with meta_path.open() as f:
+            existing = json.load(f)
+        return existing == expected_meta
+    except Exception:
+        return False
+
+
+def _write_staging_meta(staging: Path, meta: dict) -> None:
+    """Write staging metadata file."""
+    meta_path = staging / STAGING_META_FILE
+    with meta_path.open("w") as f:
+        json.dump(meta, f, indent=2)
+
+
+def _safe_pack_npy_tar(image_dirs: list[Path], records: list[dict],
+                       layer: str, tar_path: Path) -> int:
+    """Pack tar atomically: write to .part then rename on success."""
+    part_path = tar_path.with_suffix(".tar.part")
+    nc = _pack_npy_tar(image_dirs, records, layer, part_path)
+    os.replace(part_path, tar_path)
+    return nc
+
+
+def _upload_file_with_timeout(api, local_path: Path, repo_path: str,
+                              hub_repo: str, timeout: int = UPLOAD_TIMEOUT,
+                              verbose: bool = False) -> None:
+    """Upload a single file with stall detection via thread timeout.
+
+    If the upload doesn't complete within *timeout* seconds, raises
+    TimeoutError so _retry_upload can retry it.
+    """
+    def _do_upload():
+        api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo=repo_path,
+            repo_id=hub_repo,
+            repo_type="dataset",
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_do_upload)
+        try:
+            future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(
+                f"Upload stalled: {repo_path} ({_format_size(local_path.stat().st_size)}) "
+                f"did not complete within {timeout}s"
+            )
+
+
 def publish_to_hub(
     dataset_dir: Path,
     hub_repo: str,
@@ -391,9 +476,17 @@ def publish_to_hub(
     offset: int = 0,
     verbose: bool = False,
     max_tar_mb: int | None = None,
+    tmp_dir: Path | None = None,
+    upload_timeout: int = UPLOAD_TIMEOUT,
     _api=None,
 ) -> int:
-    """Publish dataset layers to HuggingFace Hub. Returns exit code."""
+    """Publish dataset layers to HuggingFace Hub. Returns exit code.
+
+    Uses a deterministic staging directory so that:
+    - Tar files are reused across interrupted runs (no rebuild needed)
+    - Ctrl-C is safe: staging persists, re-run resumes
+    - Stalled uploads are detected and retried automatically
+    """
     if _api is None:
         try:
             from huggingface_hub import HfApi
@@ -434,107 +527,178 @@ def publish_to_hub(
     max_tar_bytes = max_tar_mb * 1_000_000 if max_tar_mb else None
     has_caption = "caption" in layers
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
+    # Set up deterministic staging directory (survives Ctrl-C for reuse)
+    staging = _staging_dir_for(tmp_dir, hub_repo, offset, len(image_dirs), layers, max_tar_mb)
+    expected_meta = _staging_meta(hub_repo, offset, len(image_dirs), layers, max_tar_mb)
 
-        range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
-        manifest["total_images"] = max(manifest.get("total_images", 0), offset + len(image_dirs))
+    reusing = staging.exists() and _validate_staging(staging, expected_meta)
+    if reusing:
+        eprint(f"  resuming from staging: {staging}")
+    else:
+        # Clear any stale staging with mismatched params
+        if staging.exists():
+            shutil.rmtree(staging)
+        staging.mkdir(parents=True, exist_ok=True)
+        _write_staging_meta(staging, expected_meta)
 
-        # Data parquet — only when publishing captions
-        if has_caption:
-            try:
-                import pyarrow  # noqa: F401
-            except ImportError:
-                eprint("error: pyarrow not installed. Install with: pip install stratum-hq[publish]")
-                return 1
+    range_label = f"{offset:05d}-{offset + len(image_dirs) - 1:05d}"
+    manifest["total_images"] = max(manifest.get("total_images", 0), offset + len(image_dirs))
 
-            data_dir = tmp / "data"
-            data_dir.mkdir()
-            data_parquet = data_dir / f"{range_label}.parquet"
+    # Track files to upload: list of (local_path, repo_path)
+    upload_queue: list[tuple[Path, str]] = []
+
+    # Data parquet — only when publishing captions
+    if has_caption:
+        try:
+            import pyarrow  # noqa: F401
+        except ImportError:
+            eprint("error: pyarrow not installed. Install with: pip install stratum-hq[publish]")
+            return 1
+
+        data_dir = staging / "data"
+        data_dir.mkdir(exist_ok=True)
+        data_parquet = data_dir / f"{range_label}.parquet"
+        if data_parquet.exists() and reusing:
+            eprint(f"  data: reusing data/{range_label}.parquet")
+            # Read count from the parquet to update manifest
+            import pyarrow.parquet as pq
+            n = pq.read_metadata(data_parquet).num_rows
+        else:
             n = _write_data_parquet(records, image_dirs, data_parquet)
             eprint(f"  data: {n} records -> data/{range_label}.parquet")
 
-            layer_info = manifest["layers"].get("caption", {"format": "parquet", "chunks": {}})
-            layer_info["chunks"] = layer_info.get("chunks", {})
-            if isinstance(layer_info["chunks"], list):
-                layer_info["chunks"] = {}
-            layer_info["chunks"][range_label] = n
-            layer_info["count"] = sum(layer_info["chunks"].values())
-            manifest["layers"]["caption"] = layer_info
-            eprint(f"  captions: {n} included in data parquet")
+        upload_queue.append((data_parquet, f"data/{range_label}.parquet"))
 
-        for layer in layers:
-            if layer == "caption":
-                continue
-            layer_dir = tmp / layer
-            layer_dir.mkdir(exist_ok=True)
+        layer_info = manifest["layers"].get("caption", {"format": "parquet", "chunks": {}})
+        layer_info["chunks"] = layer_info.get("chunks", {})
+        if isinstance(layer_info["chunks"], list):
+            layer_info["chunks"] = {}
+        layer_info["chunks"][range_label] = n
+        layer_info["count"] = sum(layer_info["chunks"].values())
+        manifest["layers"]["caption"] = layer_info
+        eprint(f"  captions: {n} included in data parquet")
 
-            layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
-            layer_info["chunks"] = layer_info.get("chunks", {})
-            if isinstance(layer_info["chunks"], list):
-                layer_info["chunks"] = {}
+    for layer in layers:
+        if layer == "caption":
+            continue
+        layer_dir = staging / layer
+        layer_dir.mkdir(exist_ok=True)
 
-            if max_tar_bytes:
-                groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
+        layer_info = manifest["layers"].get(layer, {"format": "npy_tar", "chunks": {}})
+        layer_info["chunks"] = layer_info.get("chunks", {})
+        if isinstance(layer_info["chunks"], list):
+            layer_info["chunks"] = {}
+
+        if max_tar_bytes:
+            groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
+        else:
+            groups = [(image_dirs, records)]
+
+        for group_dirs, group_recs in groups:
+            first = image_dirs.index(group_dirs[0])
+            last = image_dirs.index(group_dirs[-1])
+            sub_label = f"{offset + first:05d}-{offset + last:05d}"
+
+            tar_path = layer_dir / f"{sub_label}.tar"
+            if tar_path.exists() and reusing:
+                eprint(f"  {layer}: reusing {layer}/{sub_label}.tar")
+                # Count images in existing tar (same as group size minus missing)
+                nc = sum(1 for d in group_dirs if _image_has_layer(d, layer))
             else:
-                groups = [(image_dirs, records)]
-
-            for group_dirs, group_recs in groups:
-                # Find the index range this group covers in the original list
-                first = image_dirs.index(group_dirs[0])
-                last = image_dirs.index(group_dirs[-1])
-                sub_label = f"{offset + first:05d}-{offset + last:05d}"
-
-                tar_path = layer_dir / f"{sub_label}.tar"
-                nc = _pack_npy_tar(group_dirs, group_recs, layer, tar_path)
-                layer_info["chunks"][sub_label] = nc
+                nc = _safe_pack_npy_tar(group_dirs, group_recs, layer, tar_path)
                 eprint(f"  {layer}: {nc} images -> {layer}/{sub_label}.tar")
 
-            layer_info["count"] = sum(layer_info["chunks"].values())
-            manifest["layers"][layer] = layer_info
+            layer_info["chunks"][sub_label] = nc
+            upload_queue.append((tar_path, f"{layer}/{sub_label}.tar"))
 
-        # Update manifest
-        manifest["version"] = _bump_version(manifest)
-        manifest["created_with"] = f"stratum-hq v{__version__}"
-        manifest["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        layer_info["count"] = sum(layer_info["chunks"].values())
+        manifest["layers"][layer] = layer_info
 
-        manifest_path = tmp / MANIFEST_FILE
-        with manifest_path.open("w") as f:
-            json.dump(manifest, f, indent=2, ensure_ascii=False)
+    # Update manifest
+    manifest["version"] = _bump_version(manifest)
+    manifest["created_with"] = f"stratum-hq v{__version__}"
+    manifest["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # Generate dataset card
-        card_path = tmp / "README.md"
-        _write_dataset_card(manifest, hub_repo, card_path,
-                            license_id=license_id, attribution=attribution)
+    manifest_path = staging / MANIFEST_FILE
+    with manifest_path.open("w") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
 
-        # Upload — upload_large_folder commits in batches and resumes.
-        # Install a SIGINT handler that force-kills the process, because
-        # the HF library's worker threads swallow KeyboardInterrupt.
-        if verbose:
-            _log_upload_summary(tmp)
-        eprint(f"Uploading to {hub_repo} (resumable multi-commit)...")
+    card_path = staging / "README.md"
+    _write_dataset_card(manifest, hub_repo, card_path,
+                        license_id=license_id, attribution=attribution)
 
-        prev_handler = signal.getsignal(signal.SIGINT)
+    # Upload all payload files, then manifest/card last
+    if verbose:
+        _log_upload_summary(staging)
 
-        def _force_exit(signum, frame):
-            eprint("\nInterrupted. Already-committed files are on the Hub; "
-                   "re-run to resume.")
-            os._exit(130)
+    total_files = len(upload_queue) + 2  # +2 for manifest and README
+    eprint(f"Uploading {total_files} files to {hub_repo}...")
 
-        signal.signal(signal.SIGINT, _force_exit)
-        try:
-            api.upload_large_folder(
-                folder_path=str(tmp),
-                repo_id=hub_repo,
-                repo_type="dataset",
-            )
-        except KeyboardInterrupt:
-            _force_exit(None, None)
-        except Exception as e:
-            eprint(f"error uploading to {hub_repo}: {e}")
-            return 1
-        finally:
-            signal.signal(signal.SIGINT, prev_handler)
+    interrupted = False
+
+    def _handle_interrupt(signum, frame):
+        nonlocal interrupted
+        interrupted = True
+        eprint("\n  interrupted — finishing current upload, then exiting.")
+        eprint(f"  staging preserved at: {staging}")
+        eprint("  re-run the same command to resume.")
+
+    prev_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, _handle_interrupt)
+
+    try:
+        # Upload payload files (tars, parquets)
+        for i, (local_path, repo_path) in enumerate(upload_queue, 1):
+            if interrupted:
+                break
+            size_str = _format_size(local_path.stat().st_size)
+            eprint(f"  [{i}/{total_files}] {repo_path} ({size_str})...")
+            try:
+                _retry_upload(
+                    _upload_file_with_timeout,
+                    api, local_path, repo_path, hub_repo,
+                    timeout=upload_timeout,
+                    verbose=verbose,
+                )
+            except Exception as e:
+                eprint(f"error uploading {repo_path}: {e}")
+                eprint(f"  staging preserved at: {staging}")
+                eprint("  re-run the same command to resume.")
+                return 1
+            if verbose:
+                eprint(f"  [verbose] {repo_path} uploaded successfully")
+
+        if interrupted:
+            return 130
+
+        # Upload manifest and card last (after all payload files succeed)
+        for local_path, repo_path in [(manifest_path, MANIFEST_FILE), (card_path, "README.md")]:
+            if interrupted:
+                break
+            eprint(f"  [{total_files - 1 if repo_path == MANIFEST_FILE else total_files}/{total_files}] {repo_path}...")
+            try:
+                _retry_upload(
+                    _upload_file_with_timeout,
+                    api, local_path, repo_path, hub_repo,
+                    timeout=upload_timeout,
+                    verbose=verbose,
+                )
+            except Exception as e:
+                eprint(f"error uploading {repo_path}: {e}")
+                eprint(f"  staging preserved at: {staging}")
+                return 1
+
+        if interrupted:
+            return 130
+
+    finally:
+        signal.signal(signal.SIGINT, prev_handler)
+
+    # Success — clean up staging directory
+    try:
+        shutil.rmtree(staging)
+    except OSError as e:
+        eprint(f"  warning: could not remove staging dir: {e}")
 
     eprint(f"Published successfully. Manifest version: {manifest['version']}")
     return 0

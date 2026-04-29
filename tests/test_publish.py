@@ -16,6 +16,11 @@ from stratum.publish import (
     _plan_tar_splits,
     _retry_on_429,
     _retry_upload,
+    _staging_dir_for,
+    _staging_meta,
+    _validate_staging,
+    _write_staging_meta,
+    publish_to_hub,
     reconcile_hub_manifest,
 )
 
@@ -365,11 +370,11 @@ def test_publish_splits_tar_with_max_tar_mb(tmp_path):
     mock_api.list_repo_files.return_value = []
     uploaded_paths = []
 
-    def capture_upload(*, folder_path, repo_id, repo_type):
-        for p in Path(folder_path).rglob("*.tar"):
-            uploaded_paths.append(str(p.relative_to(folder_path)))
+    def capture_upload(*, path_or_fileobj, path_in_repo, repo_id, repo_type):
+        if path_in_repo.endswith(".tar"):
+            uploaded_paths.append(path_in_repo)
 
-    mock_api.upload_large_folder.side_effect = capture_upload
+    mock_api.upload_file.side_effect = capture_upload
     mock_api.create_repo.return_value = None
 
     # Set max_tar_mb=1 byte threshold (very small) to force splitting
@@ -610,3 +615,133 @@ def test_reconcile_retries_on_429(mock_sleep, mock_load_manifest):
     result = reconcile_hub_manifest(hub_repo="user/data", _api=mock_api)
     assert result == 0
     assert mock_sleep.call_count == 2
+
+# --- Staging directory ---
+
+def test_staging_dir_deterministic():
+    """Same params produce same staging path."""
+    d1 = _staging_dir_for(Path("/tmp"), "user/repo", 0, 10, ["dinov3"], 64)
+    d2 = _staging_dir_for(Path("/tmp"), "user/repo", 0, 10, ["dinov3"], 64)
+    assert d1 == d2
+    assert "user--repo" in str(d1)
+
+
+def test_staging_dir_varies_by_offset():
+    d1 = _staging_dir_for(Path("/tmp"), "user/repo", 0, 10, ["dinov3"], 64)
+    d2 = _staging_dir_for(Path("/tmp"), "user/repo", 100, 10, ["dinov3"], 64)
+    assert d1 != d2
+
+
+def test_validate_staging_valid(tmp_path):
+    meta = _staging_meta("user/repo", 0, 10, ["dinov3"], 64)
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    _write_staging_meta(staging, meta)
+    assert _validate_staging(staging, meta) is True
+
+
+def test_validate_staging_mismatched(tmp_path):
+    meta1 = _staging_meta("user/repo", 0, 10, ["dinov3"], 64)
+    meta2 = _staging_meta("user/repo", 0, 10, ["dinov3", "t5"], 64)
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    _write_staging_meta(staging, meta1)
+    assert _validate_staging(staging, meta2) is False
+
+
+def test_validate_staging_missing(tmp_path):
+    meta = _staging_meta("user/repo", 0, 10, ["dinov3"], 64)
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    assert _validate_staging(staging, meta) is False
+
+
+# --- Publish resume (reuses tars) ---
+
+def test_publish_resumes_from_staging(tmp_path):
+    """Re-running publish reuses existing tars instead of rebuilding."""
+    dirs, recs = _make_npy_dirs(tmp_path / "dataset", 2, "dinov3")
+
+    uploaded_paths = []
+
+    def capture_upload(*, path_or_fileobj, path_in_repo, repo_id, repo_type):
+        uploaded_paths.append(path_in_repo)
+
+    mock_api = MagicMock()
+    mock_api.list_repo_files.return_value = []
+    mock_api.upload_file.side_effect = capture_upload
+    mock_api.create_repo.return_value = None
+
+    staging_dir = tmp_path / "staging"
+
+    # First run
+    result = publish_to_hub(
+        dataset_dir=tmp_path / "dataset",
+        hub_repo="user/test",
+        layers=["dinov3"],
+        tmp_dir=staging_dir,
+        _api=mock_api,
+    )
+    assert result == 0
+    first_upload_count = len(uploaded_paths)
+
+    # Second run — staging was cleaned on success, so tars are rebuilt
+    uploaded_paths.clear()
+    result = publish_to_hub(
+        dataset_dir=tmp_path / "dataset",
+        hub_repo="user/test",
+        layers=["dinov3"],
+        tmp_dir=staging_dir,
+        _api=mock_api,
+    )
+    assert result == 0
+    assert len(uploaded_paths) == first_upload_count
+
+
+# --- Stall detection ---
+
+def test_upload_stall_detected_and_retried(tmp_path):
+    """Stalled uploads (timeout) are retried."""
+    import concurrent.futures
+    from stratum.publish import _upload_file_with_timeout
+
+    # Create a dummy file
+    test_file = tmp_path / "test.tar"
+    test_file.write_bytes(b"data")
+
+    mock_api = MagicMock()
+
+    # upload_file that hangs forever
+    import threading
+    call_count = [0]
+
+    def hanging_upload(*, path_or_fileobj, path_in_repo, repo_id, repo_type):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # Simulate stall — sleep longer than timeout
+            threading.Event().wait(timeout=10)
+        # Second call succeeds
+
+    mock_api.upload_file.side_effect = hanging_upload
+
+    # Very short timeout to make test fast
+    try:
+        _upload_file_with_timeout(
+            mock_api, test_file, "dinov3/test.tar", "user/test",
+            timeout=1,  # 1 second timeout
+        )
+        # Should raise TimeoutError
+        assert False, "Expected TimeoutError"
+    except TimeoutError as e:
+        assert "stalled" in str(e).lower()
+
+
+def test_parse_args_publish_tmp_dir():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3",
+                       "--tmp-dir", "/home/user/tmp"])
+    assert args.tmp_dir == Path("/home/user/tmp")
+
+
+def test_parse_args_publish_tmp_dir_default():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3"])
+    assert args.tmp_dir is None
