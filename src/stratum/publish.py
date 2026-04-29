@@ -394,7 +394,12 @@ def _staging_dir_for(tmp_dir: Path | None, hub_repo: str, offset: int, count: in
     """Return a deterministic staging directory path for this publish run."""
     safe_repo = hub_repo.replace("/", "--")
     range_label = f"{offset:05d}-{offset + count - 1:05d}"
-    base = tmp_dir if tmp_dir else Path(tempfile.gettempdir())
+    if tmp_dir:
+        base = tmp_dir
+    else:
+        # Default to ~/.cache/stratum/ instead of /tmp, since /tmp is often
+        # a small tmpfs and tars can be large.
+        base = Path.home() / ".cache" / "stratum"
     return base / "stratum-staging" / safe_repo / range_label
 
 

@@ -624,6 +624,13 @@ def test_staging_dir_deterministic():
     d2 = _staging_dir_for(Path("/tmp"), "user/repo", 0, 10, ["dinov3"], 64)
     assert d1 == d2
     assert "user--repo" in str(d1)
+    assert str(d1).startswith("/tmp/")
+
+
+def test_staging_dir_default_uses_home_cache():
+    """Without --tmp-dir, staging goes to ~/.cache/stratum/ not /tmp."""
+    d = _staging_dir_for(None, "user/repo", 0, 10, ["dinov3"], 64)
+    assert ".cache/stratum/stratum-staging" in str(d)
 
 
 def test_staging_dir_varies_by_offset():
