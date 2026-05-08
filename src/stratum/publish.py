@@ -460,15 +460,17 @@ def _upload_file_with_timeout(api, local_path: Path, repo_path: str,
             repo_type="dataset",
         )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(_do_upload)
-        try:
-            future.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            raise TimeoutError(
-                f"Upload stalled: {repo_path} ({_format_size(local_path.stat().st_size)}) "
-                f"did not complete within {timeout}s"
-            )
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(_do_upload)
+    try:
+        future.result(timeout=timeout)
+    except concurrent.futures.TimeoutError:
+        raise TimeoutError(
+            f"Upload stalled: {repo_path} ({_format_size(local_path.stat().st_size)}) "
+            f"did not complete within {timeout}s"
+        )
+    finally:
+        pool.shutdown(wait=False)
 
 
 def publish_to_hub(
@@ -642,11 +644,10 @@ def publish_to_hub(
     interrupted = False
 
     def _handle_interrupt(signum, frame):
-        nonlocal interrupted
-        interrupted = True
-        eprint("\n  interrupted — finishing current upload, then exiting.")
+        eprint("\n  interrupted — exiting immediately.")
         eprint(f"  staging preserved at: {staging}")
         eprint("  re-run the same command to resume.")
+        sys.exit(130)
 
     prev_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, _handle_interrupt)
