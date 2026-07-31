@@ -457,3 +457,384 @@ class TestNormal2Pipeline:
         )
         normal_map = np.load(out_dir / "normal2.npy")
         assert normal_map.shape[:2] == (h, w)
+
+
+# ---------------------------------------------------------------------------
+# Pointmap pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_pointmap_model(output_h: int = 64, output_w: int = 48):
+    """Create a mock Sapiens2 pointmap model that returns (pointmap, scale)."""
+    fake = mock.MagicMock()
+    fake.pipeline.return_value = {}
+    import torch
+
+    fake.data_preprocessor.return_value = {
+        "inputs": torch.randn(1, 3, output_h, output_w),
+        "data_samples": {"meta": {"padding_size": (0, 0, 0, 0)}},
+    }
+    pointmap = torch.randn(1, 3, output_h, output_w)
+    scale = torch.tensor([[1.0]])
+    fake.return_value = (pointmap, scale)
+    return fake
+
+
+class TestPointmapPipeline:
+    """Tests for stratum2.pipeline.pointmap — Sapiens2 pointmap."""
+
+    def test_pointmap_module_importable(self):
+        from stratum2.pipeline import pointmap
+
+        assert pointmap is not None
+
+    def test_process_saves_pointmap_file(self, tmp_path):
+        from stratum2.pipeline.pointmap import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_pointmap_model()
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            pointmap_model=fake_model,
+            device="cpu",
+        )
+        assert result is True
+        assert (out_dir / "pointmap.npy").exists()
+
+    def test_process_skips_when_seg2_missing(self, tmp_path):
+        from stratum2.pipeline.pointmap import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image())
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        fake_model = _make_fake_pointmap_model()
+
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            pointmap_model=fake_model,
+            device="cpu",
+        )
+        assert result is False
+
+    def test_process_output_is_float16_hw3(self, tmp_path):
+        from stratum2.pipeline.pointmap import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_pointmap_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            pointmap_model=fake_model,
+            device="cpu",
+        )
+        pm = np.load(out_dir / "pointmap.npy")
+        assert pm.ndim == 3
+        assert pm.shape[2] == 3
+        assert pm.dtype == np.float16
+
+    def test_process_background_is_zero(self, tmp_path):
+        from stratum2.pipeline.pointmap import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.zeros((h, w), dtype=np.uint8)
+        seg[:64, :] = 1
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_pointmap_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            pointmap_model=fake_model,
+            device="cpu",
+        )
+        pm = np.load(out_dir / "pointmap.npy")
+        bg_points = pm[seg == 0]
+        assert np.all(bg_points == 0)
+
+
+# ---------------------------------------------------------------------------
+# Matting pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_matting_model(output_h: int = 64, output_w: int = 48):
+    """Create a mock Sapiens2 matting model returning [fgr_rgb(3), alpha(1)]."""
+    fake = mock.MagicMock()
+    fake.pipeline.return_value = {}
+    import torch
+
+    fake.data_preprocessor.return_value = {
+        "inputs": torch.randn(1, 3, output_h, output_w),
+        "data_samples": {"meta": {"padding_size": (0, 0, 0, 0)}},
+    }
+    # 4-channel output: fgr_rgb(3) + alpha(1)
+    out = torch.zeros(1, 4, output_h, output_w)
+    out[:, 3] = 0.5  # alpha = 0.5 everywhere
+    fake.return_value = out
+    return fake
+
+
+class TestMattingPipeline:
+    """Tests for stratum2.pipeline.matting — Sapiens2 human matting."""
+
+    def test_matting_module_importable(self):
+        from stratum2.pipeline import matting
+
+        assert matting is not None
+
+    def test_process_saves_matting_file(self, tmp_path):
+        from stratum2.pipeline.matting import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_model = _make_fake_matting_model()
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            matting_model=fake_model,
+            device="cpu",
+        )
+        assert result is True
+        assert (out_dir / "matting.npy").exists()
+
+    def test_process_output_is_float16_hw(self, tmp_path):
+        from stratum2.pipeline.matting import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_model = _make_fake_matting_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            matting_model=fake_model,
+            device="cpu",
+        )
+        alpha = np.load(out_dir / "matting.npy")
+        assert alpha.ndim == 2
+        assert alpha.dtype == np.float16
+
+    def test_process_alpha_in_range_01(self, tmp_path):
+        from stratum2.pipeline.matting import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_model = _make_fake_matting_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            matting_model=fake_model,
+            device="cpu",
+        )
+        alpha = np.load(out_dir / "matting.npy").astype(np.float32)
+        assert alpha.min() >= 0.0
+        assert alpha.max() <= 1.0
+
+    def test_process_does_not_require_seg(self, tmp_path):
+        """Matting should work without seg2.npy (standalone)."""
+        from stratum2.pipeline.matting import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        # No seg2.npy created
+
+        fake_model = _make_fake_matting_model()
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            matting_model=fake_model,
+            device="cpu",
+        )
+        assert result is True
+        assert (out_dir / "matting.npy").exists()
+
+
+# ---------------------------------------------------------------------------
+# Pose2 pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_pose_model():
+    """Create a mock Sapiens2 pose model with codec."""
+    fake = mock.MagicMock()
+    fake.pipeline.return_value = {
+        "inputs": mock.MagicMock(),
+        "data_samples": {
+            "meta": {
+                "input_size": np.array([768, 1024], dtype=np.float32),
+                "bbox_center": np.array([512.0, 384.0], dtype=np.float32),
+                "bbox_scale": np.array([768.0, 1024.0], dtype=np.float32),
+            }
+        },
+    }
+    import torch
+
+    fake.data_preprocessor.return_value = {
+        "inputs": torch.randn(1, 3, 1024, 768),
+        "data_samples": fake.pipeline.return_value["data_samples"],
+    }
+    # Return heatmaps: B × K × H × W
+    fake.return_value = torch.randn(1, 308, 64, 48)
+
+    # Mock codec.decode
+    fake.codec = mock.MagicMock()
+    fake.codec.decode.return_value = (
+        np.random.randn(1, 308, 2).astype(np.float32),  # keypoints
+        np.random.rand(1, 308).astype(np.float32),  # scores
+    )
+    return fake
+
+
+class TestPose2Pipeline:
+    """Tests for stratum2.pipeline.pose — Sapiens2 308-keypoint pose."""
+
+    def test_pose_module_importable(self):
+        from stratum2.pipeline import pose
+
+        assert pose is not None
+
+    def test_process_saves_pose2_file(self, tmp_path, monkeypatch):
+        """process() writes pose2.npy."""
+        from stratum2.pipeline.pose import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_pose_model = _make_fake_pose_model()
+
+        # Mock DETR detection to return a simple bbox
+        with mock.patch(
+            "stratum2.pipeline.pose._get_detector"
+        ) as mock_det, mock.patch(
+            "stratum2.pipeline.pose._detect_persons"
+        ) as mock_detect:
+            mock_det.return_value = (mock.MagicMock(), mock.MagicMock())
+            mock_detect.return_value = np.array(
+                [[10, 10, 100, 200]], dtype=np.float32
+            )
+
+            result = process(
+                image_path=img_path,
+                output_dir=out_dir,
+                pose_model=fake_pose_model,
+                device="cpu",
+            )
+            assert result is True
+            assert (out_dir / "pose2.npy").exists()
+
+    def test_process_output_is_n_k_3(self, tmp_path, monkeypatch):
+        """pose2.npy has shape (N, 308, 3) for N persons."""
+        from stratum2.pipeline.pose import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_pose_model = _make_fake_pose_model()
+
+        with mock.patch(
+            "stratum2.pipeline.pose._get_detector"
+        ) as mock_det, mock.patch(
+            "stratum2.pipeline.pose._detect_persons"
+        ) as mock_detect:
+            mock_det.return_value = (mock.MagicMock(), mock.MagicMock())
+            mock_detect.return_value = np.array(
+                [[10, 10, 100, 200]], dtype=np.float32
+            )
+
+            process(
+                image_path=img_path,
+                output_dir=out_dir,
+                pose_model=fake_pose_model,
+                device="cpu",
+            )
+            pose = np.load(out_dir / "pose2.npy")
+            assert pose.ndim == 3
+            assert pose.shape[1] == 308
+            assert pose.shape[2] == 3  # (x, y, confidence)
+
+    def test_process_no_persons_gives_empty(self, tmp_path, monkeypatch):
+        """Zero detections produces (0, 308, 3) array."""
+        from stratum2.pipeline.pose import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+
+        fake_pose_model = _make_fake_pose_model()
+
+        with mock.patch(
+            "stratum2.pipeline.pose._get_detector"
+        ) as mock_det, mock.patch(
+            "stratum2.pipeline.pose._detect_persons"
+        ) as mock_detect:
+            mock_det.return_value = (mock.MagicMock(), mock.MagicMock())
+            mock_detect.return_value = np.array([], dtype=np.float32).reshape(
+                0, 4
+            )
+
+            process(
+                image_path=img_path,
+                output_dir=out_dir,
+                pose_model=fake_pose_model,
+                device="cpu",
+            )
+            pose = np.load(out_dir / "pose2.npy")
+            assert pose.shape == (0, 308, 3)
