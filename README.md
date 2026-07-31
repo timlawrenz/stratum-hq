@@ -2,23 +2,30 @@
 
 A dataset-agnostic image enrichment pipeline. Given any directory of images, stratum produces per-image artifact directories containing multi-modal embeddings, captions, pose keypoints, body-part segmentation, depth maps, and surface normals — ready for publishing to HuggingFace or training diffusion models.
 
+**stratum** uses Sapiens-1B TorchScript models (v1).  
+**stratum2** uses Sapiens2 specialized safetensors checkpoints (v2) — higher quality, more modalities.
+
 ## Quick start
 
 ```bash
 # Install with GPU support (torch must be installed separately for your platform)
 pip install -e ".[all]"
 
-# Enrich a directory of images
+# === stratum (Sapiens v1) ===
 stratum process ./images/ --output ./dataset/ --passes all --device cuda
 
-# Check progress
-stratum status ./dataset/
+# === stratum2 (Sapiens v2) ===
+# Requires the sapiens2 repo: pip install "sapiens @ git+https://github.com/facebookresearch/sapiens2.git"
+SAPIENS2_SIZE=0.4b stratum2 process ./images/ --output ./dataset/ --passes all --device cuda
 
-# Publish to HuggingFace
-stratum publish ./dataset/ --hub-repo user/my-dataset --layers caption,dinov3
+# Check progress (works for both)
+stratum status ./dataset/
+stratum2 status ./dataset/
 ```
 
 ## What it produces
+
+### stratum (Sapiens v1)
 
 Each source image gets its own output directory, mirroring the source structure:
 
@@ -30,10 +37,10 @@ source/ffhq/00001.png  →  dataset/ffhq/00001/
                              ├── dinov3_patches.npy
                              ├── t5_hidden.npy
                              ├── t5_mask.npy
-                             ├── pose.npy
-                             ├── seg.npy
-                             ├── depth.npy
-                             └── normal.npy
+                             ├── pose.npy          ← DWPose (133 kp)
+                             ├── seg.npy           ← Sapiens-1B (28 cls)
+                             ├── depth.npy         ← Sapiens-1B
+                             └── normal.npy        ← Sapiens-1B
 ```
 
 | Artifact | Shape | Dtype | Description |
@@ -45,10 +52,57 @@ source/ffhq/00001.png  →  dataset/ffhq/00001/
 | `t5_hidden.npy` | `(512, 1024)` | float16 | T5-Large text encoder hidden states |
 | `t5_mask.npy` | `(512,)` | uint8 | T5 attention mask (1=valid, 0=padding) |
 | `pose.npy` | `(133, 3)` | float16 | DWPose whole-body keypoints: [x, y, confidence] in [-1, 1] |
-| `seg.npy` | `(H, W)` | uint8 | Sapiens 28-class body-part segmentation (class IDs 0–27) |
-| `depth.npy` | `(H, W)` | float16 | Sapiens relative depth, foreground-masked and normalised to [0, 1] |
-| `normal.npy` | `(H, W, 3)` | float16 | Sapiens per-pixel surface normals (XYZ), L2-normalised, foreground-masked |
+| `seg.npy` | `(H, W)` | uint8 | Sapiens-1B 28-class body-part segmentation (class IDs 0–27) |
+| `depth.npy` | `(H, W)` | float16 | Sapiens-1B relative depth, foreground-masked and normalised to [0, 1] |
+| `normal.npy` | `(H, W, 3)` | float16 | Sapiens-1B per-pixel surface normals (XYZ), L2-normalised, foreground-masked |
 | `pixel.npy` | `(3, H, W)` | float16 | Bucketed RGB crop in [0, 1] *(opt-in only)* |
+
+### stratum2 (Sapiens v2)
+
+Same directory structure; Sapiens2 artifacts use `2` suffix when they overlap with v1:
+
+```
+source/ffhq/00001.png  →  dataset/ffhq/00001/
+                             ├── metadata.json
+                             ├── caption.txt       ← shared (same as stratum)
+                             ├── dinov3_cls.npy    ← shared
+                             ├── dinov3_patches.npy ← shared
+                             ├── t5_hidden.npy     ← shared
+                             ├── t5_mask.npy       ← shared
+                             ├── pose2.npy         ← Sapiens2 pose (308 kp)
+                             ├── seg2.npy          ← Sapiens2 seg (29 cls)
+                             ├── normal2.npy       ← Sapiens2 normals
+                             ├── pointmap.npy      ← Sapiens2 3D XYZ (replaces depth)
+                             └── matting.npy       ← Sapiens2 alpha matte
+```
+
+| Artifact | Shape | Dtype | Description |
+|----------|-------|-------|-------------|
+| `pose2.npy` | `(N, 308, 3)` | float32 | Sapiens2 308-keypoint pose (x, y, confidence) per person |
+| `seg2.npy` | `(H, W)` | uint8 | Sapiens2 29-class body-part segmentation (class IDs 0–28) |
+| `normal2.npy` | `(H, W, 3)` | float16 | Sapiens2 surface normals (XYZ), L2-normalised, foreground-masked |
+| `pointmap.npy` | `(H, W, 3)` | float16 | Sapiens2 per-pixel 3D points in camera frame (metric XYZ) |
+| `matting.npy` | `(H, W)` | float16 | Sapiens2 alpha matte in [0, 1] |
+| *(shared)* | | | `metadata.json`, `caption.txt`, `dinov3_*.npy`, `t5_*.npy`, `pixel.npy` — same as stratum |
+
+### Coexisting v1 + v2 artifacts
+
+stratum and stratum2 produce different filenames for overlapping modalities, so you can run both pipelines on the same dataset:
+
+```
+dataset/ffhq/00001/
+├── seg.npy         ← Sapiens-1B (28 cls)
+├── seg2.npy        ← Sapiens2 (29 cls)
+├── depth.npy       ← Sapiens-1B depth
+├── pointmap.npy    ← Sapiens2 3D XYZ
+├── pose.npy        ← DWPose (133 kp, from stratum only)
+├── pose2.npy       ← Sapiens2 pose (308 kp, from stratum2 only)
+├── normal.npy      ← Sapiens-1B normals
+├── normal2.npy     ← Sapiens2 normals
+├── caption.txt     ← shared
+├── dinov3_cls.npy  ← shared
+└── ...
+```
 
 ## Installation
 
@@ -64,19 +118,29 @@ pip install -e ".[gpu]"
 # With pose estimation
 pip install -e ".[pose]"
 
-# With Sapiens segmentation, depth, and normals
+# With Sapiens segmentation, depth, and normals (v1)
 pip install -e ".[sapiens]"
 
 # With HuggingFace publishing
 pip install -e ".[publish]"
 
-# Everything
+# Everything (stratum v1 only)
 pip install -e ".[all]"
 ```
 
 Install PyTorch first following <https://pytorch.org/get-started/locally/>.
 
+**For stratum2 (Sapiens v2)** — additionally install the sapiens2 repo:
+
+```bash
+pip install "sapiens @ git+https://github.com/facebookresearch/sapiens2.git"
+```
+
+This provides `sapiens.dense.models.init_model()` and `sapiens.pose.models.init_model()` used by stratum2's loader. The `sapiens` package includes all task config files — no bundling needed.
+
 ## Pipeline passes
+
+### stratum (v1)
 
 Each pass runs independently and is idempotent — if the output file already exists, the image is skipped.
 
@@ -91,21 +155,51 @@ Each pass runs independently and is idempotent — if the output file already ex
 | `normal` | Surface normal prediction via Sapiens-1B | `normal.npy` | GPU + `[sapiens]`, seg |
 | `pixel` | Saves bucketed RGB crop as numpy array | `pixel.npy` | — |
 
-`--passes all` runs caption, dinov3, t5, pose, seg, depth, and normal. The pixel pass is **opt-in** — request it explicitly with `--passes pixel` to avoid bundling raw image data in published datasets. Depth and normal depend on seg (for the foreground mask), similar to how t5 depends on caption.
+`--passes all` runs caption, dinov3, t5, pose, seg, depth, and normal. The pixel pass is **opt-in**. Depth and normal depend on seg (for the foreground mask), similar to how t5 depends on caption.
+
+### stratum2 (v2)
+
+| Pass | What it does | Artifacts | Requires |
+|------|-------------|-----------|----------|
+| `caption` | Same as stratum — Ollama captioning | `caption.txt` | Ollama server |
+| `dinov3` | Same as stratum — DINOv3 embeddings | `dinov3_cls.npy`, `dinov3_patches.npy` | GPU + `[gpu]` |
+| `t5` | Same as stratum — T5 text encoding | `t5_hidden.npy`, `t5_mask.npy` | GPU + `[gpu]`, caption |
+| `seg2` | 29-class body-part segmentation via Sapiens2 | `seg2.npy` | GPU + `sapiens` package |
+| `pose2` | 308-keypoint pose via Sapiens2 + DETR detector | `pose2.npy` | GPU + `sapiens` + `transformers` |
+| `matting` | Alpha matte extraction via Sapiens2 | `matting.npy` | GPU + `sapiens` package |
+| `normal2` | Surface normals via Sapiens2 | `normal2.npy` | GPU + `sapiens`, seg2 |
+| `pointmap` | 3D point cloud (XYZ) via Sapiens2 | `pointmap.npy` | GPU + `sapiens`, seg2 |
+| `pixel` | Same as stratum — bucketed RGB crop | `pixel.npy` | — |
+
+`--passes all` runs: caption, dinov3, t5, seg2, pose2, matting, normal2, pointmap. The `pixel` pass is **opt-in**.
+
+**Dependency ordering**: stratum2 enforces two-phase execution:
+- **Phase 1** (parallel): caption, dinov3, t5, pixel, seg2, pose2, matting
+- **Phase 2** (after seg2): normal2, pointmap — both need the foreground mask from `seg2.npy`
+
+You can also run passes as separate commands — each pass independently checks for its dependencies:
+```bash
+# Generate seg2 masks first
+stratum2 process ./images/ --output ./dataset/ --passes seg2
+
+# Then consume them
+stratum2 process ./images/ --output ./dataset/ --passes normal2,pointmap
+```
 
 ## CLI reference
 
-### `stratum process`
+### `stratum process` / `stratum2 process`
 
 Generate dataset artifacts from a directory of images.
 
 ```bash
 stratum process <input_dir> --output <output_dir> [options]
+stratum2 process <input_dir> --output <output_dir> [options]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--passes` | `all` | Comma-separated passes or `all` (caption,dinov3,t5,pose,seg,depth,normal) |
+| `--passes` | `all` | Comma-separated passes or `all` |
 | `--device` | `auto` | Compute device: `auto`, `cpu`, `cuda`, `cuda:0`, etc. |
 | `--shard N/M` | — | Process every M-th image starting at offset N |
 | `--image-list` | — | File with explicit image paths (one per line) |
@@ -115,12 +209,23 @@ stratum process <input_dir> --output <output_dir> [options]
 | `--progress-every` | `100` | Print progress every N images (0 to disable) |
 | `--verbose` | off | Per-image logging |
 
-### `stratum status`
+**stratum2 additional parameters** (via environment variables):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SAPIENS2_SIZE` | `5b` | Model variant: `0.4b`, `0.8b`, `1b`, `5b` |
+| `SAPIENS2_CACHE_DIR` | `/mnt/nas-ai-models/sapiens2` | Checkpoint cache directory |
+
+**stratum2 passes**: `caption`, `dinov3`, `t5`, `pixel`, `seg2`, `pose2`, `matting`, `normal2`, `pointmap`  
+**stratum passes**: `caption`, `dinov3`, `t5`, `pixel`, `pose`, `seg`, `depth`, `normal`
+
+### `stratum status` / `stratum2 status`
 
 Report dataset completeness — counts artifacts per type.
 
 ```bash
 stratum status <dataset_dir>
+stratum2 status <dataset_dir>
 ```
 
 Example output:
@@ -132,15 +237,18 @@ Total images: 70,000
   dinov3_cls:           45,000 / 70,000 (64.3%)
   dinov3_patches:       45,000 / 70,000 (64.3%)
   t5_hidden:            10,000 / 70,000 (14.3%)
-  pose:                 30,000 / 70,000 (42.9%)
+  pose2:                30,000 / 70,000 (42.9%)
+  seg2:                 50,000 / 70,000 (71.4%)
+  pointmap:             20,000 / 70,000 (28.6%)
 ```
 
-### `stratum verify`
+### `stratum verify` / `stratum2 verify`
 
 Check data integrity — validates shapes, dtypes, and consistency.
 
 ```bash
 stratum verify <dataset_dir> [--fix]
+stratum2 verify <dataset_dir> [--fix]
 ```
 
 With `--fix`, corrupt files are deleted so they can be regenerated on the next `process` run.
@@ -150,7 +258,7 @@ With `--fix`, corrupt files are deleted so they can be regenerated on the next `
 Publish layers to a HuggingFace dataset repository.
 
 ```bash
-stratum publish <dataset_dir> --hub-repo <user/repo> --layers <layers> [--limit N] [--offset N]
+stratum publish <dataset_dir> --hub-repo <user/repo> --layers <layers> [options]
 ```
 
 Uploads are atomic — each batch is a single HuggingFace commit, so a stalled upload leaves no partial state. Automatic retry with exponential backoff handles HTTP 429 rate limits.
@@ -169,6 +277,19 @@ stratum publish ./dataset/ --hub-repo user/stratum-ffhq --layers dinov3 --offset
 ```
 
 Each publish updates a `manifest.json` tracking what's available and auto-generates a dataset card.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--hub-repo` | *(required)* | HuggingFace repo (e.g., `user/stratum-ffhq`) |
+| `--layers` | *(required)* | Comma-separated layers to publish (`caption,dinov3,t5,pose,seg,depth,normal`) |
+| `--limit N` | — | Max images to publish |
+| `--offset N` | `0` | Skip first N images |
+| `--max-tar-mb N` | — | Split layer tars when they exceed N MB |
+| `--max-files-per-tar N` | — | Split layer tars when they reach N images. Can be combined with `--max-tar-mb`; whichever limit is hit first triggers the split. Example: `--max-files-per-tar 10` |
+| `--tmp-dir` | `~/.cache/stratum` | Directory for staging/temp files |
+| `--license` | `cc-by-nc-sa-4.0` | SPDX license for the dataset card |
+| `--attribution-file` | — | Markdown file with provenance text |
+| `--verbose` | off | Log upload requests, responses, and file sizes |
 
 ### `stratum reconcile`
 
@@ -273,7 +394,7 @@ stratum process ./images/ --output ./dataset/ --passes caption \
 - Models auto-download from HuggingFace to `~/.cache/dwpose/`
 - Standalone — requires only `onnxruntime` and `opencv-python`, no mmpose
 
-### Sapiens segmentation, depth, and surface normals
+### Sapiens segmentation, depth, and surface normals (v1)
 
 - **Models**: Sapiens-1B TorchScript checkpoints from [facebook/sapiens](https://huggingface.co/facebook/sapiens) (1.17B parameters each)
 - **License**: CC-BY-NC 4.0 (non-commercial)
@@ -285,6 +406,22 @@ stratum process ./images/ --output ./dataset/ --passes caption \
 - **Foreground masking**: Depth and normal outputs use the segmentation mask to zero out background
 - **Output resolution**: Interpolated to aspect bucket dimensions (not 1024×768) for consistency with other artifacts
 - Models auto-download from HuggingFace to `~/.cache/sapiens/`
+
+### Sapiens2 segmentation, normals, pointmap, pose, matting (v2)
+
+- **Models**: Sapiens2 safetensors checkpoints from [facebook/sapiens2](https://huggingface.co/facebook/sapiens2)
+- **Architecture**: Specialized task heads on pretrained ViT backbones (0.4B–5B parameters). Model size controlled by `SAPIENS2_SIZE` env var.
+- **License**: Sapiens2 License
+- **Loading**: Uses the `sapiens` package's `init_model(config, checkpoint)` — requires `pip install "sapiens @ git+https://github.com/facebookresearch/sapiens2.git"`
+- **Input**: 1024×768 (H×W), BGR format (`cv2.imread`). Preprocessing handled by `model.pipeline()` and `model.data_preprocessor()` — same normalization as v1, with internal BGR→RGB conversion.
+- **Segmentation**: 29 classes (28 body parts + background): Face/Neck, Hair, Hands, Feet, Upper/Lower Arms, Upper/Lower Legs, Torso, Apparel, Eyeglass, Shoes, Socks, Teeth, Tongue, Lips, etc.
+- **Pose**: 308-keypoint top-down estimation (274 face + body + hands + feet). Requires DETR ResNet-101 person detector (`facebook/detr-resnet-101-dc5`). Output: `(N, 308, 3)` — keypoint (x, y) + confidence per person.
+- **Pointmap**: Per-pixel 3D XYZ points in camera frame. Model returns `(pointmap, scale)` tuple; metric coordinates = pointmap / scale. Supersedes v1 depth — depth can be derived as the Z channel.
+- **Normals**: Per-pixel XYZ unit vectors, L2-normalised.
+- **Matting**: Alpha matte (per-pixel opacity in [0, 1]). Only available at 1B size.
+- **Foreground masking**: Normal2 and pointmap use seg2's foreground mask to zero out background. Matting and pose are standalone.
+- Checkpoints download to `$SAPIENS2_CACHE_DIR` (default: `/mnt/nas-ai-models/sapiens2`).
+- Config files are resolved from the installed `sapiens` package — no bundling needed.
 
 ### Per-image directories
 
