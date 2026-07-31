@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from unittest import mock
 
+import numpy as np
 import pytest
 
 # Ensure src/ is on the path
@@ -32,12 +33,10 @@ class TestStratum2Config:
     def test_sapiens2_size_from_env(self, monkeypatch):
         """SAPIENS2_SIZE reads from environment variable."""
         monkeypatch.setenv("SAPIENS2_SIZE", "0.4b")
-        # Re-import to pick up env var (modules use os.environ.get at import time)
         import stratum2.config
 
         importlib.reload(stratum2.config)
         assert stratum2.config.SAPIENS2_SIZE == "0.4b"
-        # Restore
         monkeypatch.delenv("SAPIENS2_SIZE")
         importlib.reload(stratum2.config)
 
@@ -78,7 +77,6 @@ class TestStratum2Config:
         size = config.SAPIENS2_SIZE
         for task in ["seg", "normal", "pointmap", "pose"]:
             assert size in config.SAPIENS2_FILENAMES[task]
-        # matting is always 1b
         assert "1b" in config.SAPIENS2_FILENAMES["matting"]
 
     def test_stratum2_package_importable(self):
@@ -102,9 +100,7 @@ class TestStratum2Loader:
         from stratum2 import loader
 
         monkeypatch.setattr(loader, "SAPIENS2_CACHE_DIR", tmp_path)
-        # hf_hub_download is imported inside _download_checkpoint — mock it in huggingface_hub
         with mock.patch("huggingface_hub.hf_hub_download") as mock_dl:
-            # First call: file doesn't exist yet, should trigger download
             expected_path = tmp_path / "test--repo" / "test.safetensors"
             mock_dl.return_value = str(expected_path)
             mock_dl.side_effect = lambda *a, **kw: expected_path.parent.mkdir(
@@ -114,10 +110,9 @@ class TestStratum2Loader:
             assert path == expected_path
             assert mock_dl.call_count == 1
 
-            # Second call: file exists, should skip download
             path2 = loader._download_checkpoint("test/repo", "test.safetensors")
             assert path2 == expected_path
-            assert mock_dl.call_count == 1  # no additional download
+            assert mock_dl.call_count == 1
 
     def test_get_config_path_returns_existing_file(self):
         """get_config_path returns a path that exists for valid task/size."""
@@ -125,7 +120,6 @@ class TestStratum2Loader:
 
         path = loader.get_config_path("seg", "1b")
         assert path is not None
-        # The config file should exist on disk
         assert Path(path).exists(), f"Config not found at {path}"
 
     def test_get_config_path_unknown_task_raises(self):
@@ -134,3 +128,150 @@ class TestStratum2Loader:
 
         with pytest.raises(ValueError, match="Unknown task"):
             loader.get_config_path("nonexistent", "1b")
+
+
+# ---------------------------------------------------------------------------
+# Pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_image(h: int = 256, w: int = 256) -> np.ndarray:
+    """Create a synthetic BGR image for testing."""
+    rng = np.random.default_rng(42)
+    return rng.integers(0, 256, (h, w, 3), dtype=np.uint8)
+
+
+def _make_fake_seg_model(output_h: int = 256, output_w: int = 256):
+    """Create a mock Sapiens2 seg model that returns predictable logits."""
+    fake = mock.MagicMock()
+
+    # model.pipeline(dict(img=image)) → data dict
+    fake.pipeline.return_value = {"img_meta": {}}
+
+    # model.data_preprocessor(data) → data with "inputs" tensor
+    import torch
+
+    fake.data_preprocessor.return_value = {
+        "inputs": torch.randn(1, 3, 1024, 768),
+        "data_samples": {"meta": {"padding_size": (0, 0, 0, 0)}},
+    }
+
+    # model(inputs) → seg_logits (1×29×H×W)
+    fake.return_value = torch.randn(1, 29, output_h, output_w)
+    return fake
+
+
+class TestSeg2Pipeline:
+    """Tests for stratum2.pipeline.seg — Sapiens2 segmentation."""
+
+    def test_seg_module_importable(self):
+        """stratum2.pipeline.seg module exists."""
+        from stratum2.pipeline import seg
+
+        assert seg is not None
+
+    def test_process_saves_seg2_file(self, tmp_path):
+        """process() writes seg2.npy to the output directory."""
+        from stratum2.pipeline.seg import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image())
+        out_dir = tmp_path / "output"
+        fake_model = _make_fake_seg_model()
+
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            seg_model=fake_model,
+            device="cpu",
+        )
+        assert result is True
+        seg_file = out_dir / "seg2.npy"
+        assert seg_file.exists(), f"Expected {seg_file} to exist"
+
+    def test_process_output_is_uint8_hw(self, tmp_path):
+        """seg2.npy has shape (H, W) and dtype uint8."""
+        from stratum2.pipeline.seg import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(128, 128))
+        out_dir = tmp_path / "output"
+        fake_model = _make_fake_seg_model()
+
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            seg_model=fake_model,
+            device="cpu",
+        )
+        seg = np.load(out_dir / "seg2.npy")
+        assert seg.ndim == 2, f"Expected 2D, got {seg.ndim}D"
+        assert seg.dtype == np.uint8
+
+    def test_process_output_values_in_class_range(self, tmp_path):
+        """seg2.npy values are in [0, 28] (29 classes)."""
+        from stratum2.pipeline.seg import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(128, 128))
+        out_dir = tmp_path / "output"
+        fake_model = _make_fake_seg_model()
+
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            seg_model=fake_model,
+            device="cpu",
+        )
+        seg = np.load(out_dir / "seg2.npy")
+        assert seg.min() >= 0
+        assert seg.max() <= 28
+
+    def test_process_uses_model_pipeline_with_bgr_image(self, tmp_path):
+        """process() calls model.pipeline() with a BGR image from cv2.imread."""
+        from stratum2.pipeline.seg import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image())
+        out_dir = tmp_path / "output"
+        fake_model = _make_fake_seg_model()
+
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            seg_model=fake_model,
+            device="cpu",
+        )
+        # model.pipeline was called with dict(img=image_bgr)
+        fake_model.pipeline.assert_called_once()
+        call_args = fake_model.pipeline.call_args[0][0]
+        assert "img" in call_args
+
+    def test_process_resizes_output_to_image_size(self, tmp_path):
+        """seg2.npy dimensions match the input image size after resize."""
+        from stratum2.pipeline.seg import process
+
+        h, w = 200, 300
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        fake_model = _make_fake_seg_model()
+
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            seg_model=fake_model,
+            device="cpu",
+        )
+        seg = np.load(out_dir / "seg2.npy")
+        assert seg.shape == (h, w), f"Expected {(h, w)}, got {seg.shape}"
