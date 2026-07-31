@@ -275,3 +275,185 @@ class TestSeg2Pipeline:
         )
         seg = np.load(out_dir / "seg2.npy")
         assert seg.shape == (h, w), f"Expected {(h, w)}, got {seg.shape}"
+
+
+# ---------------------------------------------------------------------------
+# Normal2 pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_normal_model(output_h: int = 64, output_w: int = 48):
+    """Create a mock Sapiens2 normal model."""
+    fake = mock.MagicMock()
+    fake.pipeline.return_value = {}
+    import torch
+
+    fake.data_preprocessor.return_value = {
+        "inputs": torch.randn(1, 3, output_h, output_w),
+        "data_samples": {"meta": {"padding_size": (0, 0, 0, 0)}},
+    }
+    # Return unit-ish normals
+    normals = torch.randn(1, 3, output_h, output_w)
+    normals = normals / torch.norm(normals, dim=1, keepdim=True).clamp(min=1e-8)
+    fake.return_value = normals
+    return fake
+
+
+class TestNormal2Pipeline:
+    """Tests for stratum2.pipeline.normal — Sapiens2 surface normals."""
+
+    def test_normal_module_importable(self):
+        """stratum2.pipeline.normal module exists."""
+        from stratum2.pipeline import normal
+
+        assert normal is not None
+
+    def test_process_saves_normal2_file(self, tmp_path):
+        """process() writes normal2.npy to the output directory."""
+        from stratum2.pipeline.normal import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+
+        # Need seg2.npy for foreground mask
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_normal_model()
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        assert result is True
+        assert (out_dir / "normal2.npy").exists()
+
+    def test_process_skips_when_seg2_missing(self, tmp_path):
+        """process() returns False when seg2.npy doesn't exist."""
+        from stratum2.pipeline.normal import process
+
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image())
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        fake_model = _make_fake_normal_model()
+
+        result = process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        assert result is False
+        assert not (out_dir / "normal2.npy").exists()
+
+    def test_process_output_is_float16_hw3(self, tmp_path):
+        """normal2.npy has shape (H, W, 3) and dtype float16."""
+        from stratum2.pipeline.normal import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_normal_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        normal_map = np.load(out_dir / "normal2.npy")
+        assert normal_map.ndim == 3
+        assert normal_map.shape[2] == 3
+        assert normal_map.dtype == np.float16
+
+    def test_process_normals_are_unit_vectors(self, tmp_path):
+        """Non-zero normal vectors are L2-normalized (unit length)."""
+        from stratum2.pipeline.normal import process
+
+        h, w = 64, 48  # Match fake model output to avoid interpolation
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_normal_model(output_h=h, output_w=w)
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        normal_map = np.load(out_dir / "normal2.npy").astype(np.float32)
+        norms = np.linalg.norm(normal_map, axis=-1)
+        fg_norms = norms[seg > 0]
+        np.testing.assert_allclose(fg_norms, 1.0, atol=0.01)
+
+    def test_process_background_is_zero(self, tmp_path):
+        """Background pixels (seg==0) have zero normals."""
+        from stratum2.pipeline.normal import process
+
+        h, w = 128, 128
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        # Half foreground, half background
+        seg = np.zeros((h, w), dtype=np.uint8)
+        seg[:64, :] = 1
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_normal_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        normal_map = np.load(out_dir / "normal2.npy")
+        bg_normals = normal_map[seg == 0]
+        assert np.all(bg_normals == 0), "Background normals should be zero"
+
+    def test_process_output_size_matches_image(self, tmp_path):
+        """normal2.npy spatial dimensions match the input image."""
+        from stratum2.pipeline.normal import process
+
+        h, w = 200, 300
+        img_path = tmp_path / "test.png"
+        import cv2
+
+        cv2.imwrite(str(img_path), _make_fake_image(h, w))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        seg = np.ones((h, w), dtype=np.uint8)
+        np.save(str(out_dir / "seg2.npy"), seg)
+
+        fake_model = _make_fake_normal_model()
+        process(
+            image_path=img_path,
+            output_dir=out_dir,
+            normal_model=fake_model,
+            device="cpu",
+        )
+        normal_map = np.load(out_dir / "normal2.npy")
+        assert normal_map.shape[:2] == (h, w)
