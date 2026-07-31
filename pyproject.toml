@@ -49,6 +49,10 @@ all = [
 
 [project.scripts]
 stratum = "stratum.cli:main"
+stratum2 = "stratum2.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/stratum"]
+packages = ["src/stratum", "src/stratum2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
