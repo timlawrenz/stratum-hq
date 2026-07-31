@@ -62,15 +62,14 @@ def process(
         normal = normal / torch.norm(normal, dim=1, keepdim=True).clamp(min=1e-8)
 
         # Unpad
-        pad_left, pad_right, pad_top, pad_bottom = data["data_samples"]["meta"][
-            "padding_size"
-        ]
-        normal = normal[
-            :,
-            :,
-            pad_top : inputs.shape[2] - pad_bottom,
-            pad_left : inputs.shape[3] - pad_right,
-        ]
+        ds = data["data_samples"]
+        if isinstance(ds, list) and len(ds) > 0: ds = ds[0]
+        metainfo = getattr(ds, "metainfo", ds.get("meta", {}) if isinstance(ds, dict) else {})
+        padding_size = metainfo.get("padding_size", (0, 0, 0, 0))
+        pad_left, pad_right, pad_top, pad_bottom = padding_size
+        h_end = inputs.shape[2] - pad_bottom if pad_bottom > 0 else inputs.shape[2]
+        w_end = inputs.shape[3] - pad_right if pad_right > 0 else inputs.shape[3]
+        normal = normal[:, :, pad_top:h_end, pad_left:w_end]
 
         # Resize to original dimensions
         normal = F.interpolate(

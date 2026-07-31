@@ -102,9 +102,12 @@ def process(
 
         # --- Person detection ---
         if det_checkpoint is None:
-            det_checkpoint = str(
-                SAPIENS2_CACHE_DIR / "detector" / "detr-resnet-101-dc5"
-            )
+            local_det_dir = SAPIENS2_CACHE_DIR / "detector" / "detr-resnet-101-dc5"
+            if local_det_dir.exists():
+                det_checkpoint = str(local_det_dir)
+            else:
+                from stratum2.config import POSE_DETECTOR_REPO
+                det_checkpoint = POSE_DETECTOR_REPO
         processor, detector_model = _get_detector(device, det_checkpoint)
         bboxes = _detect_persons(image, processor, detector_model, device)
 
@@ -125,12 +128,14 @@ def process(
 
             pred = pred.cpu().numpy()
             # Decode via UDPHeatmap codec
-            data_samples = data["data_samples"]
+            ds = data["data_samples"]
+            if isinstance(ds, list) and len(ds) > 0: ds = ds[0]
+            metainfo = getattr(ds, "metainfo", ds.get("meta", {}) if isinstance(ds, dict) else {})
             keypoints_i, scores_i = pose_model.codec.decode(pred[0])
             # Transform from crop coords to image coords
-            input_size = np.asarray(data_samples["meta"]["input_size"], dtype=np.float32)
-            bbox_center = np.asarray(data_samples["meta"]["bbox_center"], dtype=np.float32)
-            bbox_scale = np.asarray(data_samples["meta"]["bbox_scale"], dtype=np.float32)
+            input_size = np.asarray(metainfo["input_size"], dtype=np.float32)
+            bbox_center = np.asarray(metainfo["bbox_center"], dtype=np.float32)
+            bbox_scale = np.asarray(metainfo["bbox_scale"], dtype=np.float32)
             keypoints_i = (
                 keypoints_i / input_size * bbox_scale
                 + bbox_center

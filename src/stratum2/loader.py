@@ -108,4 +108,11 @@ def load_sapiens2_model(task: str, device: str = "cpu"):
 
     model = init_model(str(config_path), str(ckpt_path), device=device)
     model.eval()
+
+    # Attach codec for pose model (needed by pose pipeline)
+    if task == "pose" and hasattr(model.cfg, "codec"):
+        from sapiens.pose.src.datasets.codecs.udp_heatmap import UDPHeatmap
+        codec_cfg = {k: v for k, v in model.cfg.codec.items() if k != "type"}
+        model.codec = UDPHeatmap(**codec_cfg)
+
     return model
