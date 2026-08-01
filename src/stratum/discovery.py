@@ -91,23 +91,31 @@ def shard_image_list(images: list[Path], worker: int, total: int) -> list[Path]:
     return images[worker::total]
 
 
-def scan_dataset_status(dataset_dir: Path) -> dict[str, int]:
+def scan_dataset_status(dataset_dir: Path, artifact_files: dict[str, str] | None = None) -> dict[str, int]:
     """Scan dataset directory and count artifacts per type.
+
+    Args:
+        dataset_dir: Root of the dataset output tree.
+        artifact_files: Optional override for which artifacts to count.
+            Defaults to ARTIFACT_FILES (stratum v1 artifacts).
 
     Returns dict with 'total' key and one key per artifact type.
     """
+    if artifact_files is None:
+        artifact_files = ARTIFACT_FILES
+
     dataset_dir = dataset_dir.resolve()
     if not dataset_dir.is_dir():
         return {"total": 0}
 
-    counts: dict[str, int] = {name: 0 for name in ARTIFACT_FILES}
+    counts: dict[str, int] = {name: 0 for name in artifact_files}
     total = 0
 
     # Walk dataset looking for metadata.json as indicator of image dirs
-    for meta_path in sorted(dataset_dir.rglob(METADATA_FILE)):
+    for meta_path in dataset_dir.rglob(METADATA_FILE):
         img_dir = meta_path.parent
         total += 1
-        for name, filename in ARTIFACT_FILES.items():
+        for name, filename in artifact_files.items():
             if (img_dir / filename).exists():
                 counts[name] += 1
 

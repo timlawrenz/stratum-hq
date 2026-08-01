@@ -148,8 +148,31 @@ def cmd_process(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     from stratum.discovery import scan_dataset_status
+    from stratum2.config import (
+        MATTING_FILE,
+        NORMAL2_FILE,
+        POINTMAP_FILE,
+        POSE2_FILE,
+        SEG2_FILE,
+    )
 
-    status = scan_dataset_status(args.dataset_dir)
+    # Stratum2-aware artifact list (includes both v1 and v2 artifacts)
+    stratum2_artifacts = {
+        "metadata": "metadata.json",
+        "caption": "caption.txt",
+        "dinov3_cls": "dinov3_cls.npy",
+        "dinov3_patches": "dinov3_patches.npy",
+        "t5_hidden": "t5_hidden.npy",
+        "t5_mask": "t5_mask.npy",
+        "pixel": "pixel.npy",
+        "seg2": SEG2_FILE,
+        "pose2": POSE2_FILE,
+        "normal2": NORMAL2_FILE,
+        "pointmap": POINTMAP_FILE,
+        "matting": MATTING_FILE,
+    }
+
+    status = scan_dataset_status(args.dataset_dir, artifact_files=stratum2_artifacts)
     total = status.pop("total", 0)
     if total == 0:
         print("No image directories found.", file=sys.stderr)

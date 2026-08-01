@@ -378,38 +378,56 @@ def render_combined_panel(panels: list[tuple[str, Image.Image]],
     """
     cell_w = target_size
     cell_h = target_size
-    padding = 4
-    label_h = 28
+    padding = 16
+    label_h = 44
 
     n_cols = 2
     n_rows = (len(panels) + n_cols - 1) // n_cols
 
     def fit(img: Image.Image) -> Image.Image:
         """Resize to fit cell while preserving aspect ratio, center on black."""
-        ratio = min(cell_w / img.width, cell_h / img.height)
+        ratio = min((cell_w - 4) / img.width, (cell_h - 4) / img.height)
         new_w = int(img.width * ratio)
         new_h = int(img.height * ratio)
         resized = img.resize((new_w, new_h), Image.LANCZOS)
-        cell = Image.new("RGB", (cell_w, cell_h), (30, 30, 30))
+        cell = Image.new("RGB", (cell_w, cell_h), (25, 25, 25))
         cell.paste(resized, ((cell_w - new_w) // 2, (cell_h - new_h) // 2))
+        
+        # Add a subtle border around the image area
+        draw_cell = ImageDraw.Draw(cell)
+        draw_cell.rectangle([0, 0, cell_w - 1, cell_h - 1], outline=(70, 70, 70), width=2)
         return cell
 
+    title_h = 90
     grid_w = cell_w * n_cols + padding * (n_cols + 1)
-    grid_h = (cell_h + label_h) * n_rows + padding * (n_rows + 1)
-    result = Image.new("RGB", (grid_w, grid_h), (20, 20, 20))
+    grid_h = title_h + (cell_h + label_h) * n_rows + padding * (n_rows + 1)
+    
+    # Sleek dark background
+    result = Image.new("RGB", (grid_w, grid_h), (18, 18, 22))
     draw = ImageDraw.Draw(result)
 
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        sub_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
     except OSError:
         font = ImageFont.load_default()
+        title_font = font
+        sub_font = font
+        
+    draw.text((padding + 8, padding), "Stratum Dataset Enriched Conditioning Layers", fill=(240, 240, 245), font=title_font)
+    draw.text((padding + 8, padding + 48), "Pre-computed multi-modal features decoupled from original pixel data.", fill=(160, 160, 160), font=sub_font)
 
     for idx, (label, img) in enumerate(panels):
         col = idx % n_cols
         row = idx // n_cols
         x = padding + col * (cell_w + padding)
-        y = padding + row * (cell_h + label_h + padding)
-        draw.text((x + 8, y + 4), label, fill=(200, 200, 200), font=font)
+        y = title_h + padding + row * (cell_h + label_h + padding)
+        
+        # Draw label header
+        draw.rectangle([x, y, x + cell_w - 1, y + label_h], fill=(45, 45, 55), outline=(70, 70, 70), width=2)
+        draw.text((x + 16, y + 8), label, fill=(255, 255, 255), font=font)
+        
         fitted = fit(img)
         result.paste(fitted, (x, y + label_h))
 

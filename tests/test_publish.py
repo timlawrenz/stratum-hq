@@ -336,6 +336,28 @@ def test_plan_tar_splits_skips_missing_layer(tmp_path):
     assert len(groups[0][0]) == 2  # only 2 images have the layer
 
 
+def test_plan_tar_splits_splits_on_file_count(tmp_path):
+    """max_files=2 splits N images into ceil(N/2) groups."""
+    dirs, recs = _make_npy_dirs(tmp_path, 5, "dinov3")
+    groups = _plan_tar_splits(dirs, recs, "dinov3", max_files=2)
+    assert len(groups) == 3  # 2, 2, 1
+    assert len(groups[0][0]) == 2
+    assert len(groups[1][0]) == 2
+    assert len(groups[2][0]) == 1
+
+
+def test_plan_tar_splits_both_limits(tmp_path):
+    """When both limits are set, the more restrictive one triggers the split."""
+    dirs, recs = _make_npy_dirs(tmp_path, 6, "dinov3")
+    # max_files=3 would give 2 groups; max_files=2 would give 3 groups
+    # Use a huge byte limit so size never triggers, only count does
+    groups = _plan_tar_splits(dirs, recs, "dinov3",
+                              max_tar_bytes=999_999_999, max_files=2)
+    assert len(groups) == 3
+    for g_dirs, _ in groups:
+        assert len(g_dirs) <= 2
+
+
 def _make_npy_dirs(base: Path, n: int, layer: str) -> tuple[list[Path], list[dict]]:
     """Helper: create n image dirs with dummy npy files for a layer."""
     import numpy as np
@@ -400,6 +422,37 @@ def test_publish_splits_tar_with_max_tar_mb(tmp_path):
     assert all(p.startswith("dinov3/") for p in uploaded_paths)
 
 
+def test_publish_splits_tar_with_max_files_per_tar(tmp_path):
+    """publish_to_hub with max_files_per_tar=2 produces ceil(N/2) sub-range tars."""
+    from stratum.publish import publish_to_hub
+
+    _make_npy_dirs(tmp_path / "dataset", 5, "dinov3")
+
+    mock_api = MagicMock()
+    mock_api.list_repo_files.return_value = []
+    uploaded_paths = []
+
+    def capture_upload(*, path_or_fileobj, path_in_repo, repo_id, repo_type):
+        if path_in_repo.endswith(".tar"):
+            uploaded_paths.append(path_in_repo)
+
+    mock_api.upload_file.side_effect = capture_upload
+    mock_api.create_repo.return_value = None
+
+    result = publish_to_hub(
+        dataset_dir=tmp_path / "dataset",
+        hub_repo="user/test",
+        layers=["dinov3"],
+        max_files_per_tar=2,
+        _api=mock_api,
+    )
+
+    assert result == 0
+    # 5 images / 2 per tar = 3 tars (2, 2, 1)
+    assert len(uploaded_paths) == 3
+    assert all(p.startswith("dinov3/") for p in uploaded_paths)
+
+
 # --- CLI parsing ---
 
 def test_parse_args_reconcile():
@@ -432,6 +485,17 @@ def test_parse_args_publish_max_tar_mb():
 def test_parse_args_publish_max_tar_mb_default():
     args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3"])
     assert args.max_tar_mb is None
+
+
+def test_parse_args_publish_max_files_per_tar():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3",
+                       "--max-files-per-tar", "10"])
+    assert args.max_files_per_tar == 10
+
+
+def test_parse_args_publish_max_files_per_tar_default():
+    args = parse_args(["publish", "./ds", "--hub-repo", "u/d", "--layers", "dinov3"])
+    assert args.max_files_per_tar is None
 
 
 def test_parse_args_reconcile_verbose():

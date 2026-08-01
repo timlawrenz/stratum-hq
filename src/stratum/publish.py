@@ -234,10 +234,15 @@ def _pack_npy_tar(image_dirs: list[Path], records: list[dict], layer: str, outpu
 
 
 def _plan_tar_splits(
-    image_dirs: list[Path], records: list[dict], layer: str, max_tar_bytes: int
+    image_dirs: list[Path],
+    records: list[dict],
+    layer: str,
+    max_tar_bytes: int | None = None,
+    max_files: int | None = None,
 ) -> list[tuple[list[Path], list[dict]]]:
-    """Group images so each group's tar stays under *max_tar_bytes*.
+    """Group images so each group's tar respects *max_tar_bytes* and/or *max_files*.
 
+    A new group is started whenever *either* limit would be exceeded.
     Returns a list of ``(group_dirs, group_records)`` tuples.  Images that
     lack the layer's artifacts are silently skipped (they won't appear in
     any group).
@@ -252,7 +257,9 @@ def _plan_tar_splits(
             continue
         img_bytes = sum((img_dir / f).stat().st_size for f in LAYER_ARTIFACTS[layer])
 
-        if cur_dirs and cur_size + img_bytes > max_tar_bytes:
+        size_exceeded = max_tar_bytes is not None and cur_dirs and cur_size + img_bytes > max_tar_bytes
+        count_exceeded = max_files is not None and len(cur_dirs) >= max_files
+        if size_exceeded or count_exceeded:
             groups.append((cur_dirs, cur_recs))
             cur_dirs, cur_recs, cur_size = [], [], 0
 
@@ -390,7 +397,8 @@ UPLOAD_TIMEOUT = 300  # seconds per file upload before considering it stalled
 
 
 def _staging_dir_for(tmp_dir: Path | None, hub_repo: str, offset: int, count: int,
-                     layers: list[str], max_tar_mb: int | None) -> Path:
+                     layers: list[str], max_tar_mb: int | None,
+                     max_files_per_tar: int | None = None) -> Path:
     """Return a deterministic staging directory path for this publish run."""
     safe_repo = hub_repo.replace("/", "--")
     range_label = f"{offset:05d}-{offset + count - 1:05d}"
@@ -404,7 +412,8 @@ def _staging_dir_for(tmp_dir: Path | None, hub_repo: str, offset: int, count: in
 
 
 def _staging_meta(hub_repo: str, offset: int, count: int,
-                  layers: list[str], max_tar_mb: int | None) -> dict:
+                  layers: list[str], max_tar_mb: int | None,
+                  max_files_per_tar: int | None = None) -> dict:
     """Build metadata dict describing this staging run's parameters."""
     return {
         "hub_repo": hub_repo,
@@ -412,6 +421,7 @@ def _staging_meta(hub_repo: str, offset: int, count: int,
         "count": count,
         "layers": sorted(layers),
         "max_tar_mb": max_tar_mb,
+        "max_files_per_tar": max_files_per_tar,
     }
 
 
@@ -483,6 +493,7 @@ def publish_to_hub(
     offset: int = 0,
     verbose: bool = False,
     max_tar_mb: int | None = None,
+    max_files_per_tar: int | None = None,
     tmp_dir: Path | None = None,
     upload_timeout: int = UPLOAD_TIMEOUT,
     _api=None,
@@ -535,8 +546,10 @@ def publish_to_hub(
     has_caption = "caption" in layers
 
     # Set up deterministic staging directory (survives Ctrl-C for reuse)
-    staging = _staging_dir_for(tmp_dir, hub_repo, offset, len(image_dirs), layers, max_tar_mb)
-    expected_meta = _staging_meta(hub_repo, offset, len(image_dirs), layers, max_tar_mb)
+    staging = _staging_dir_for(tmp_dir, hub_repo, offset, len(image_dirs), layers, max_tar_mb,
+                               max_files_per_tar)
+    expected_meta = _staging_meta(hub_repo, offset, len(image_dirs), layers, max_tar_mb,
+                                  max_files_per_tar)
 
     reusing = staging.exists() and _validate_staging(staging, expected_meta)
     if reusing:
@@ -596,8 +609,10 @@ def publish_to_hub(
         if isinstance(layer_info["chunks"], list):
             layer_info["chunks"] = {}
 
-        if max_tar_bytes:
-            groups = _plan_tar_splits(image_dirs, records, layer, max_tar_bytes)
+        if max_tar_bytes or max_files_per_tar:
+            groups = _plan_tar_splits(image_dirs, records, layer,
+                                      max_tar_bytes=max_tar_bytes,
+                                      max_files=max_files_per_tar)
         else:
             groups = [(image_dirs, records)]
 

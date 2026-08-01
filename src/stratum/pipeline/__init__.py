@@ -88,7 +88,7 @@ def run_passes(
     output_dir: Path,
     passes: list[str],
     device: str = "auto",
-    ollama_url: str = "http://localhost:11434/api/generate",
+    ollama_url: str = "http://192.168.86.137:11434/api/generate",
     ollama_model: str = "gemma3:27b",
     caption_max_tokens: int = 500,
     progress_every: int = 100,
