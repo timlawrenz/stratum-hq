@@ -36,8 +36,8 @@ def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
             }
         )
 
-    # Torso
-    torso_px = (seg2 == 22).sum()
+    # Torso (include clothing classes that cover the torso: Upper_Clothing=23, Lower_Clothing=13)
+    torso_px = (seg2 == 22).sum() + (seg2 == 23).sum() + (seg2 == 13).sum()
     if torso_px > 0:
         parts.append(
             {
