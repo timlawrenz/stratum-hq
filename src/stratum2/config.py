@@ -44,6 +44,10 @@ NORMAL2_FILE = "normal2.npy"
 POINTMAP_FILE = "pointmap.npy"
 POSE2_FILE = "pose2.npy"
 MATTING_FILE = "matting.npy"
+DETERMINATIONS_FILE = "determinations.json"
+CAPTION2_FILE = "caption2.txt"
+T52_HIDDEN_FILE = "t52_hidden.npy"
+T52_MASK_FILE = "t52_mask.npy"
 
 # --- Frozen Index Tables ---
 
