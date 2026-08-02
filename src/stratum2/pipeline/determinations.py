@@ -102,7 +102,7 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
 
     if n > 0:
         p = pose2[0]
-        
+
         # Pointmap (camera)
         pointmap_path = output_dir / "pointmap.npy"
         if pointmap_path.exists():
@@ -111,16 +111,16 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
             if fg_mask.any():
                 zs = pm[..., 2][fg_mask]
                 median_z = float(np.median(zs))
-                
+
                 # Height relative to shoulder
                 # Get Y coordinate from pointmap at the shoulder pixel
                 lsho = p[GOLIATH_308.index("left_shoulder")]
                 rsho = p[GOLIATH_308.index("right_shoulder")]
-                
+
                 # Pick the more confident shoulder
                 sho = lsho if lsho[2] > rsho[2] else rsho
                 height_rel = None
-                
+
                 if sho[2] > 0.3:
                     x, y = int(sho[0]), int(sho[1])
                     if 0 <= y < pm.shape[0] and 0 <= x < pm.shape[1]:
@@ -132,13 +132,11 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
                         # So val_y is exactly camera_height_rel_shoulder!
                         val_y = float(pm[y, x, 1])
                         height_rel = val_y
-                        
-                cam_doc = {
-                    "distance_m": round(median_z, 2)
-                }
+
+                cam_doc = {"distance_m": round(median_z, 2)}
                 if height_rel is not None:
                     cam_doc["height_rel_shoulder_m"] = round(height_rel, 2)
-                
+
                 doc["camera"] = cam_doc
 
         # Extent
@@ -154,23 +152,44 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
             }
 
         # Upright
-        neck = p[GOLIATH_308.index("neck")]
-        hip_y = (
-            p[GOLIATH_308.index("left_hip"), 1] + p[GOLIATH_308.index("right_hip"), 1]
-        ) / 2.0
-        hip_x = (
-            p[GOLIATH_308.index("left_hip"), 0] + p[GOLIATH_308.index("right_hip"), 0]
-        ) / 2.0
-
-        dy = hip_y - neck[1]
-        dx = hip_x - neck[0]
-
-        deg = math.degrees(math.atan2(dy, dx))
-        upright = abs(deg - 90.0)
-        doc["orientation"]["upright_deg"] = round(upright, 1)
-
         # Body parts
-        doc["body_parts_visible"] = get_body_parts_visible(seg2, p)
+        body_parts = get_body_parts_visible(seg2, p)
+        doc["body_parts_visible"] = body_parts
+
+        # Determine which broad regions are actually present in segmentation
+        parts_present = {bp["part"] for bp in body_parts if bp["pixel_frac"] > 0.01}
+
+        # Wipe keypoint confidences if the body part isn't actually in the image
+        # This prevents Sapiens2 from hallucinating tiny bodies inside face crops
+        if "torso" not in parts_present:
+            p[GOLIATH_308.index("left_shoulder"), 2] = 0.0
+            p[GOLIATH_308.index("right_shoulder"), 2] = 0.0
+            p[GOLIATH_308.index("left_hip"), 2] = 0.0
+            p[GOLIATH_308.index("right_hip"), 2] = 0.0
+
+        # We need a robust check before computing upright_deg:
+        # Only compute upright_deg if BOTH neck and hips exist in the cleaned keypoints
+        neck = p[GOLIATH_308.index("neck")]
+        lhip = p[GOLIATH_308.index("left_hip")]
+        rhip = p[GOLIATH_308.index("right_hip")]
+
+        if neck[2] > 0.3 and (lhip[2] > 0.3 or rhip[2] > 0.3):
+            hip_y = 0.0
+            hip_x = 0.0
+            if lhip[2] > 0.3 and rhip[2] > 0.3:
+                hip_y = (lhip[1] + rhip[1]) / 2.0
+                hip_x = (lhip[0] + rhip[0]) / 2.0
+            elif lhip[2] > 0.3:
+                hip_y, hip_x = lhip[1], lhip[0]
+            else:
+                hip_y, hip_x = rhip[1], rhip[0]
+
+            dy = hip_y - neck[1]
+            dx = hip_x - neck[0]
+
+            deg = math.degrees(math.atan2(dy, dx))
+            upright = abs(deg - 90.0)
+            doc["orientation"]["upright_deg"] = round(upright, 1)
 
         # Relations
         rels = []
@@ -228,7 +247,18 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
                         # Level relative to joints
                         # Synthetic hips are at 600, wrists at 500
                         y_center = (y1 + y2) / 2
-                        if abs(y_center - hip_y) < 200:
+
+                        hip_y_ref = 0.0
+                        lhip = p[GOLIATH_308.index("left_hip")]
+                        rhip = p[GOLIATH_308.index("right_hip")]
+                        if lhip[2] > 0.3 and rhip[2] > 0.3:
+                            hip_y_ref = (lhip[1] + rhip[1]) / 2.0
+                        elif lhip[2] > 0.3:
+                            hip_y_ref = lhip[1]
+                        elif rhip[2] > 0.3:
+                            hip_y_ref = rhip[1]
+
+                        if hip_y_ref > 0 and abs(y_center - hip_y_ref) < 200:
                             level = "pelvis level"
                         else:
                             level = "waist level"
