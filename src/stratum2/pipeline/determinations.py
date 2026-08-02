@@ -102,6 +102,24 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
 
     if n > 0:
         p = pose2[0]
+        # ---------------------------------------------------------
+        # PRE-PROCESSING: Wipe keypoint confidences if the body part 
+        # isn't actually in the image to prevent DETR hallucinations.
+        # ---------------------------------------------------------
+        body_parts = get_body_parts_visible(seg2, p)
+        doc["body_parts_visible"] = body_parts
+
+        # Determine which broad regions are actually present in segmentation
+        parts_present = {bp["part"] for bp in body_parts if bp["pixel_frac"] > 0.01}
+
+        # Wipe keypoint confidences if the body part isn't actually in the image
+        # This prevents Sapiens2 from hallucinating tiny bodies inside face crops
+        if "torso" not in parts_present:
+            p[GOLIATH_308.index("left_shoulder"), 2] = 0.0
+            p[GOLIATH_308.index("right_shoulder"), 2] = 0.0
+            p[GOLIATH_308.index("left_hip"), 2] = 0.0
+            p[GOLIATH_308.index("right_hip"), 2] = 0.0
+
 
         # Pointmap (camera)
         pointmap_path = output_dir / "pointmap.npy"
@@ -152,20 +170,6 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
             }
 
         # Upright
-        # Body parts
-        body_parts = get_body_parts_visible(seg2, p)
-        doc["body_parts_visible"] = body_parts
-
-        # Determine which broad regions are actually present in segmentation
-        parts_present = {bp["part"] for bp in body_parts if bp["pixel_frac"] > 0.01}
-
-        # Wipe keypoint confidences if the body part isn't actually in the image
-        # This prevents Sapiens2 from hallucinating tiny bodies inside face crops
-        if "torso" not in parts_present:
-            p[GOLIATH_308.index("left_shoulder"), 2] = 0.0
-            p[GOLIATH_308.index("right_shoulder"), 2] = 0.0
-            p[GOLIATH_308.index("left_hip"), 2] = 0.0
-            p[GOLIATH_308.index("right_hip"), 2] = 0.0
 
         # We need a robust check before computing upright_deg:
         # Only compute upright_deg if BOTH neck and hips exist in the cleaned keypoints
