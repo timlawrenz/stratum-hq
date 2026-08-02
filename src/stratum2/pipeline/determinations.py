@@ -102,6 +102,44 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
 
     if n > 0:
         p = pose2[0]
+        
+        # Pointmap (camera)
+        pointmap_path = output_dir / "pointmap.npy"
+        if pointmap_path.exists():
+            pm = np.load(pointmap_path)
+            fg_mask = seg2 > 0
+            if fg_mask.any():
+                zs = pm[..., 2][fg_mask]
+                median_z = float(np.median(zs))
+                
+                # Height relative to shoulder
+                # Get Y coordinate from pointmap at the shoulder pixel
+                lsho = p[GOLIATH_308.index("left_shoulder")]
+                rsho = p[GOLIATH_308.index("right_shoulder")]
+                
+                # Pick the more confident shoulder
+                sho = lsho if lsho[2] > rsho[2] else rsho
+                height_rel = None
+                
+                if sho[2] > 0.3:
+                    x, y = int(sho[0]), int(sho[1])
+                    if 0 <= y < pm.shape[0] and 0 <= x < pm.shape[1]:
+                        # PM is camera frame: +Y is down.
+                        # If shoulder Y is negative, shoulder is above camera.
+                        # Meaning camera is below shoulder (negative relative height).
+                        # If shoulder Y is positive, shoulder is below camera.
+                        # Meaning camera is above shoulder (positive relative height).
+                        # So val_y is exactly camera_height_rel_shoulder!
+                        val_y = float(pm[y, x, 1])
+                        height_rel = val_y
+                        
+                cam_doc = {
+                    "distance_m": round(median_z, 2)
+                }
+                if height_rel is not None:
+                    cam_doc["height_rel_shoulder_m"] = round(height_rel, 2)
+                
+                doc["camera"] = cam_doc
 
         # Extent
         vis = p[p[:, 2] > 0.3]

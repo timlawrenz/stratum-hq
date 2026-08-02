@@ -121,17 +121,35 @@ def make_synthetic_seg2(mask_type: str = "full_body", shape=(1000, 1000)) -> np.
     return seg
 
 
-def setup_fixture_dir(
-    tmp_path: Path, num_persons=1, pose_type="standing", mask_type="full_body"
-):
+def make_synthetic_pointmap(shape=(1000, 1000), mask_type="full_body") -> np.ndarray:
+    """Create a synthetic pointmap.npy array (H, W, 3) float16."""
+    pm = np.zeros((shape[0], shape[1], 3), dtype=np.float16)
+    
+    if mask_type == "full_body":
+        # Flat plane at Z=2.5m
+        pm[100:900, 300:700, 2] = 2.5
+        # Y goes from top (-0.5) to bottom (+1.0)
+        y_grid = np.linspace(-0.5, 1.0, 800)[:, None]
+        pm[100:900, 300:700, 1] = np.repeat(y_grid, 400, axis=1)
+        # X goes from left (-0.3) to right (+0.3)
+        x_grid = np.linspace(-0.3, 0.3, 400)[None, :]
+        pm[100:900, 300:700, 0] = np.repeat(x_grid, 800, axis=0)
+    elif mask_type == "face_only":
+        pm[0:1000, 0:1000, 2] = 1.0
+        
+    return pm
+
+def setup_fixture_dir(tmp_path: Path, num_persons=1, pose_type="standing", mask_type="full_body"):
     """Writes synthetic arrays to tmp_path and returns the path."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     pose2 = make_synthetic_pose2(num_persons, pose_type)
     seg2 = make_synthetic_seg2(mask_type)
-
+    pointmap = make_synthetic_pointmap(shape=(1000, 1000), mask_type=mask_type)
+    
     np.save(str(tmp_path / "pose2.npy"), pose2)
     np.save(str(tmp_path / "seg2.npy"), seg2)
-
+    np.save(str(tmp_path / "pointmap.npy"), pointmap)
+    
     return tmp_path
 
 
