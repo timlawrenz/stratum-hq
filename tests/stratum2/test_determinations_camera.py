@@ -20,8 +20,7 @@ def test_determinations_camera(tmp_path):
     assert "camera" in r_stand
     cam = r_stand["camera"]
     assert abs(cam["distance_m"] - 2.5) < 0.1
-    # Y=0 is the camera. If shoulder is at Y=-0.21, camera is 0.21m below shoulder.
-    # Our formula in plan is "height_rel_shoulder_m". So +0.21 or -0.21 depending on sign convention.
-    # Let's say + is above, - is below. Y=-0.21 means shoulder is ABOVE camera (-Y is up).
-    # So camera is BELOW shoulder -> negative.
-    assert -0.3 < cam["height_rel_shoulder_m"] < -0.1
+    # Renamed field: shoulder_height_rel_camera_m is the pointmap Y at the
+    # shoulder (camera frame, +Y down, camera at origin). Shoulder at Y=-0.21
+    # means the shoulder sits 0.21m above the camera.
+    assert -0.3 < cam["shoulder_height_rel_camera_m"] < -0.1

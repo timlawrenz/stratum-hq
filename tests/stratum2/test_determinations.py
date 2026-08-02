@@ -110,11 +110,36 @@ def make_synthetic_seg2(mask_type: str = "full_body", shape=(1000, 1000)) -> np.
     if mask_type == "full_body":
         seg[100:900, 300:700] = torso_idx
         seg[50:150, 400:600] = face_idx
+        # Corroborate arm/hand/leg regions so relations anchored on them fire.
+        # Each region patch must exceed 1% of 1,000,000 px (10,000 px).
+        l_ua, l_la = DOME_29.index("Left_Upper_Arm"), DOME_29.index("Left_Lower_Arm")
+        r_ua, r_la = DOME_29.index("Right_Upper_Arm"), DOME_29.index("Right_Lower_Arm")
+        l_h, r_h = DOME_29.index("Left_Hand"), DOME_29.index("Right_Hand")
+        l_ul, r_ul = DOME_29.index("Left_Upper_Leg"), DOME_29.index("Right_Upper_Leg")
+        l_ll, r_ll = DOME_29.index("Left_Lower_Leg"), DOME_29.index("Right_Lower_Leg")
+        seg[250:560, 360:400] = l_ua
+        seg[560:700, 360:400] = l_la
+        seg[250:560, 600:640] = r_ua
+        seg[560:700, 600:640] = r_la
+        seg[420:530, 350:460] = l_h  # left hand, 110x110=12100 px
+        seg[420:530, 540:650] = r_h  # right hand, 110x110=12100 px
+        seg[700:900, 430:470] = l_ul
+        seg[900:1000, 430:500] = l_ll
+        seg[700:900, 530:570] = r_ul
+        seg[900:1000, 500:570] = r_ll
+        # top-up lower legs so each leg region exceeds the 1% threshold
+        seg[880:1000, 420:470] = l_ll
+        seg[880:1000, 530:580] = r_ll
     elif mask_type == "face_only":
         seg[0:1000, 0:1000] = face_idx
     elif mask_type == "held_object":
         seg[100:900, 300:700] = torso_idx
         seg[50:150, 400:600] = face_idx
+        l_h, r_h = DOME_29.index("Left_Hand"), DOME_29.index("Right_Hand")
+        # Hands at the wrist positions (490/510,500), each >= 10,001 px,
+        # and NOT overlapping the background held-object square (450:550,450:550).
+        seg[300:450, 380:500] = l_h  # 150x120=18000 px, left of object
+        seg[300:450, 520:640] = r_h  # 150x120=18000 px, right of object
         # Held object is dense background in front of torso, between wrists
         seg[450:550, 450:550] = 0  # Background class
 
@@ -124,7 +149,7 @@ def make_synthetic_seg2(mask_type: str = "full_body", shape=(1000, 1000)) -> np.
 def make_synthetic_pointmap(shape=(1000, 1000), mask_type="full_body") -> np.ndarray:
     """Create a synthetic pointmap.npy array (H, W, 3) float16."""
     pm = np.zeros((shape[0], shape[1], 3), dtype=np.float16)
-    
+
     if mask_type == "full_body":
         # Flat plane at Z=2.5m
         pm[100:900, 300:700, 2] = 2.5
@@ -136,20 +161,23 @@ def make_synthetic_pointmap(shape=(1000, 1000), mask_type="full_body") -> np.nda
         pm[100:900, 300:700, 0] = np.repeat(x_grid, 800, axis=0)
     elif mask_type == "face_only":
         pm[0:1000, 0:1000, 2] = 1.0
-        
+
     return pm
 
-def setup_fixture_dir(tmp_path: Path, num_persons=1, pose_type="standing", mask_type="full_body"):
+
+def setup_fixture_dir(
+    tmp_path: Path, num_persons=1, pose_type="standing", mask_type="full_body"
+):
     """Writes synthetic arrays to tmp_path and returns the path."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     pose2 = make_synthetic_pose2(num_persons, pose_type)
     seg2 = make_synthetic_seg2(mask_type)
     pointmap = make_synthetic_pointmap(shape=(1000, 1000), mask_type=mask_type)
-    
+
     np.save(str(tmp_path / "pose2.npy"), pose2)
     np.save(str(tmp_path / "seg2.npy"), seg2)
     np.save(str(tmp_path / "pointmap.npy"), pointmap)
-    
+
     return tmp_path
 
 
@@ -206,8 +234,8 @@ def test_determinations_crop_silence(tmp_path):
     process(image_path=Path("dummy.jpg"), output_dir=d_face)
     r_face = json.loads((d_face / "determinations.json").read_text())
 
-    # Assert silence on relations (no confidently wrong limb relations)
-    assert len(r_face.get("relations", [])) == 0
+    # Assert only the face relation fires (no limb relations on a face crop)
+    assert r_face.get("relations", []) == ["face turned toward camera"]
 
     # But still has extent and visible parts
     parts = [p["part"] for p in r_face["body_parts_visible"]]
