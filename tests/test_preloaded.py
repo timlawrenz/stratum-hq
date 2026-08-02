@@ -164,3 +164,80 @@ class TestPreloadedImageSupport:
         assert result is True
         assert not m.called
         assert (out_dir / "pose2.npy").exists()
+
+
+class TestDetectorCache:
+    """The DETR person detector must be loaded once and reused.
+
+    Loading a 785-tensor model from disk per image costs ~2s and dominated
+    the pose2 pass. The upstream sapiens2 vis_pose.py caches it; stratum2
+    must too.
+    """
+
+    def test_get_detector_caches_across_calls(self, tmp_path):
+        from stratum2.pipeline import pose
+
+        ckpt = str(tmp_path / "detr")
+        fake_proc = mock.MagicMock()
+        fake_model = mock.MagicMock()
+
+        with mock.patch.object(
+            pose, "_get_detector", side_effect=[(fake_proc, fake_model)]
+        ) as loader:
+            pose._detector_cache.clear()
+            # Call through a fresh accessor twice — only one load should happen
+            p1, m1 = pose._get_cached_detector("cuda:0", ckpt)
+            p2, m2 = pose._get_cached_detector("cuda:0", ckpt)
+            assert p1 is p2 and m1 is m2
+            assert loader.call_count == 1
+
+    def test_process_calls_get_detector_once_for_two_images(self, tmp_path):
+        """Two pose process() calls must load the DETR detector only once."""
+        from stratum2.pipeline import pose
+        from stratum2.pipeline.pose import process
+
+        def _make_fake_pose_model():
+            fake = mock.MagicMock()
+            fake.pipeline.return_value = {
+                "inputs": mock.MagicMock(),
+                "data_samples": {
+                    "meta": {
+                        "input_size": np.array([48, 64], dtype=np.float32),
+                        "bbox_center": np.array([32.0, 24.0], dtype=np.float32),
+                        "bbox_scale": np.array([48.0, 64.0], dtype=np.float32),
+                    }
+                },
+            }
+            fake.data_preprocessor.return_value = {
+                "inputs": torch.randn(1, 3, 48, 64),
+                "data_samples": fake.pipeline.return_value["data_samples"],
+            }
+            fake.return_value = torch.randn(1, 308, 16, 12)
+            fake.codec = mock.MagicMock()
+            fake.codec.decode.return_value = (
+                np.random.randn(1, 308, 2).astype(np.float32),
+                np.random.rand(1, 308).astype(np.float32),
+            )
+            return fake
+
+        img1 = tmp_path / "a.png"
+        img2 = tmp_path / "b.png"
+        cv2.imwrite(str(img1), _make_bgr())
+        cv2.imwrite(str(img2), _make_bgr())
+        out1 = tmp_path / "out1"
+        out2 = tmp_path / "out2"
+
+        fake_proc = mock.MagicMock()
+        fake_det = mock.MagicMock()
+        pose._detector_cache.clear()
+        with mock.patch("cv2.imread", side_effect=lambda p: _make_bgr()), mock.patch(
+            "stratum2.pipeline.pose._get_detector",
+            return_value=(fake_proc, fake_det),
+        ) as slow_loader, mock.patch(
+            "stratum2.pipeline.pose._detect_persons",
+            return_value=np.array([[0, 0, 63, 47]], dtype=np.float32),
+        ):
+            process(img1, out1, _make_fake_pose_model(), "cpu")
+            process(img2, out2, _make_fake_pose_model(), "cpu")
+            # The slow loader must have been hit exactly once across 2 images
+            assert slow_loader.call_count == 1

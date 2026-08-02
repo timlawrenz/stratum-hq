@@ -21,13 +21,25 @@ def eprint(*args, **kwargs):
 
 
 def _get_detector(device: str, det_checkpoint: str):
-    """Load DETR person detector (cached)."""
+    """Load DETR person detector (slow — called once, then cached)."""
     import torch
     from transformers import DetrForObjectDetection, DetrImageProcessor
 
     processor = DetrImageProcessor.from_pretrained(det_checkpoint)
     model = DetrForObjectDetection.from_pretrained(det_checkpoint).eval().to(device)
     return processor, model
+
+
+# Module-level cache: loading the DETR detector costs ~2s per call (785
+# tensors from disk). Without this, every pose2 image pays that tax.
+_detector_cache: dict[str, tuple] = {}
+
+
+def _get_cached_detector(device: str, det_checkpoint: str):
+    """Return the DETR person detector, loading it only once per checkpoint."""
+    if det_checkpoint not in _detector_cache:
+        _detector_cache[det_checkpoint] = _get_detector(device, det_checkpoint)
+    return _detector_cache[det_checkpoint]
 
 
 def _detect_persons(
@@ -105,7 +117,7 @@ def process(
             eprint(f"warning: cannot read {image_path}")
             return False
 
-        # --- Person detection ---
+        # --- Person detection (cached — loaded once per checkpoint) ---
         if det_checkpoint is None:
             local_det_dir = SAPIENS2_CACHE_DIR / "detector" / "detr-resnet-101-dc5"
             if local_det_dir.exists():
@@ -113,7 +125,7 @@ def process(
             else:
                 from stratum2.config import POSE_DETECTOR_REPO
                 det_checkpoint = POSE_DETECTOR_REPO
-        processor, detector_model = _get_detector(device, det_checkpoint)
+        processor, detector_model = _get_cached_detector(device, det_checkpoint)
         bboxes = _detect_persons(image, processor, detector_model, device)
 
         # --- Pose estimation per person ---
