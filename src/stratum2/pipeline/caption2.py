@@ -74,5 +74,41 @@ def process(
     ollama_model: str = "gemma3:27b",
     **kwargs,
 ) -> bool:
-    """To be implemented in Phase 4"""
-    pass
+    """Run Ollama with the determinations-grounded prompt."""
+    out_path = output_dir / "caption2.txt"
+    if out_path.exists():
+        return True
+
+    det_path = output_dir / "determinations.json"
+    if not det_path.exists():
+        import sys
+
+        print(
+            f"warning: caption2 skipped for {image_path}: determinations.json not found",
+            file=sys.stderr,
+        )
+        return False
+
+    # Read determinations
+    det_data = json.loads(det_path.read_text())
+
+    # Build prompt
+    prompt = build_prompt(det_data)
+
+    # Run Ollama (via stratum1's OllamaCaptionBackend)
+    from stratum.pipeline.caption import OllamaCaptionBackend, ensure_single_paragraph
+    from PIL import Image
+
+    backend = OllamaCaptionBackend(url=ollama_url, model_name=ollama_model)
+    try:
+        img = Image.open(image_path).convert("RGB")
+        raw_text = backend.generate(img, prompt=prompt)
+        text = ensure_single_paragraph(raw_text)
+    except Exception as exc:
+        import sys
+
+        print(f"warning: caption2 failed for {image_path}: {exc}", file=sys.stderr)
+        return False
+
+    out_path.write_text(text)
+    return True
