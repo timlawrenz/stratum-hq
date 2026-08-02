@@ -44,6 +44,11 @@ def make_synthetic_pose2(
             # Arms down
             pose[i, lwri_idx, :2] = [380, 550]
             pose[i, rwri_idx, :2] = [620, 550]
+            # Legs down
+            lank_idx = GOLIATH_308.index("left_ankle")
+            rank_idx = GOLIATH_308.index("right_ankle")
+            pose[i, lank_idx, :2] = [450, 900]
+            pose[i, rank_idx, :2] = [550, 900]
 
         elif pose_type == "inverted":
             pose[i, neck_idx, :2] = [500, 800]
@@ -58,11 +63,39 @@ def make_synthetic_pose2(
         elif pose_type == "arms_raised":
             pose[i, neck_idx, :2] = [500, 400]
             pose[i, lsho_idx, :2] = [400, 450]
+            pose[i, rsho_idx, :2] = [600, 450]
             pose[i, lhip_idx, :2] = [450, 800]
             pose[i, rhip_idx, :2] = [550, 800]
-            # Wrist above shoulder
             pose[i, lwri_idx, :2] = [400, 200]
             pose[i, rwri_idx, :2] = [600, 200]
+
+        elif pose_type == "hands_together":
+            pose[i, neck_idx, :2] = [500, 200]
+            pose[i, lsho_idx, :2] = [400, 250]
+            pose[i, rsho_idx, :2] = [600, 250]
+            pose[i, lhip_idx, :2] = [450, 600]
+            pose[i, rhip_idx, :2] = [550, 600]
+            # Hands overlapping in center
+            pose[i, lwri_idx, :2] = [490, 500]
+            pose[i, rwri_idx, :2] = [510, 500]
+
+        elif pose_type == "profile_left":
+            # Right side occluded/absent
+            pose[i, neck_idx, :2] = [500, 200]
+            pose[i, lsho_idx, :2] = [500, 250]
+            pose[i, rsho_idx, :2] = [500, 250]
+            pose[i, rsho_idx, 2] = 0.0  # hidden
+            pose[i, lhip_idx, :2] = [500, 600]
+            pose[i, rhip_idx, :2] = [500, 600]
+            pose[i, rhip_idx, 2] = 0.0
+            pose[i, lwri_idx, :2] = [480, 500]
+            pose[i, rwri_idx, 2] = 0.0
+
+            # Face symmetry hints
+            lear_idx = GOLIATH_308.index("left_ear")
+            rear_idx = GOLIATH_308.index("right_ear")
+            pose[i, lear_idx, :2] = [520, 180]
+            pose[i, rear_idx, 2] = 0.0  # right ear hidden
 
     return pose
 
@@ -79,6 +112,11 @@ def make_synthetic_seg2(mask_type: str = "full_body", shape=(1000, 1000)) -> np.
         seg[50:150, 400:600] = face_idx
     elif mask_type == "face_only":
         seg[0:1000, 0:1000] = face_idx
+    elif mask_type == "held_object":
+        seg[100:900, 300:700] = torso_idx
+        seg[50:150, 400:600] = face_idx
+        # Held object is dense background in front of torso, between wrists
+        seg[450:550, 450:550] = 0  # Background class
 
     return seg
 

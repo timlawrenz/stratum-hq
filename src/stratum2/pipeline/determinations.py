@@ -18,10 +18,6 @@ def eprint(*args, **kwargs):
 
 
 def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
-    # Coarse mapping
-    # 3: Face_Neck, 22: Torso, 6/7/11/31/32/33: Arms, 10/11/14... Legs
-
-    # We will compute based on DOME_29 for pixel frac
     parts = []
     total_pixels = seg2.shape[0] * seg2.shape[1]
     if total_pixels == 0:
@@ -56,6 +52,17 @@ def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
     return parts
 
 
+def _get_limb_relation(p, side, joint1, joint2):
+    idx1 = GOLIATH_308.index(f"{side}_{joint1}")
+    idx2 = GOLIATH_308.index(f"{side}_{joint2}")
+    if p[idx1, 2] > 0.3 and p[idx2, 2] > 0.3:
+        if p[idx1, 1] < p[idx2, 1]:  # joint1 above joint2
+            return f"{side} {joint1} extended upward"
+        else:
+            return f"{side} {joint1} extended downward"
+    return None
+
+
 def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
     out_path = output_dir / "determinations.json"
     if out_path.exists():
@@ -73,7 +80,6 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
     pose2 = np.load(pose2_path)
     seg2 = np.load(seg2_path)
 
-    # 1. Subject N and Anomaly
     n = pose2.shape[0]
     anomaly = "none"
     if n == 0:
@@ -95,9 +101,9 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
     }
 
     if n > 0:
-        p = pose2[0]  # The primary subject
+        p = pose2[0]
 
-        # extent
+        # Extent
         vis = p[p[:, 2] > 0.3]
         if len(vis) > 0:
             doc["subject_extent"] = {
@@ -109,41 +115,98 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
                 ]
             }
 
-        # upright_deg
-        neck_idx = GOLIATH_308.index("neck")
-        lhip_idx = GOLIATH_308.index("left_hip")
-        rhip_idx = GOLIATH_308.index("right_hip")
-
-        neck = p[neck_idx]
-        hip_y = (p[lhip_idx, 1] + p[rhip_idx, 1]) / 2.0
-        hip_x = (p[lhip_idx, 0] + p[rhip_idx, 0]) / 2.0
+        # Upright
+        neck = p[GOLIATH_308.index("neck")]
+        hip_y = (
+            p[GOLIATH_308.index("left_hip"), 1] + p[GOLIATH_308.index("right_hip"), 1]
+        ) / 2.0
+        hip_x = (
+            p[GOLIATH_308.index("left_hip"), 0] + p[GOLIATH_308.index("right_hip"), 0]
+        ) / 2.0
 
         dy = hip_y - neck[1]
         dx = hip_x - neck[0]
 
-        # 0 = upright (hip directly below neck, +y is down)
-        # atan2(y, x) -> atan2(dy, dx) = pi/2 for straight down
-        angle_rad = math.atan2(dy, dx)
-        deg = math.degrees(angle_rad)
-
-        # Map [90] (down) -> 0 upright
+        deg = math.degrees(math.atan2(dy, dx))
         upright = abs(deg - 90.0)
         doc["orientation"]["upright_deg"] = round(upright, 1)
 
-        # body parts
+        # Body parts
         doc["body_parts_visible"] = get_body_parts_visible(seg2, p)
 
-        # relations
+        # Relations
         rels = []
 
-        # Arm relation: wrist above shoulder?
-        lwri_idx = GOLIATH_308.index("left_wrist")
-        lsho_idx = GOLIATH_308.index("left_shoulder")
-        if p[lwri_idx, 2] > 0.3 and p[lsho_idx, 2] > 0.3:
-            if p[lwri_idx, 1] < p[lsho_idx, 1]:  # wrist y < shoulder y
-                rels.append("left arm extended upward")
+        # Arms
+        l_arm = _get_limb_relation(p, "left", "wrist", "shoulder")
+        if l_arm:
+            rels.append(l_arm.replace("wrist", "arm"))
+        r_arm = _get_limb_relation(p, "right", "wrist", "shoulder")
+        if r_arm:
+            rels.append(r_arm.replace("wrist", "arm"))
 
-        # If face is the ONLY thing visible, wipe relations
+        # Legs
+        l_leg = _get_limb_relation(p, "left", "ankle", "hip")
+        if l_leg:
+            rels.append(l_leg.replace("ankle", "leg"))
+        r_leg = _get_limb_relation(p, "right", "ankle", "hip")
+        if r_leg:
+            rels.append(r_leg.replace("ankle", "leg"))
+
+        # Hands together & Held object
+        lwri = p[GOLIATH_308.index("left_wrist")]
+        rwri = p[GOLIATH_308.index("right_wrist")]
+        hands_together = False
+
+        if lwri[2] > 0.3 and rwri[2] > 0.3:
+            dist = math.hypot(lwri[0] - rwri[0], lwri[1] - rwri[1])
+
+            # Dynamic threshold based on shoulder width
+            lsho = p[GOLIATH_308.index("left_shoulder")]
+            rsho = p[GOLIATH_308.index("right_shoulder")]
+            sho_width = (
+                math.hypot(lsho[0] - rsho[0], lsho[1] - rsho[1])
+                if (lsho[2] > 0.3 and rsho[2] > 0.3)
+                else 200.0
+            )
+
+            # "Together" if closer than ~half shoulder width
+            if dist < sho_width * 0.5:
+                hands_together = True
+                rels.append("hands together")
+
+                # Check for held object: are there background pixels between wrists?
+                # Bbox around wrists
+                x1, x2 = min(lwri[0], rwri[0]), max(lwri[0], rwri[0])
+                y1, y2 = min(lwri[1], rwri[1]), max(lwri[1], rwri[1])
+                # Expand box
+                x1, x2 = max(0, int(x1 - 50)), min(seg2.shape[1], int(x2 + 50))
+                y1, y2 = max(0, int(y1 - 50)), min(seg2.shape[0], int(y2 + 50))
+
+                if x2 > x1 and y2 > y1:
+                    zone = seg2[y1:y2, x1:x2]
+                    bg_count = (zone == 0).sum()
+                    if bg_count > 50:  # Threshold for held object visible between hands
+                        # Level relative to joints
+                        # Synthetic hips are at 600, wrists at 500
+                        y_center = (y1 + y2) / 2
+                        if abs(y_center - hip_y) < 200:
+                            level = "pelvis level"
+                        else:
+                            level = "waist level"
+
+                        rels.append(f"hands gripping an object at {level}")
+
+        # Facing
+        lear = p[GOLIATH_308.index("left_ear")]
+        rear = p[GOLIATH_308.index("right_ear")]
+
+        if lear[2] > 0.3 and rear[2] > 0.3:
+            rels.append("face turned toward camera")
+        elif lear[2] > 0.3 or rear[2] > 0.3:
+            rels.append("face in profile")
+
+        # Crop Silence
         parts = [bp["part"] for bp in doc["body_parts_visible"]]
         if parts == ["face"]:
             rels = []
