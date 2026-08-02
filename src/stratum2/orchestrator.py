@@ -185,153 +185,168 @@ def run_passes(
     counters = {"processed": 0, "skipped": 0, "errors": 0}
     started = time.time()
 
-    for i, image_path in enumerate(images):
-        out_dir = output_dir_for_image(image_path, input_dir, output_dir)
-        meta = _ensure_metadata(image_path, out_dir)
-        if meta is None:
-            counters["errors"] += 1
-            continue
+    # Prefetch images in a background thread so the GPU never waits on CIFS
+    from stratum2.prefetch import PrefetchReader
 
-        aspect_bucket = meta.get("aspect_bucket")
-        did_work = False
-
-        # --- Phase 1: parallel-safe passes ---
-
-        # Caption
-        if run_caption and _needs(out_dir, CAPTION_FILE):
-            from stratum.pipeline.caption import process as caption_process
-
-            if verbose:
-                eprint(f"  captioning {meta['image_id']}...")
-            if caption_process(
-                image_path, out_dir, caption_backend, aspect_bucket, caption_max_tokens
-            ):
-                did_work = True
-            else:
+    with PrefetchReader(images, depth=8) as prefetcher:
+        for i, (image_path, preloaded) in enumerate(prefetcher):
+            if image_path is None:
+                continue  # sentinel guard
+            out_dir = output_dir_for_image(image_path, input_dir, output_dir)
+            meta = _ensure_metadata(image_path, out_dir)
+            if meta is None:
                 counters["errors"] += 1
+                continue
 
-        # DINOv3
-        if run_dinov3 and (
-            _needs(out_dir, DINOV3_CLS_FILE) or _needs(out_dir, DINOV3_PATCHES_FILE)
-        ):
-            from stratum.pipeline.dinov3 import process as dinov3_process
+            aspect_bucket = meta.get("aspect_bucket")
+            did_work = False
 
-            if verbose:
-                eprint(f"  DINOv3 {meta['image_id']}...")
-            if dinov3_process(image_path, out_dir, dino, torch_device, aspect_bucket):
-                did_work = True
-            else:
-                counters["errors"] += 1
+            # --- Phase 1: parallel-safe passes ---
 
-        # T5
-        if run_t5 and (
-            _needs(out_dir, T5_HIDDEN_FILE) or _needs(out_dir, T5_MASK_FILE)
-        ):
-            if (out_dir / CAPTION_FILE).exists():
-                from stratum.pipeline.t5 import process as t5_process
+            # Caption
+            if run_caption and _needs(out_dir, CAPTION_FILE):
+                from stratum.pipeline.caption import process as caption_process
 
                 if verbose:
-                    eprint(f"  T5 {meta['image_id']}...")
-                if t5_process(out_dir, t5_tokenizer, t5_encoder, torch_device):
-                    did_work = True
-                else:
-                    counters["errors"] += 1
-
-        # Pixel
-        if run_pixel and aspect_bucket and _needs(out_dir, PIXEL_FILE):
-            from stratum.pipeline.pixel import process as pixel_process
-
-            if verbose:
-                eprint(f"  pixel {meta['image_id']}...")
-            if pixel_process(image_path, out_dir, aspect_bucket):
-                did_work = True
-            else:
-                counters["errors"] += 1
-
-        # Seg2
-        if run_seg2 and _needs(out_dir, SEG2_FILE):
-            from stratum2.pipeline.seg import process as seg2_process
-
-            if verbose:
-                eprint(f"  seg2 {meta['image_id']}...")
-            if seg2_process(image_path, out_dir, seg2_model, torch_device, aspect_bucket):
-                did_work = True
-            else:
-                counters["errors"] += 1
-
-        # Pose2
-        if run_pose2 and _needs(out_dir, POSE2_FILE):
-            from stratum2.pipeline.pose import process as pose2_process
-
-            if verbose:
-                eprint(f"  pose2 {meta['image_id']}...")
-            if pose2_process(image_path, out_dir, pose2_model, torch_device, aspect_bucket):
-                did_work = True
-            else:
-                counters["errors"] += 1
-
-        # Matting
-        if run_matting and _needs(out_dir, MATTING_FILE):
-            from stratum2.pipeline.matting import process as matting_process
-
-            if verbose:
-                eprint(f"  matting {meta['image_id']}...")
-            if matting_process(
-                image_path, out_dir, matting_model, torch_device, aspect_bucket
-            ):
-                did_work = True
-            else:
-                counters["errors"] += 1
-
-        # --- Phase 2: seg2-dependent passes ---
-
-        # Normal2 (requires seg2.npy)
-        if run_normal2 and _needs(out_dir, NORMAL2_FILE):
-            if (out_dir / SEG2_FILE).exists():
-                from stratum2.pipeline.normal import process as normal2_process
-
-                if verbose:
-                    eprint(f"  normal2 {meta['image_id']}...")
-                if normal2_process(
-                    image_path, out_dir, normal2_model, torch_device, aspect_bucket
+                    eprint(f"  captioning {meta['image_id']}...")
+                if caption_process(
+                    image_path, out_dir, caption_backend, aspect_bucket, caption_max_tokens
                 ):
                     did_work = True
                 else:
                     counters["errors"] += 1
-            elif verbose:
-                eprint(f"  normal2 skipped {meta['image_id']} (no seg2)")
 
-        # Pointmap (requires seg2.npy)
-        if run_pointmap and _needs(out_dir, POINTMAP_FILE):
-            if (out_dir / SEG2_FILE).exists():
-                from stratum2.pipeline.pointmap import process as pointmap_process
+            # DINOv3
+            if run_dinov3 and (
+                _needs(out_dir, DINOV3_CLS_FILE) or _needs(out_dir, DINOV3_PATCHES_FILE)
+            ):
+                from stratum.pipeline.dinov3 import process as dinov3_process
 
                 if verbose:
-                    eprint(f"  pointmap {meta['image_id']}...")
-                if pointmap_process(
-                    image_path, out_dir, pointmap_model, torch_device, aspect_bucket
+                    eprint(f"  DINOv3 {meta['image_id']}...")
+                if dinov3_process(image_path, out_dir, dino, torch_device, aspect_bucket):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # T5
+            if run_t5 and (
+                _needs(out_dir, T5_HIDDEN_FILE) or _needs(out_dir, T5_MASK_FILE)
+            ):
+                if (out_dir / CAPTION_FILE).exists():
+                    from stratum.pipeline.t5 import process as t5_process
+
+                    if verbose:
+                        eprint(f"  T5 {meta['image_id']}...")
+                    if t5_process(out_dir, t5_tokenizer, t5_encoder, torch_device):
+                        did_work = True
+                    else:
+                        counters["errors"] += 1
+
+            # Pixel
+            if run_pixel and aspect_bucket and _needs(out_dir, PIXEL_FILE):
+                from stratum.pipeline.pixel import process as pixel_process
+
+                if verbose:
+                    eprint(f"  pixel {meta['image_id']}...")
+                if pixel_process(image_path, out_dir, aspect_bucket):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # Seg2
+            if run_seg2 and _needs(out_dir, SEG2_FILE):
+                from stratum2.pipeline.seg import process as seg2_process
+
+                if verbose:
+                    eprint(f"  seg2 {meta['image_id']}...")
+                if seg2_process(
+                    image_path, out_dir, seg2_model, torch_device, aspect_bucket,
+                    image=preloaded,
                 ):
                     did_work = True
                 else:
                     counters["errors"] += 1
-            elif verbose:
-                eprint(f"  pointmap skipped {meta['image_id']} (no seg2)")
 
-        if did_work:
-            counters["processed"] += 1
-        else:
-            counters["skipped"] += 1
+            # Pose2
+            if run_pose2 and _needs(out_dir, POSE2_FILE):
+                from stratum2.pipeline.pose import process as pose2_process
 
-        # Progress
-        total = i + 1
-        if progress_every and total % progress_every == 0:
-            elapsed = time.time() - started
-            rate = counters["processed"] / elapsed if elapsed > 0 else 0
-            eprint(
-                f"progress: {total}/{len(images)} "
-                f"({counters['processed']} processed, {counters['skipped']} skipped, "
-                f"{counters['errors']} errors) {rate:.1f} img/s"
-            )
+                if verbose:
+                    eprint(f"  pose2 {meta['image_id']}...")
+                if pose2_process(
+                    image_path, out_dir, pose2_model, torch_device, aspect_bucket,
+                    image=preloaded,
+                ):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # Matting
+            if run_matting and _needs(out_dir, MATTING_FILE):
+                from stratum2.pipeline.matting import process as matting_process
+
+                if verbose:
+                    eprint(f"  matting {meta['image_id']}...")
+                if matting_process(
+                    image_path, out_dir, matting_model, torch_device, aspect_bucket,
+                    image=preloaded,
+                ):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # --- Phase 2: seg2-dependent passes ---
+
+            # Normal2 (requires seg2.npy)
+            if run_normal2 and _needs(out_dir, NORMAL2_FILE):
+                if (out_dir / SEG2_FILE).exists():
+                    from stratum2.pipeline.normal import process as normal2_process
+
+                    if verbose:
+                        eprint(f"  normal2 {meta['image_id']}...")
+                    if normal2_process(
+                        image_path, out_dir, normal2_model, torch_device, aspect_bucket,
+                        image=preloaded,
+                    ):
+                        did_work = True
+                    else:
+                        counters["errors"] += 1
+                elif verbose:
+                    eprint(f"  normal2 skipped {meta['image_id']} (no seg2)")
+
+            # Pointmap (requires seg2.npy)
+            if run_pointmap and _needs(out_dir, POINTMAP_FILE):
+                if (out_dir / SEG2_FILE).exists():
+                    from stratum2.pipeline.pointmap import process as pointmap_process
+
+                    if verbose:
+                        eprint(f"  pointmap {meta['image_id']}...")
+                    if pointmap_process(
+                        image_path, out_dir, pointmap_model, torch_device, aspect_bucket,
+                        image=preloaded,
+                    ):
+                        did_work = True
+                    else:
+                        counters["errors"] += 1
+                elif verbose:
+                    eprint(f"  pointmap skipped {meta['image_id']} (no seg2)")
+
+            if did_work:
+                counters["processed"] += 1
+            else:
+                counters["skipped"] += 1
+
+            # Progress
+            total = i + 1
+            if progress_every and total % progress_every == 0:
+                elapsed = time.time() - started
+                rate = counters["processed"] / elapsed if elapsed > 0 else 0
+                eprint(
+                    f"progress: {total}/{len(images)} "
+                    f"({counters['processed']} processed, {counters['skipped']} skipped, "
+                    f"{counters['errors']} errors) {rate:.1f} img/s"
+                )
 
     elapsed = time.time() - started
     eprint(

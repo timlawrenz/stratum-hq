@@ -28,8 +28,14 @@ def process(
     normal_model,
     device,
     aspect_bucket: str | None = None,
+    *,
+    image=None,
 ) -> bool:
     """Run Sapiens2 surface normal estimation and save ``normal2.npy``.
+
+    Args:
+        image: Optional preloaded BGR image. When provided, skips reading
+            the image from disk (used by the prefetch reader).
 
     Returns ``True`` on success, ``False`` on failure.
     """
@@ -40,9 +46,10 @@ def process(
             eprint(f"warning: normal2 skipped for {image_path}: seg2 not found")
             return False
 
-        import cv2
+        if image is None:
+            import cv2
 
-        image = cv2.imread(str(image_path))  # BGR
+            image = cv2.imread(str(image_path))  # BGR
         if image is None:
             eprint(f"warning: cannot read {image_path}")
             return False

@@ -80,22 +80,27 @@ def process(
     aspect_bucket: str | None = None,
     *,
     det_checkpoint: str | None = None,
+    image=None,
 ) -> bool:
     """Run Sapiens2 308-keypoint pose estimation and save ``pose2.npy``.
 
     Args:
         det_checkpoint: Path to DETR snapshot directory. Defaults to
             ``SAPIENS2_CACHE_DIR / "detector" / "detr-resnet-101-dc5"``.
+        image: Optional preloaded BGR image. When provided, skips reading
+            the image from disk (used by the prefetch reader).
 
     Returns ``True`` on success, ``False`` on failure.
     """
     try:
-        import cv2
         import torch
 
         from stratum2.config import SAPIENS2_CACHE_DIR
 
-        image = cv2.imread(str(image_path))  # BGR
+        if image is None:
+            import cv2
+
+            image = cv2.imread(str(image_path))  # BGR
         if image is None:
             eprint(f"warning: cannot read {image_path}")
             return False

@@ -26,15 +26,22 @@ def process(
     matting_model,
     device,
     aspect_bucket: str | None = None,
+    *,
+    image=None,
 ) -> bool:
     """Run Sapiens2 human matting and save ``matting.npy``.
+
+    Args:
+        image: Optional preloaded BGR image. When provided, skips reading
+            the image from disk (used by the prefetch reader).
 
     Returns ``True`` on success, ``False`` on failure.
     """
     try:
-        import cv2
+        if image is None:
+            import cv2
 
-        image = cv2.imread(str(image_path))  # BGR
+            image = cv2.imread(str(image_path))  # BGR
         if image is None:
             eprint(f"warning: cannot read {image_path}")
             return False
