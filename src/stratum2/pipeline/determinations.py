@@ -30,7 +30,7 @@ def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
             {
                 "part": "face",
                 "pixel_frac": float(face_px / total_pixels),
-                "kp_conf": float(np.mean(pose2_person[21:263, 2]))
+                "kp_conf": float(np.mean(pose2_person[70:308, 2]))
                 if pose2_person is not None
                 else 0.0,
             }
