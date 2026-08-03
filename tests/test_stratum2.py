@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import importlib
-import os
 import sys
+import types
 from pathlib import Path
 from unittest import mock
 
@@ -96,31 +96,43 @@ class TestStratum2Loader:
         assert loader is not None
 
     def test_download_checkpoint_creates_cache_dir(self, tmp_path, monkeypatch):
-        """_download_checkpoint creates cache directory structure."""
+        """_download_checkpoint creates cache structure through the hub boundary."""
         from stratum2 import loader
 
         monkeypatch.setattr(loader, "SAPIENS2_CACHE_DIR", tmp_path)
-        with mock.patch("huggingface_hub.hf_hub_download") as mock_dl:
-            expected_path = tmp_path / "test--repo" / "test.safetensors"
-            mock_dl.return_value = str(expected_path)
-            mock_dl.side_effect = lambda *a, **kw: expected_path.parent.mkdir(
+        expected_path = tmp_path / "test--repo" / "test.safetensors"
+        fake_hub = types.ModuleType("huggingface_hub")
+        mock_download = mock.Mock(
+            side_effect=lambda *args, **kwargs: expected_path.parent.mkdir(
                 parents=True, exist_ok=True
             ) or expected_path.touch() or str(expected_path)
-            path = loader._download_checkpoint("test/repo", "test.safetensors")
-            assert path == expected_path
-            assert mock_dl.call_count == 1
+        )
+        fake_hub.__dict__["hf_hub_download"] = mock_download
+        monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
 
-            path2 = loader._download_checkpoint("test/repo", "test.safetensors")
-            assert path2 == expected_path
-            assert mock_dl.call_count == 1
+        path = loader._download_checkpoint("test/repo", "test.safetensors")
+        assert path == expected_path
+        assert mock_download.call_count == 1
 
-    def test_get_config_path_returns_existing_file(self):
-        """get_config_path returns a path that exists for valid task/size."""
+        path2 = loader._download_checkpoint("test/repo", "test.safetensors")
+        assert path2 == expected_path
+        assert mock_download.call_count == 1
+
+    def test_get_config_path_returns_existing_file(self, tmp_path, monkeypatch):
+        """get_config_path resolves a config shipped by the installed package."""
         from stratum2 import loader
 
+        config = tmp_path / "dense" / "configs" / "seg" / "dome"
+        config.mkdir(parents=True)
+        expected = config / "sapiens2_1b_seg_dome-1024x768.py"
+        expected.write_text("# synthetic config\n", encoding="utf-8")
+        fake_sapiens = types.ModuleType("sapiens")
+        fake_sapiens.__file__ = str(tmp_path / "__init__.py")
+        monkeypatch.setitem(sys.modules, "sapiens", fake_sapiens)
+
         path = loader.get_config_path("seg", "1b")
-        assert path is not None
-        assert Path(path).exists(), f"Config not found at {path}"
+        assert path == expected
+        assert path.exists()
 
     def test_get_config_path_unknown_task_raises(self):
         """get_config_path raises ValueError for unknown task."""

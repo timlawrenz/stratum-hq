@@ -43,6 +43,10 @@ publish = [
     "huggingface-hub>=0.20.0",
     "pyarrow>=14.0.0",
 ]
+test = [
+    "pytest>=8.0.0",
+    "opencv-python-headless>=4.5.0",
+]
 all = [
     "stratum-hq[gpu,pose,sapiens,publish]",
 ]
