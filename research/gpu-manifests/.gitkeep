@@ -1,0 +1,2 @@
+# Approved manifests belong here only after human review.
+# The current GPU supervisor is observer-only and will never launch them.

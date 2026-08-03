@@ -50,9 +50,10 @@ all = [
 [project.scripts]
 stratum = "stratum.cli:main"
 stratum2 = "stratum2.cli:main"
+research-harness = "research_harness.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/stratum", "src/stratum2"]
+packages = ["src/stratum", "src/stratum2", "src/research_harness"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
