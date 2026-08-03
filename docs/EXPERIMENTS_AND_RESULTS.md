@@ -15,7 +15,9 @@ This ledger records empirical findings and negative results permanently. A green
 - The existing `t5_*` and `t52_*` encoders are fixed to 512 tokens, so a target ~4K compact context requires separate artifacts and a new downstream-consumption research arm.
 - Existing NAS GPU scheduler: 4090 local route; Strix remote route `ssh:max395` with 10GB evergreen reservation. Its `poll` operation performs the atomic claim; harness supervisor is observer-only.
 
-**Verdict:** `PENDING` — harness implementation must pass tests and undergo draft-PR review. No GPU work or corpus mutation is authorized by this entry.
+**Draft PR:** #6 (`feat: add autonomous research harness`).
+
+**Verdict:** `PENDING` — harness implementation passed local verification and must undergo draft-PR review. No GPU work or corpus mutation is authorized by this entry.
 
 ## Arm 0 — Geometry-grounded captioning prototype — `[ACTIVE — PENDING]`
 

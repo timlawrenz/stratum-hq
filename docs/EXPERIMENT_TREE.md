@@ -22,7 +22,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 
 ## Harness status
 
-* **[DRAFT-PR REVIEW] Autonomous research control plane**
+* **[DRAFT-PR REVIEW] Autonomous research control plane** (draft PR #6)
   * Project-neutral GitHub issue-tree, evidence/compression contract, fail-closed GPU manifest validation, and draft-PR-only workflow.
   * GPU supervisor is observer-only until a separately reviewed host-specific launcher exists.
 

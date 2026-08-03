@@ -18,7 +18,7 @@ The live GitHub tree is strict and non-FIFO:
 
 ## Immediate next action
 
-Review the draft research-harness PR before activation. Until that review, #3 may advance only through the contract's authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
+Review draft PR #6 (`feat: add autonomous research harness`) before activation. Until that review, #3 may advance only through the contract's authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
 
 ## Headline result so far
 
