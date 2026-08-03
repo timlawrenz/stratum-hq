@@ -17,8 +17,16 @@ import numpy as np
 
 from stratum2.config import DOME_29, GOLIATH_308
 
-# Minimal foreground fraction for a region to count as corroborated.
+# Minimal fraction for a region to count as corroborated, measured against the
+# subject's OWN foreground pixels (seg2 > 0), not the whole frame. Frame-
+# normalized fractions penalize environmental full-body shots where the subject
+# is a small part of the scene (a slender arm can be clearly visible yet <1% of
+# a 1.7Mpx outdoor frame).
 MIN_REGION_FRAC = 0.01
+
+# Absolute pixel floor: a region must also clear this raw count so a tiny seg2
+# smear can't pass a 1%-of-tiny-foreground gate on near-empty crops.
+MIN_REGION_PX = 200
 
 # Region -> seg2 classes (DOME_29 indices). Clothing classes count toward the
 # underlying body region (a shirt means a torso is present).
@@ -67,11 +75,21 @@ def eprint(*args, **kwargs):
 
 
 def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
-    """Report all corroborated regions with pixel fraction + kp confidence."""
+    """Report all regions with pixel fractions + kp confidence.
+
+    ``pixel_frac`` is normalized against the subject's own foreground pixels
+    (seg2 > 0) — this is what the corroboration gate reads. ``frame_frac`` is
+    the frame-normalized fraction, kept for reference only.
+    """
     parts = []
     total_pixels = seg2.shape[0] * seg2.shape[1]
     if total_pixels == 0:
         return parts
+
+    fg_pixels = int((seg2 > 0).sum())
+    # Guard against degenerate near-empty seg: fall back to frame denominator so
+    # fractions stay sane instead of exploding on a 2-pixel foreground.
+    denom = fg_pixels if fg_pixels > 0 else total_pixels
 
     for region, classes in REGION_SEG_CLASSES.items():
         px = int(sum((seg2 == c).sum() for c in classes))
@@ -86,7 +104,9 @@ def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
         parts.append(
             {
                 "part": region,
-                "pixel_frac": float(px / total_pixels),
+                "pixel_frac": float(px / denom),
+                "frame_frac": float(px / total_pixels),
+                "pixel_count": px,
                 "kp_conf": kp_conf,
             }
         )
@@ -94,8 +114,13 @@ def get_body_parts_visible(seg2: np.ndarray, pose2_person: np.ndarray | None):
 
 
 def _corroborated_regions(body_parts: list[dict]) -> set[str]:
-    """Regions seg2 corroborates above the minimal fraction."""
-    return {bp["part"] for bp in body_parts if bp["pixel_frac"] > MIN_REGION_FRAC}
+    """Regions seg2 corroborates: foreground fraction AND absolute pixel floor."""
+    return {
+        bp["part"]
+        for bp in body_parts
+        if bp["pixel_frac"] > MIN_REGION_FRAC
+        and bp.get("pixel_count", 0) >= MIN_REGION_PX
+    }
 
 
 def _kp(p, name):
