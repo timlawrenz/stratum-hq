@@ -22,7 +22,7 @@
       "top_k": 1,
       "top_p": 1.0
     },
-    "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
+    "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
     "git_commit": "caaca9f4b978a2fb5dc8e0fab4e2534a1572fc08",
     "launcher_source_sha256": "3d1fc471bc72a6429e2b4aa0a87e11ad2f341a89c96636d532467efc3c12487e",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
