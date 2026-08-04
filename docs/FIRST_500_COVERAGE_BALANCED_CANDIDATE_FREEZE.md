@@ -81,8 +81,9 @@ the selected existing core artifacts. It may not backfill or mutate
 
 ## Remaining hold and exact next decision
 
-Issue #18 blocks autonomous Stage B. The owner must approve, amend, or decline
-a bounded request tied to the manifest fingerprint above. It must name:
+Issue #18 is a global program hold on further autonomous selection or execution.
+The owner must approve, amend, or decline a bounded request tied to the manifest
+fingerprint above. It must name:
 
 1. the exact already-installed local aggregator and immutable model/code/config
    provenance;
