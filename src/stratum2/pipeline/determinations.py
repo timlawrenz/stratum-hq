@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from stratum2.config import DOME_29, GOLIATH_308
+from stratum2.config import GOLIATH_308
 
 # Minimal fraction for a region to count as corroborated, measured against the
 # subject's OWN foreground pixels (seg2 > 0), not the whole frame. Frame-
@@ -142,23 +142,18 @@ def _get_limb_relation(p, side, joint1, joint2):
     return None
 
 
-def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
-    out_path = output_dir / "determinations.json"
-    if out_path.exists():
-        return True
+def derive_determinations(
+    pose2: np.ndarray,
+    seg2: np.ndarray,
+    *,
+    pointmap: np.ndarray | None = None,
+) -> dict:
+    """Derive one determinations document from already-loaded artifact arrays.
 
-    pose2_path = output_dir / "pose2.npy"
-    seg2_path = output_dir / "seg2.npy"
-
-    if not pose2_path.exists() or not seg2_path.exists():
-        eprint(
-            f"warning: determinations skipped for {image_path}: pose2/seg2 not found"
-        )
-        return False
-
-    pose2 = np.load(pose2_path)
-    seg2 = np.load(seg2_path)
-
+    The function is intentionally pure: it neither mutates its NumPy inputs nor
+    reads/writes a corpus path. This lets bounded research runs reuse the exact
+    determination semantics while keeping output outside ``crawlr/stratum``.
+    """
     n = pose2.shape[0]
     anomaly = "none"
     if n == 0:
@@ -179,142 +174,162 @@ def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
         "relations": [],
     }
 
-    if n > 0:
-        p = pose2[0]  # read-only view; never mutated
+    if n == 0:
+        return doc
 
-        # Per-region corroboration from seg2 (the independent witness).
-        body_parts = get_body_parts_visible(seg2, p)
-        doc["body_parts_visible"] = body_parts
-        corroborated = _corroborated_regions(body_parts)
+    p = pose2[0]  # read-only view; never mutated
 
-        # Pointmap (camera). Requires torso corroboration for shoulder height.
-        pointmap_path = output_dir / "pointmap.npy"
-        if pointmap_path.exists():
-            pm = np.load(pointmap_path)
-            fg_mask = seg2 > 0
-            if fg_mask.any():
-                zs = pm[..., 2][fg_mask]
-                median_z = float(np.median(zs))
-                cam_doc = {"distance_m": round(median_z, 2)}
+    # Per-region corroboration from seg2 (the independent witness).
+    body_parts = get_body_parts_visible(seg2, p)
+    doc["body_parts_visible"] = body_parts
+    corroborated = _corroborated_regions(body_parts)
 
-                if "torso" in corroborated:
-                    lsho = _kp(p, "left_shoulder")
-                    rsho = _kp(p, "right_shoulder")
-                    sho = lsho if lsho[2] > rsho[2] else rsho
-                    if _confident(sho):
-                        x, y = int(sho[0]), int(sho[1])
-                        if 0 <= y < pm.shape[0] and 0 <= x < pm.shape[1]:
-                            # PM is camera frame, +Y down, camera at origin.
-                            # shoulder Y (m) is shoulder height relative to camera.
-                            cam_doc["shoulder_height_rel_camera_m"] = round(
-                                float(pm[y, x, 1]), 2
-                            )
-                doc["camera"] = cam_doc
+    # Pointmap (camera). Requires torso corroboration for shoulder height.
+    if pointmap is not None:
+        fg_mask = seg2 > 0
+        if fg_mask.any():
+            zs = pointmap[..., 2][fg_mask]
+            median_z = float(np.median(zs))
+            cam_doc = {"distance_m": round(median_z, 2)}
 
-        # Extent (from raw pose2, unmodified).
-        vis = p[p[:, 2] > 0.3]
-        if len(vis) > 0:
-            doc["subject_extent"] = {
-                "bbox_px": [
-                    float(vis[:, 0].min()),
-                    float(vis[:, 1].min()),
-                    float(vis[:, 0].max()),
-                    float(vis[:, 1].max()),
-                ]
-            }
-
-        # Upright orientation. Anchored on torso (neck + hips).
-        if "torso" in corroborated:
-            neck = _kp(p, "neck")
-            lhip = _kp(p, "left_hip")
-            rhip = _kp(p, "right_hip")
-            if _confident(neck) and (_confident(lhip) or _confident(rhip)):
-                if _confident(lhip) and _confident(rhip):
-                    hip_y = (lhip[1] + rhip[1]) / 2.0
-                    hip_x = (lhip[0] + rhip[0]) / 2.0
-                elif _confident(lhip):
-                    hip_y, hip_x = lhip[1], lhip[0]
-                else:
-                    hip_y, hip_x = rhip[1], rhip[0]
-                dy = hip_y - neck[1]
-                dx = hip_x - neck[0]
-                deg = math.degrees(math.atan2(dy, dx))
-                doc["orientation"]["upright_deg"] = round(abs(deg - 90.0), 1)
-
-        # Relations — each declares the regions it needs.
-        rels = []
-
-        # Arms (anchored on the corresponding arm region).
-        if "left_arm" in corroborated:
-            r = _get_limb_relation(p, "left", "wrist", "shoulder")
-            if r:
-                rels.append(r.replace("wrist", "arm"))
-        if "right_arm" in corroborated:
-            r = _get_limb_relation(p, "right", "wrist", "shoulder")
-            if r:
-                rels.append(r.replace("wrist", "arm"))
-
-        # Legs (anchored on the corresponding leg region).
-        if "left_leg" in corroborated:
-            r = _get_limb_relation(p, "left", "ankle", "hip")
-            if r:
-                rels.append(r.replace("ankle", "leg"))
-        if "right_leg" in corroborated:
-            r = _get_limb_relation(p, "right", "ankle", "hip")
-            if r:
-                rels.append(r.replace("ankle", "leg"))
-
-        # Hands together & held object (anchored on both hand regions).
-        if "left_hand" in corroborated and "right_hand" in corroborated:
-            lwri = _kp(p, "left_wrist")
-            rwri = _kp(p, "right_wrist")
-            if _confident(lwri) and _confident(rwri):
-                dist = math.hypot(lwri[0] - rwri[0], lwri[1] - rwri[1])
+            if "torso" in corroborated:
                 lsho = _kp(p, "left_shoulder")
                 rsho = _kp(p, "right_shoulder")
-                sho_width = (
-                    math.hypot(lsho[0] - rsho[0], lsho[1] - rsho[1])
-                    if (_confident(lsho) and _confident(rsho))
-                    else 200.0
-                )
-                if dist < sho_width * 0.5:
-                    rels.append("hands together")
+                sho = lsho if lsho[2] > rsho[2] else rsho
+                if _confident(sho):
+                    x, y = int(sho[0]), int(sho[1])
+                    if 0 <= y < pointmap.shape[0] and 0 <= x < pointmap.shape[1]:
+                        # Pointmap is camera frame, +Y down, camera at origin.
+                        cam_doc["shoulder_height_rel_camera_m"] = round(
+                            float(pointmap[y, x, 1]), 2
+                        )
+            doc["camera"] = cam_doc
 
-                    # Held object: background pixels between the wrists.
-                    x1, x2 = min(lwri[0], rwri[0]), max(lwri[0], rwri[0])
-                    y1, y2 = min(lwri[1], rwri[1]), max(lwri[1], rwri[1])
-                    x1, x2 = max(0, int(x1 - 50)), min(seg2.shape[1], int(x2 + 50))
-                    y1, y2 = max(0, int(y1 - 50)), min(seg2.shape[0], int(y2 + 50))
-                    if x2 > x1 and y2 > y1:
-                        zone = seg2[y1:y2, x1:x2]
-                        if (zone == 0).sum() > 50:
-                            y_center = (y1 + y2) / 2
-                            hip_y_ref = 0.0
-                            lhip = _kp(p, "left_hip")
-                            rhip = _kp(p, "right_hip")
-                            if _confident(lhip) and _confident(rhip):
-                                hip_y_ref = (lhip[1] + rhip[1]) / 2.0
-                            elif _confident(lhip):
-                                hip_y_ref = lhip[1]
-                            elif _confident(rhip):
-                                hip_y_ref = rhip[1]
-                            level = (
-                                "pelvis level"
-                                if (hip_y_ref > 0 and abs(y_center - hip_y_ref) < 200)
-                                else "waist level"
-                            )
-                            rels.append(f"hands gripping an object at {level}")
+    # Extent (from raw pose2, unmodified).
+    vis = p[p[:, 2] > 0.3]
+    if len(vis) > 0:
+        doc["subject_extent"] = {
+            "bbox_px": [
+                float(vis[:, 0].min()),
+                float(vis[:, 1].min()),
+                float(vis[:, 0].max()),
+                float(vis[:, 1].max()),
+            ]
+        }
 
-        # Facing (anchored on face region).
-        if "face" in corroborated:
-            lear = _kp(p, "left_ear")
-            rear = _kp(p, "right_ear")
-            if _confident(lear) and _confident(rear):
-                rels.append("face turned toward camera")
-            elif _confident(lear) or _confident(rear):
-                rels.append("face in profile")
+    # Upright orientation. Anchored on torso (neck + hips).
+    if "torso" in corroborated:
+        neck = _kp(p, "neck")
+        lhip = _kp(p, "left_hip")
+        rhip = _kp(p, "right_hip")
+        if _confident(neck) and (_confident(lhip) or _confident(rhip)):
+            if _confident(lhip) and _confident(rhip):
+                hip_y = (lhip[1] + rhip[1]) / 2.0
+                hip_x = (lhip[0] + rhip[0]) / 2.0
+            elif _confident(lhip):
+                hip_y, hip_x = lhip[1], lhip[0]
+            else:
+                hip_y, hip_x = rhip[1], rhip[0]
+            dy = hip_y - neck[1]
+            dx = hip_x - neck[0]
+            deg = math.degrees(math.atan2(dy, dx))
+            doc["orientation"]["upright_deg"] = round(abs(deg - 90.0), 1)
 
-        doc["relations"] = rels
+    # Relations — each declares the regions it needs.
+    rels = []
 
+    # Arms (anchored on the corresponding arm region).
+    if "left_arm" in corroborated:
+        r = _get_limb_relation(p, "left", "wrist", "shoulder")
+        if r:
+            rels.append(r.replace("wrist", "arm"))
+    if "right_arm" in corroborated:
+        r = _get_limb_relation(p, "right", "wrist", "shoulder")
+        if r:
+            rels.append(r.replace("wrist", "arm"))
+
+    # Legs (anchored on the corresponding leg region).
+    if "left_leg" in corroborated:
+        r = _get_limb_relation(p, "left", "ankle", "hip")
+        if r:
+            rels.append(r.replace("ankle", "leg"))
+    if "right_leg" in corroborated:
+        r = _get_limb_relation(p, "right", "ankle", "hip")
+        if r:
+            rels.append(r.replace("ankle", "leg"))
+
+    # Hands together & held object (anchored on both hand regions).
+    if "left_hand" in corroborated and "right_hand" in corroborated:
+        lwri = _kp(p, "left_wrist")
+        rwri = _kp(p, "right_wrist")
+        if _confident(lwri) and _confident(rwri):
+            dist = math.hypot(lwri[0] - rwri[0], lwri[1] - rwri[1])
+            lsho = _kp(p, "left_shoulder")
+            rsho = _kp(p, "right_shoulder")
+            sho_width = (
+                math.hypot(lsho[0] - rsho[0], lsho[1] - rsho[1])
+                if (_confident(lsho) and _confident(rsho))
+                else 200.0
+            )
+            if dist < sho_width * 0.5:
+                rels.append("hands together")
+
+                # Held object: background pixels between the wrists.
+                x1, x2 = min(lwri[0], rwri[0]), max(lwri[0], rwri[0])
+                y1, y2 = min(lwri[1], rwri[1]), max(lwri[1], rwri[1])
+                x1, x2 = max(0, int(x1 - 50)), min(seg2.shape[1], int(x2 + 50))
+                y1, y2 = max(0, int(y1 - 50)), min(seg2.shape[0], int(y2 + 50))
+                if x2 > x1 and y2 > y1:
+                    zone = seg2[y1:y2, x1:x2]
+                    if (zone == 0).sum() > 50:
+                        y_center = (y1 + y2) / 2
+                        hip_y_ref = 0.0
+                        lhip = _kp(p, "left_hip")
+                        rhip = _kp(p, "right_hip")
+                        if _confident(lhip) and _confident(rhip):
+                            hip_y_ref = (lhip[1] + rhip[1]) / 2.0
+                        elif _confident(lhip):
+                            hip_y_ref = lhip[1]
+                        elif _confident(rhip):
+                            hip_y_ref = rhip[1]
+                        level = (
+                            "pelvis level"
+                            if (hip_y_ref > 0 and abs(y_center - hip_y_ref) < 200)
+                            else "waist level"
+                        )
+                        rels.append(f"hands gripping an object at {level}")
+
+    # Facing (anchored on face region).
+    if "face" in corroborated:
+        lear = _kp(p, "left_ear")
+        rear = _kp(p, "right_ear")
+        if _confident(lear) and _confident(rear):
+            rels.append("face turned toward camera")
+        elif _confident(lear) or _confident(rear):
+            rels.append("face in profile")
+
+    doc["relations"] = rels
+    return doc
+
+
+def process(image_path: Path, output_dir: Path, **kwargs) -> bool:
+    out_path = output_dir / "determinations.json"
+    if out_path.exists():
+        return True
+
+    pose2_path = output_dir / "pose2.npy"
+    seg2_path = output_dir / "seg2.npy"
+
+    if not pose2_path.exists() or not seg2_path.exists():
+        eprint(
+            f"warning: determinations skipped for {image_path}: pose2/seg2 not found"
+        )
+        return False
+
+    pose2 = np.load(pose2_path)
+    seg2 = np.load(seg2_path)
+    pointmap_path = output_dir / "pointmap.npy"
+    pointmap = np.load(pointmap_path) if pointmap_path.exists() else None
+    doc = derive_determinations(pose2, seg2, pointmap=pointmap)
     out_path.write_text(json.dumps(doc, indent=2))
     return True

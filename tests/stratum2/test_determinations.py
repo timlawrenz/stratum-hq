@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from stratum2.config import GOLIATH_308, DOME_29
 # We will import the actual processor once it's written
@@ -184,6 +183,27 @@ def setup_fixture_dir(
 # ==========================================
 # TESTS
 # ==========================================
+
+
+def test_derive_determinations_is_pure_and_matches_written_document(tmp_path):
+    from stratum2.pipeline.determinations import derive_determinations, process
+
+    fixture_dir = setup_fixture_dir(tmp_path / "pure", pose_type="arms_raised")
+    pose2 = np.load(fixture_dir / "pose2.npy")
+    seg2 = np.load(fixture_dir / "seg2.npy")
+    pointmap = np.load(fixture_dir / "pointmap.npy")
+    before_pose = pose2.copy()
+    before_seg = seg2.copy()
+    before_pointmap = pointmap.copy()
+
+    derived = derive_determinations(pose2, seg2, pointmap=pointmap)
+    assert "left arm extended upward" in derived["relations"]
+    np.testing.assert_array_equal(pose2, before_pose)
+    np.testing.assert_array_equal(seg2, before_seg)
+    np.testing.assert_array_equal(pointmap, before_pointmap)
+
+    process(image_path=Path("dummy.jpg"), output_dir=fixture_dir)
+    assert derived == json.loads((fixture_dir / "determinations.json").read_text())
 
 
 def test_determinations_single_subject_anomaly(tmp_path):
