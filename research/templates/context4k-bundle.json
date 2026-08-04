@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "image_id": "replace-with-image-id",
+  "expanded_dossier": {
+    "token_count": 100000,
+    "evidence_ids": [
+      "specialist-name:artifact-or-run-id"
+    ]
+  },
+  "compact_context": {
+    "token_count": 4000,
+    "claims": [
+      {
+        "text": "Replace with a supported contextual claim.",
+        "evidence_ids": [
+          "specialist-name:artifact-or-run-id"
+        ]
+      }
+    ]
+  },
+  "artifacts": {
+    "structured": "context4k.json",
+    "human_readable": "context4k.md",
+    "provenance": "compression.json"
+  }
+}
