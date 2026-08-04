@@ -17,7 +17,7 @@
     "items": [
       {
         "image_id": "<stable-image-id>",
-        "source_relative_path": "<path-relative-to-source-root>",
+        "source_relative_path": "<normalized-posix-path-relative-to-source-root-without-dotdot>",
         "source_sha256": "<64-lowercase-hex-source-hash>",
         "artifact_availability": {
           "<open-world-artifact-role>": true
@@ -38,8 +38,20 @@
         "fingerprint": "<64-lowercase-hex-prompt-fingerprint>"
       },
       "evidence": {
+        "kind": "specialist_bundle",
         "id": "<evidence-bundle-or-no-specialist-evidence>",
-        "fingerprint": "<64-lowercase-hex-evidence-fingerprint>"
+        "fingerprint": "<64-lowercase-hex-evidence-fingerprint>",
+        "specialists": [
+          {
+            "id": "<stable-specialist-id>",
+            "scope": "<observable-domain-and-explicit-limits>",
+            "inputs": "<frozen-input-artifacts-and-view-policy>",
+            "output_semantics": "<what-the-output-means-and-does-not-mean>",
+            "provenance": "<model-code-config-or-deterministic-method-provenance>",
+            "abstention_policy": "<when-and-how-the-specialist-abstains>",
+            "qualification_gate": "<pre-registered-specialist-qualification-gate>"
+          }
+        ]
       },
       "aggregator": {
         "model_id": "<local-model-id>",

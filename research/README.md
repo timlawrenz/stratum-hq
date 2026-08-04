@@ -25,7 +25,9 @@ Before a caption/context comparison runs, freeze a source-hashed pilot manifest,
 research-harness validate-comparison-plan research/program.json <frozen-plan.json>
 ```
 
-[`templates/comparison-parity-plan.template.json`](templates/comparison-parity-plan.template.json) is deliberately a non-validating fill-in template. Replace every placeholder with an immutable pilot and real fingerprints before invoking the validator. The comparison contract keeps the local aggregator and generation settings fixed, preserves detector disagreement as a quality anomaly rather than caption content, and keeps `context4k` out of the legacy 512-token route.
+[`templates/comparison-parity-plan.template.json`](templates/comparison-parity-plan.template.json) is deliberately a non-validating fill-in template. Replace every placeholder with an immutable pilot and real fingerprints before invoking the validator. Every pilot `source_relative_path` must be a normalized POSIX path relative to the declared canonical source root: it must not be absolute, contain `..`, use backslashes, or rely on redundant path segments.
+
+Evidence is explicit rather than opaque. A no-specialist baseline uses `"kind": "none"`, an evidence ID, and a fingerprint, **without** a `specialists` field. Any non-null evidence condition uses `"kind": "specialist_bundle"` and carries inline declarations for every specialist: stable ID, scope, inputs/view policy, output semantics, provenance, abstention policy, and qualification gate. This keeps a frozen comparison plan self-contained and auditable while the specialist roster remains open-world. The comparison contract keeps the local aggregator and generation settings fixed, preserves detector disagreement as a quality anomaly rather than caption content, and keeps `context4k` out of the legacy 512-token route.
 
 ## GPU manifests
 

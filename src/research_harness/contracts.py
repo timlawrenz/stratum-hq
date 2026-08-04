@@ -146,6 +146,69 @@ def _is_at_or_below(path: str, root: str) -> bool:
     return path == root or path.startswith(f"{root}/")
 
 
+def _require_safe_relative_path(value: Any, field: str) -> str:
+    """Require a normalized POSIX path that cannot escape a declared root."""
+    raw = _require_meaningful_string(value, field)
+    if "\x00" in raw or "\\" in raw:
+        raise ContractError(f"{field} must be a normalized relative POSIX path")
+    path = PurePosixPath(raw)
+    normalized = str(path)
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or normalized in {"", "."}
+        or raw != normalized
+    ):
+        raise ContractError(
+            f"{field} must be a normalized relative POSIX path without '..'"
+        )
+    return normalized
+
+
+def _validate_inline_specialist_evidence(
+    value: Any,
+    field: str,
+    required_declaration_fields: list[str],
+) -> dict[str, Any]:
+    """Validate an explicit no-evidence baseline or inline specialist bundle."""
+    evidence = _require_mapping(value, field)
+    kind = _require_nonempty_string(evidence.get("kind"), f"{field}.kind")
+    _require_meaningful_string(evidence.get("id"), f"{field}.id")
+    _require_sha256(evidence.get("fingerprint"), f"{field}.fingerprint")
+
+    if kind == "none":
+        if "specialists" in evidence:
+            raise ContractError(
+                f"{field}.specialists must be omitted when {field}.kind is 'none'"
+            )
+        return dict(evidence)
+    if kind != "specialist_bundle":
+        raise ContractError(
+            f"{field}.kind must be 'none' or 'specialist_bundle'"
+        )
+
+    specialists = evidence.get("specialists")
+    if not isinstance(specialists, list) or not specialists:
+        raise ContractError(
+            f"{field}.specialists must be a non-empty list for specialist_bundle"
+        )
+    specialist_ids: set[str] = set()
+    for raw_specialist in specialists:
+        specialist = _require_mapping(raw_specialist, f"{field}.specialist")
+        specialist_id = _require_meaningful_string(
+            specialist.get("id"), f"{field}.specialist.id"
+        )
+        if specialist_id in specialist_ids:
+            raise ContractError(f"{field}.specialist.id must not contain duplicates")
+        specialist_ids.add(specialist_id)
+        for declaration_field in required_declaration_fields:
+            _require_meaningful_string(
+                specialist.get(declaration_field),
+                f"{field}.specialist.{declaration_field}",
+            )
+    return dict(evidence)
+
+
 def _parse_duration_hours(value: Any, field: str) -> float:
     raw = _require_nonempty_string(value, field)
     match = _DURATION.fullmatch(raw)
@@ -470,6 +533,12 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
     for field in ("hypothesis", "falsified_if", "metric_version"):
         _require_meaningful_string(plan.get(field), f"comparison parity plan {field}")
 
+    specialists = _require_mapping(program["specialists"], "specialists")
+    required_declaration_fields = _require_string_list(
+        specialists.get("required_declaration_fields"),
+        "comparison parity plan specialist declaration fields",
+    )
+
     pilot = _require_mapping(plan.get("pilot_manifest"), "comparison parity plan pilot_manifest")
     pilot_id = _require_meaningful_string(pilot.get("id"), "comparison parity plan pilot_manifest.id")
     canonical_source = _require_mapping(program["canonical_source"], "canonical_source")
@@ -494,7 +563,7 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
         if image_id in item_ids:
             raise ContractError("comparison parity plan pilot item.image_id must not contain duplicates")
         item_ids.add(image_id)
-        _require_meaningful_string(
+        _require_safe_relative_path(
             item.get("source_relative_path"), "comparison parity plan pilot item.source_relative_path"
         )
         _require_sha256(item.get("source_sha256"), "comparison parity plan pilot item.source_sha256")
@@ -522,13 +591,18 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
             raise ContractError("comparison parity plan condition.pilot_manifest_id must match pilot manifest")
 
         components: dict[str, dict[str, Any]] = {}
-        for axis in _COMPARISON_AXES:
+        for axis in _COMPARISON_AXES - {"evidence"}:
             component = _require_mapping(
                 condition.get(axis), f"comparison parity plan condition.{axis}"
             )
             _require_meaningful_string(component.get("id"), f"comparison parity plan condition.{axis}.id")
             _require_sha256(component.get("fingerprint"), f"comparison parity plan condition.{axis}.fingerprint")
             components[axis] = dict(component)
+        components["evidence"] = _validate_inline_specialist_evidence(
+            condition.get("evidence"),
+            "comparison parity plan condition.evidence",
+            required_declaration_fields,
+        )
         condition_axes[condition_id] = components
 
         aggregator = _require_mapping(condition.get("aggregator"), "comparison parity plan condition.aggregator")
