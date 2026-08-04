@@ -1,54 +1,44 @@
 # Project Status — Stratum Contextual Specialist Research
 
 **Last updated:** 2026-08-04
-**Phase / status:** **METHODOLOGY PLANNING** — arm #4 is the sole `research:active` arm and remains `research:metric-risk`; provenance hold #9 is resolved. Work is draft-PR-only, pre-compute only, and the GPU supervisor remains observer-only.
+**Phase / status:** **ACTIVE METHODOLOGY / PRE-COMPUTE** — #4 is the sole `research:active` and remains `research:metric-risk`. Stage A is completed and independently audited, but remains `PENDING` / non-executing; no Stage-B action is authorized.
 
 ## Current state
 
-The canonical research corpus is `crawlr/approved` (11,825 source images); `crawlr/stratum` remains a partial derived-artifact tree. An early geometry-grounded captioning prototype is preserved as draft PR #1 on `exp/geometry-grounded-captioning`.
-
-The program studies open-world specialist evidence and contextual aggregation. Its target architecture expands an image into a provenance-bearing dossier (exactly 100K tokens in the Stratum policy profile) and compresses it into a first-class 4K context representation. The existing 512-token T5 artifacts are not assumed to be the long-context consumer.
-
-The live GitHub tree is strict and non-FIFO:
-
-- #2 is the open program root;
-- #3 preserves the `PENDING` portrait-evidence discovery map in draft PR #7;
-- #4 is the sole `research:active` baseline/comparison-parity methodology arm, now unblocked only for pre-compute pilot-authorization planning;
-- #5 records the preserved Arm 0 prototype; and
-- #9 is closed: its comparison-plan provenance/harness gap was resolved without an empirical run.
-
-## Accepted draft governance baseline
-
-The repository owner directly reviewed and accepted draft PRs #6, #7, #8, #10, and #11 because GitHub cannot record a formal self-approval on owner-authored pull requests. The direct owner-decision comments are the durable review record.
-
-The accepted stack remains unmerged and draft-only:
+The canonical corpus is `crawlr/approved`; `crawlr/stratum` remains a partial derived tree. The immutable Stage-A records are exactly:
 
 ```text
-#6 harness → #8 comparison-plan guard → #10 inline declarations → #11 strict envelopes/fingerprints
+/mnt/nas-ai-models/research/stratum/stage-a-caption-context-parity/
+  pilot-manifest.json
+  comparison-parity-plan.json
+  preparation-log.md
+  review-record.md
 ```
 
-The current accepted top is draft PR #11, commit `a7cecb89f55eef9375137e7e70dafccac7427f41`. Acceptance does **not** authorize a merge, a `main` push, empirical inference, model download, GPU scheduling, corpus mutation, or a backfill.
+They are noncanonical pre-compute provenance records and must not be overwritten, reinterpreted, or silently replaced. Their 24-item six-slice ordinal sample is distinct from the first-500 core-covered cohort. The historical Stage-A request remains at `research/proposals/stage-a-caption-context-parity-preparation.md` / draft PR #13; its proposal text is not an execution authorization.
+
+A new read-only audit at `research/coverage/first-500-core-coverage-v1.json` confirms readable `pose2.npy`, `seg2.npy`, `normal2.npy`, `pointmap.npy`, and `matting.npy` coverage for all 500 first bytewise-ordered eligible filenames. It also confirms that only 10 have the complete later `determinations` → `caption2` → `t52` chain. `docs/FIRST_500_CORE_COHORT_PILOT_DESIGN.md` records the resulting coverage-aware, one-axis feasibility design.
 
 ## Immediate next action
 
-Review the draft-only **Stage A preparation-authorization proposal** for arm #4 at `research/proposals/stage-a-caption-context-parity-preparation.md`. It requests a deterministic maximum-24-candidate selection/read/hash and manifest-materialization pass under an approved noncanonical root, without any selected item identities or source hashes in the request.
+Use the first-500 design only as a pre-compute decision instrument. Before any Stage-B request, independently review draft PR #15, the synthetic-test repair for prototype `caption_max_tokens` forwarding and detector-anomaly prompt leakage; then bind any proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
 
-Do not select or hash pilot images before direct Stage A approval. Stage A explicitly denies model invocation, GPU scheduling, additive artifact generation, corpus mutation, and backfill. After approved Stage A, freeze and validate the exact manifest and comparison plan; only a fresh Stage B owner approval tied to those immutable identities may individually authorize any model, GPU, data, or additive-artifact execution.
+Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files cannot substitute for the missing 490-item evidence condition or for `context4k`.
 
-## Automation state
+## Live research tree
 
-The `stratum-ffhq` strategist is paused. It must not draft a Stage-A proposal, select candidates, read or hash source images, create a manifest, invoke a model, or operate the scheduler until a separately approved resumption handoff is applied.
+- #2 is the sole open program root.
+- #3 is the preserved PENDING portrait-evidence map.
+- #4 is the sole active baseline/comparison-parity arm.
+- #5 is the preserved geometry-grounded-captioning prototype.
+- #9 is closed; it resolved a comparison-plan provenance gate only.
 
-- strategist: paused; any future resumption is limited to Stage-A preparation-authorization **planning**, not Stage-A execution;
-- GPU observer: enabled, no-agent, and observer-only;
-- cadence metrics collector: enabled, recommendation-only, and never edits a schedule.
+## Automation and authority
 
-No automation may infer execution authority from the resolved provenance hold. It must hold again if pilot selection, metric definition, model, GPU, data, or architecture authority is unclear.
+The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.
+
+It may not merge, push `main`, mutate either corpus tree, backfill, install/download/invoke an image model, call the GPU scheduler, or execute Stage B. A detector disagreement is a quality anomaly, never caption content. Any uncertainty about metric, model, data, GPU, policy, or architecture requires a hold issue.
 
 ## Headline result so far
 
-**PENDING.** The geometry-grounded prototype has synthetic-fixture tests but no controlled caption-quality or downstream-conditioning verdict. The comparison provenance gate is resolved; a real pilot and evaluation remain unexecuted.
-
-## Authority boundary
-
-Draft PRs, documentation, tests, issue-tree state, and a pilot-authorization proposal are authorized. GPU claims/launches, model installation or download, canonical-corpus reads beyond explicitly approved pilot preparation, derived-tree mutation, full backfills, merges, and direct `main` pushes require separately explicit authority.
+**PENDING.** The comparison instrument and Stage-A provenance are structurally available; the first-500 core cohort makes a future controlled view/prompt design feasible, but the evidence-only comparison remains blocked by the 490-item later-chain gap, fixed local-aggregator provenance, `caption_max_tokens` forwarding, metric self-audit, adversarial review, and separate Stage-B authority.

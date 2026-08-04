@@ -9,6 +9,7 @@ This directory holds durable, versioned control-plane artifacts. GitHub issues a
 - `gpu-manifests/` — future approved GPU job manifests. The current supervisor is observer-only and cannot launch them.
 - `templates/` — project-neutral starting formats for program contracts, compact contexts, research-arm issues, comparison-parity plans, pilot-authorization proposals, and future GPU manifests.
 - `proposals/` — filled, draft-only owner-decision requests. A proposal never grants its own authority.
+- `coverage/` — compact read-only coverage audits. These bind filename membership and probe summaries; they do not create model outputs or authorize execution.
 
 Future GPU manifests must use a human-reviewed authorization, a registered launcher, the program's scheduler project, a bounded duration/VRAM request, and an approved noncanonical output root. A manifest is still not executable authority while `execution_mode` remains `observer_only`.
 
