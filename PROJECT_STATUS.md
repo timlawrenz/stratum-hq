@@ -21,7 +21,7 @@ A new read-only audit at `research/coverage/first-500-core-coverage-v1.json` con
 
 ## Immediate next action
 
-Use the first-500 design only as a pre-compute decision instrument. Before any Stage-B request, independently review draft PR #15, the synthetic-test repair for prototype `caption_max_tokens` forwarding and detector-anomaly prompt leakage; then bind any proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
+Use the first-500 design only as a pre-compute decision instrument. Draft PR #15's prototype `caption_max_tokens` forwarding and detector-anomaly prompt repair received an independent non-executing review at `db85fe9bacc55e1c444615b027a2734d63398f61`; draft PR #16 adds the durable mocked CLI-to-backend regression. Those draft artifacts do not authorize Stage B. Before any Stage-B request, bind a proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
 
 Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files cannot substitute for the missing 490-item evidence condition or for `context4k`.
 
@@ -41,4 +41,4 @@ It may not merge, push `main`, mutate either corpus tree, backfill, install/down
 
 ## Headline result so far
 
-**PENDING.** The comparison instrument and Stage-A provenance are structurally available; the first-500 core cohort makes a future controlled view/prompt design feasible, but the evidence-only comparison remains blocked by the 490-item later-chain gap, fixed local-aggregator provenance, `caption_max_tokens` forwarding, metric self-audit, adversarial review, and separate Stage-B authority.
+**PENDING.** The comparison instrument and Stage-A provenance are structurally available; the first-500 core cohort makes a future controlled view/prompt design feasible, but the evidence-only comparison remains blocked by the 490-item later-chain gap, fixed local-aggregator provenance, metric self-audit, adversarial review, and separate Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` forwarding synthetic unit and CLI-to-backend coverage only; it is not execution authority.
