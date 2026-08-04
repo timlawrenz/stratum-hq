@@ -23,8 +23,8 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
-    "git_commit": "4aba79d85b3d3d71d4fc884cee07e2c265fba09c",
-    "launcher_source_sha256": "c1dc60097ce570f0ed3e9735491b2305de29320f45332a6c6dc567e3c00e3acd",
+    "git_commit": "0541267f2382e46936c090f14b2b6209f344819d",
+    "launcher_source_sha256": "0761f30863e977409a006aa43030e1a9beb2cd09d7beeccc2db91a37785e829a",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
     "runner_module": "research_harness.stage_b",
