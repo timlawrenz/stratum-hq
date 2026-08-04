@@ -21,7 +21,7 @@ A new read-only audit at `research/coverage/first-500-core-coverage-v1.json` con
 
 ## Immediate next action
 
-Use the first-500 design only as a pre-compute decision instrument. Before any Stage-B request, publish and independently review the synthetic-test repair for prototype `caption_max_tokens` forwarding, then bind any proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
+Use the first-500 design only as a pre-compute decision instrument. Before any Stage-B request, independently review draft PR #15, the synthetic-test repair for prototype `caption_max_tokens` forwarding and detector-anomaly prompt leakage; then bind any proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
 
 Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files cannot substitute for the missing 490-item evidence condition or for `context4k`.
 

@@ -27,7 +27,7 @@ This ledger records empirical findings and negative results permanently. A green
 - Stage A is completed and independently audited as pre-compute evidence. The historic record set remains byte-for-byte untouched; it is not silently reissued as a first-500 or coverage-aware cohort.
 - No model invocation/download, GPU or scheduler action, corpus mutation, derived-tree mutation, backfill, comparison, merge, or direct `main` push occurred.
 
-**Verdict:** `PENDING` — structural provenance only. Stage B still needs fixed local-model/generation provenance, `caption_max_tokens` forwarding repair, metric self-audit, adversarial review, and separately explicit execution authority.
+**Verdict:** `PENDING` — structural provenance only. Stage B still needs fixed local-model/generation provenance, independent review of draft PR #15's `caption_max_tokens` forwarding repair, metric self-audit, adversarial review, and separately explicit execution authority.
 
 ## First-500 core-artifact coverage audit — `[PENDING / PRE-COMPUTE]`
 
@@ -96,6 +96,6 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Pre-registered gate:** A controlled evaluation must hold source-image preprocessing, prompt structure, model/generation settings, item set, and review rubric fixed.
 
-**Known confounds / prerequisites:** Legacy captions use a bucketed/cropped image while current `caption2` opens the raw source. Existing caption output therefore cannot be interpreted as evidence-only. `caption_max_tokens` forwarding must be repaired and tested before a controlled prototype comparison. `t52` remains a legacy-compatible 512-token artifact rather than `context4k`.
+**Known confounds / prerequisites:** Legacy captions use a bucketed/cropped image while current `caption2` opens the raw source. Existing caption output therefore cannot be interpreted as evidence-only. Draft PR #15 repairs/tests `caption_max_tokens` forwarding and removes detector-anomaly prompt content; it remains pending independent review before a controlled prototype comparison. `t52` remains a legacy-compatible 512-token artifact rather than `context4k`.
 
 **Verdict:** `PENDING` — preserve as a prototype; do not infer quality or downstream usefulness.

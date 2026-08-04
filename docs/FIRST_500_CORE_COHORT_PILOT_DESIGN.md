@@ -88,7 +88,7 @@ The current partial chain is the immediate evidence limitation:
 
 - **490 / 500** lack each of `determinations.json`, `caption2.txt`, `t52_hidden.npy`, and `t52_mask.npy`.
 - No backfill, derived-tree mutation, or additive artifact creation is authorized by this report.
-- The preserved prototype's `caption2` backend must forward the fixed `caption_max_tokens` value before it can participate in a parity comparison; a draft-only code repair and synthetic regression are a pre-inference prerequisite.
+- Draft PR #15 repairs/tests the preserved prototype's `caption2` `caption_max_tokens` forwarding and removes detector-anomaly prompt content; independent review is still a pre-inference prerequisite.
 - A Stage-B request must replace `stage-b-local-aggregator-pending-v1` with an already-installed local model identity and immutable generation fingerprint.
 - The reviewer rubric remains required: supported claims, unsupported claims, omissions, contradictions, abstentions, known-case/null self-audit, and adversarial review.
 
