@@ -20,14 +20,16 @@ The live GitHub tree is strict and non-FIFO:
 
 Tim authorized activation of both `stratum-ffhq` records on 2026-08-04:
 
-- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`, restricted to `web`, `terminal`, and `file`.
+- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`, restricted to `web`, `terminal`, `file`, and read-only skill access.
 - `ae13cfe18a81` — no-agent GPU-manifest observer, `every 5m`, running only `stratum_gpu_observer.sh`.
+
+The strategist runs from the clean isolated worktree `/home/tim/source/activity/stratum-hq-research-agent` on `research/autonomous-workspace`. Until draft PR #6 merges, downstream experiment/documentation PRs must target `feat/autonomous-research-harness`, not `main`, so the harness diff is not duplicated.
 
 The observer emits `[SILENT]` without an approved manifest and can only emit a hold; it cannot operate the scheduler or launch a workload. Starting either record does **not** authorize GPU request/claim/launch, model download, canonical-data mutation, backfill, merge, or direct `main` push; the research contract’s hold conditions remain in force.
 
 ## Immediate next action
 
-Review draft PR #6 (`feat: add autonomous research harness`) before activation. Until that review, #3 may advance only through the contract's authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
+Active arm #3 should survey the research tree and produce the portrait-evidence discovery map or a documented hold. It may use only the contract-authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
 
 ## Headline result so far
 
