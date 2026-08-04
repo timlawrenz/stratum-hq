@@ -2,43 +2,32 @@
 
 This is a living map. GitHub issues are the detailed source of truth; this document provides project orientation rather than a FIFO schedule.
 
-## Global hold
-
-* **[HOLD / HARNESS-GAP] #9 — Bind comparison plans to canonical paths and specialist declarations**
-  * Blocks autonomous comparison-plan selection/execution while the pre-compute provenance instrument can accept an escaping canonical-source item path or opaque non-null evidence bundle.
-  * Tim approved inline declarations for non-null evidence bundles: each carries stable specialist ID, scope, inputs/view policy, output semantics, provenance, abstention policy, known failure modes, and qualification gate.
-  * Independent review found the first inline remediation permissive about undeclared payloads and an unbound evidence fingerprint. The stacked strict-envelope follow-up must reject absolute/parent-traversal and whitespace-alias paths/identity/audit fields, retain a payload-free explicit no-specialist baseline, reject unknown envelope/declaration fields, bind the evidence digest to canonical inline content, receive synthetic regression coverage and independent review, then revalidate before #9 can close.
-  * The hold does not authorize model inference, GPU scheduling, model installation, corpus/derived-tree mutation, backfill, merge, or direct `main` push.
-
 ## Live issue tree
 
 * **[ROOT] #2 — Open-world specialist evidence → contextual representation**
-  * The program root: canonical corpus, policy, hold boundary, and linked arms.
+  * The program root: canonical corpus, policy, evidence architecture, and linked arms.
 
 * **[PENDING] #3 — Portrait evidence discovery**
-  * The evidence-discovery map is preserved in draft PR #7.
-  * It identified open-world candidate evidence roles and the raw-versus-bucketed input-view confound without selecting a specialist winner.
+  * The owner-approved evidence-discovery map is preserved in draft PR #7.
+  * It identifies open-world candidate evidence roles and the raw-versus-bucketed input-view confound without selecting a specialist winner.
 
-* **[ACTIVE / BLOCKED / METRIC-RISK] #4 — Baseline and comparison parity**
-  * The sole `research:active` arm remains selected but cannot advance past #9's provenance hold.
-  * Once #9 closes, isolate preprocessing/crop, prompt structure, Sapiens2 evidence, and aggregator model before judging the prototype.
+* **[ACTIVE / METRIC-RISK / PRE-COMPUTE] #4 — Baseline and comparison parity**
+  * The sole `research:active` arm.
+  * The provenance guard is resolved, but no comparative inference is authorized yet.
+  * Immediate bounded task: prepare a draft Stage-A preparation-authorization proposal that names a selection protocol, maximum item count, and output root without real item identities/hashes. Only a direct Stage-A approval may permit bounded read/hash preparation; freeze/validate the exact plan, then require a fresh Stage-B execution approval before any model, GPU, or artifact action.
 
 * **[PROPOSAL / PENDING] #5 — Geometry-grounded captioning prototype** (`exp/geometry-grounded-captioning`, draft PR #1)
   * Additive chain: `pose2 + seg2 + optional pointmap → determinations → caption2 → t52`.
   * Synthetic fixture coverage exists. No controlled empirical verdict exists.
-  * The arm is not production-ready and must not be merged as a result of the harness build.
+  * The arm is not production-ready and must not be merged as a result of the governance build.
 
-## Harness status
+## Accepted draft governance baseline
 
-* **[DRAFT-PR REVIEW] Autonomous research control plane** (draft PR #6)
-  * Project-neutral GitHub issue-tree, evidence/compression contract, fail-closed GPU manifest validation, and draft-PR-only workflow.
-  * GPU supervisor is observer-only until a separately reviewed host-specific launcher exists.
-
-* **[DRAFT-PR REVIEW] Controlled comparison plan guard** (draft PR #8)
-  * Freezes the shape of a one-axis-at-a-time plan before any real pilot selection or inference.
-
-* **[DRAFT REMEDIATION] Strict inline declaration and canonical-path binding** (issue #9 follow-up)
-  * Stacked on the first inline remediation; pending independent review before the hold can close.
+* **[OWNER-APPROVED / DRAFT STACK] Autonomous research control plane**
+  * Draft PR #6 supplies the control plane; PR #8 adds the comparison-plan guard; PR #10 adds inline declarations; PR #11 closes envelope, identity, and fingerprint gaps.
+  * PR #11 at `a7cecb89f55eef9375137e7e70dafccac7427f41` is the accepted top of the unmerged stack.
+  * Acceptance is a review decision, not merge authority or empirical authority.
+  * GPU supervision remains observer-only until a separately reviewed host-specific launcher and manifest authority exist.
 
 ## Future candidate branches
 
@@ -50,4 +39,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 
 ## Concluded
 
-* None yet.
+* **[CONCLUDED — HARNESS GATE RESOLVED] #9 — Bind comparison plans to canonical paths and specialist declarations**
+  * Owner-approved draft PR #11 remediates canonical pilot paths, closed inline evidence envelopes, required failure modes, canonical comparison/audit identities, and content-bound evidence fingerprints.
+  * Fresh program and live-tree validation passed before closure; hosted checks passed and the exact staged index received independent review.
+  * This is a governance result only: it does not establish caption quality, invoke a model, or authorize data/GPU work.

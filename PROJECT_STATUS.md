@@ -1,7 +1,7 @@
 # Project Status — Stratum Contextual Specialist Research
 
 **Last updated:** 2026-08-04
-**Phase / status:** **GLOBAL HOLD** — comparison-plan provenance guard (#9); draft-PR-only, GPU supervisor observer-only
+**Phase / status:** **METHODOLOGY PLANNING** — arm #4 is the sole `research:active` arm and remains `research:metric-risk`; provenance hold #9 is resolved. Work is draft-PR-only, pre-compute only, and the GPU supervisor remains observer-only.
 
 ## Current state
 
@@ -13,36 +13,42 @@ The live GitHub tree is strict and non-FIFO:
 
 - #2 is the open program root;
 - #3 preserves the `PENDING` portrait-evidence discovery map in draft PR #7;
-- #4 is the sole `research:active` baseline/comparison-parity methodology arm, currently `research:blocked` and `research:metric-risk`;
+- #4 is the sole `research:active` baseline/comparison-parity methodology arm, now unblocked only for pre-compute pilot-authorization planning;
 - #5 records the preserved Arm 0 prototype; and
-- #9 is the open global `research:hold` / `research:harness-gap` for canonical-path and specialist-declaration binding.
+- #9 is closed: its comparison-plan provenance/harness gap was resolved without an empirical run.
 
-## Global hold
+## Accepted draft governance baseline
 
-Issue #9 found that draft PR #8's comparison-plan validator accepted escaped pilot item paths and opaque non-null specialist bundles. Tim approved **inline specialist declarations** as the minimal durable binding representation. Independent review found the first remediation still accepted undeclared envelope payloads, omitted contract-required known failure modes, and left its evidence fingerprint unbound to inline content; the strict-envelope follow-up remains pending review.
+The repository owner directly reviewed and accepted draft PRs #6, #7, #8, #10, and #11 because GitHub cannot record a formal self-approval on owner-authored pull requests. The direct owner-decision comments are the durable review record.
 
-No model inference, GPU action, model installation, canonical/derived-tree mutation, backfill, merge, or direct `main` push is authorized while the hold remains open. The hold may close only after the strict-envelope remediation rejects the documented adversarial probes, receives independent review, and revalidates the live tree.
+The accepted stack remains unmerged and draft-only:
 
-## Active automation
+```text
+#6 harness → #8 comparison-plan guard → #10 inline declarations → #11 strict envelopes/fingerprints
+```
 
-The `stratum-ffhq` strategist and observer records remain enabled, but the global hold supersedes autonomous research selection and execution:
-
-- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`, restricted to `web`, `terminal`, `file`, and read-only skill access.
-- `ae13cfe18a81` — no-agent GPU-manifest observer, `every 5m`, running only `stratum_gpu_observer.sh`.
-- `dde79019f9bb` — no-agent cadence metrics collector, `every 5m`, recommendation-only; it never changes a schedule.
-
-The strategist runs from `/home/tim/source/activity/stratum-hq-research-agent` on `research/autonomous-workspace`. Until draft PR #6 merges, downstream draft PRs target `feat/autonomous-research-harness`, not `main`, so the harness diff is not duplicated.
-
-The observer emits `[SILENT]` without an approved manifest and can only emit a hold; it cannot operate the scheduler or launch a workload. Starting either record does **not** authorize GPU request/claim/launch, model download, canonical-data mutation, backfill, merge, or direct `main` push.
+The current accepted top is draft PR #11, commit `a7cecb89f55eef9375137e7e70dafccac7427f41`. Acceptance does **not** authorize a merge, a `main` push, empirical inference, model download, GPU scheduling, corpus mutation, or a backfill.
 
 ## Immediate next action
 
-Independently review and validate the #9 strict-envelope follow-up: pilot paths, comparison identities, and audit identifiers must use canonical spellings; evidence envelopes must reject undeclared payload; the evidence fingerprint must bind canonical inline content; and every non-null specialist declaration must include known failure modes as well as the other open-world fields. Keep #9 open until that review is complete.
+Prepare a draft-only **Stage A preparation-authorization proposal** from `research/templates/pilot-authorization-proposal.md` for arm #4. It may name the canonical root, selection protocol, maximum item count, preparation output root, and future evaluation design **without selected item identities or source hashes**. Stage A must request only bounded selection/read/hash and manifest-materialization authority.
+
+Do not select or hash pilot images before direct Stage A approval. Stage A must explicitly deny model invocation, GPU scheduling, additive artifact generation, corpus mutation, and backfill. After Stage A, freeze and validate the exact manifest and comparison plan; only a fresh Stage B owner approval tied to those immutable identities may individually authorize any model, GPU, data, or additive-artifact execution.
+
+## Automation state
+
+The `stratum-ffhq` strategist is paused. It must not draft a Stage-A proposal, select candidates, read or hash source images, create a manifest, invoke a model, or operate the scheduler until a separately approved resumption handoff is applied.
+
+- strategist: paused; any future resumption is limited to Stage-A preparation-authorization **planning**, not Stage-A execution;
+- GPU observer: enabled, no-agent, and observer-only;
+- cadence metrics collector: enabled, recommendation-only, and never edits a schedule.
+
+No automation may infer execution authority from the resolved provenance hold. It must hold again if pilot selection, metric definition, model, GPU, data, or architecture authority is unclear.
 
 ## Headline result so far
 
-**PENDING.** The geometry-grounded prototype has synthetic-fixture tests but no controlled caption-quality or downstream-conditioning verdict. The comparison instrument is blocked by the open provenance hold.
+**PENDING.** The geometry-grounded prototype has synthetic-fixture tests but no controlled caption-quality or downstream-conditioning verdict. The comparison provenance gate is resolved; a real pilot and evaluation remain unexecuted.
 
 ## Authority boundary
 
-Draft PRs, tests, documents, issue-tree state, and harness code are authorized only within the global hold's boundaries. GPU claims/launches, model installation, canonical-corpus writes, full backfills, merges, and direct `main` pushes require a future explicit arm decision after the hold closes.
+Draft PRs, documentation, tests, issue-tree state, and a pilot-authorization proposal are authorized. GPU claims/launches, model installation or download, canonical-corpus reads beyond explicitly approved pilot preparation, derived-tree mutation, full backfills, merges, and direct `main` pushes require separately explicit authority.
