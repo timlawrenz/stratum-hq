@@ -10,6 +10,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[ACTIVE] #3 — Portrait evidence discovery**
   * The sole `research:active` arm. It surveyed the full open tree before selection.
   * Question: what observable, useful, non-redundant dimensions characterize exactly-one-woman images across extreme crops, full-body scenes, lighting, clothing, swimsuits/nudity, props, and environment?
+  * Draft output: [`PORTRAIT_EVIDENCE_DISCOVERY_MAP.md`](PORTRAIT_EVIDENCE_DISCOVERY_MAP.md) and its bounded artifact inventory. The map is `PENDING` review, selects no model winner, and keeps candidate roles open-world.
   * Output: an evidence map and pre-registered candidate qualification plan—not a closed taxonomy.
 
 * **[PROPOSAL / METRIC-RISK] #4 — Baseline and comparison parity**
