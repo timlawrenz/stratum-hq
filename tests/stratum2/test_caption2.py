@@ -72,7 +72,7 @@ def test_caption2_idempotency(mock_generate, tmp_path):
 
 @patch("stratum.pipeline.caption.OllamaCaptionBackend.generate")
 def test_caption2_forwards_nondefault_max_tokens_to_backend(mock_generate, tmp_path):
-    """The CLI/orchestrator budget reaches the actual caption backend call."""
+    """A direct caption2 call passes a non-default budget to the backend."""
     from PIL import Image
     import numpy as np
 
@@ -87,3 +87,58 @@ def test_caption2_forwards_nondefault_max_tokens_to_backend(mock_generate, tmp_p
     ) is True
 
     assert mock_generate.call_args.kwargs["max_tokens"] == 731
+
+
+@patch("stratum.pipeline.caption.OllamaCaptionBackend.generate")
+def test_caption2_cli_forwards_budget_and_omits_detector_anomaly(mock_generate, tmp_path):
+    """The full CLI path preserves budget control and strips anomaly prompt content."""
+    from PIL import Image
+    import numpy as np
+
+    from stratum.discovery import output_dir_for_image
+    from stratum2.cli import cmd_process, parse_args
+
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    image_path = input_dir / "dummy.jpg"
+    Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8)).save(image_path)
+
+    artifact_dir = output_dir_for_image(image_path, input_dir, output_dir)
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "determinations.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "subject": {
+                    "n_detections": 2,
+                    "detector_anomaly": "extra_detections(2)",
+                },
+            }
+        )
+    )
+    mock_generate.return_value = "CLI-controlled caption."
+
+    args = parse_args(
+        [
+            "process",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+            "--passes",
+            "caption2",
+            "--caption-max-tokens",
+            "731",
+            "--device",
+            "cpu",
+            "--progress-every",
+            "0",
+        ]
+    )
+
+    assert cmd_process(args) == 0
+    assert mock_generate.call_args.kwargs["max_tokens"] == 731
+    prompt = mock_generate.call_args.kwargs["prompt"]
+    assert "detector anomaly" not in prompt.lower()
+    assert "extra_detections" not in prompt
+    assert (artifact_dir / "caption2.txt").read_text() == "CLI-controlled caption."
