@@ -42,6 +42,7 @@ def test_stratum_program_keeps_its_specific_corpus_and_accelerator_contract() ->
         "notes": "The Crawlr labeling process is evergreen. Scheduler state, not a transient utilization snapshot, determines availability.",
     }
     assert program["policy_profile"] == "stratum-single-woman-v1"
+    assert "known_failure_modes" in program["specialists"]["required_declaration_fields"]
     assert program["artifact_policy"] == {
         "approved_output_roots": ["/mnt/nas-ai-models/research"],
         "canonical_source_write_allowed": False,

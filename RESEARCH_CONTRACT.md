@@ -51,7 +51,7 @@ Every specialist must declare:
 - known failure modes;
 - a pre-registered qualification gate.
 
-A specialist’s output is evidence, not automatically a fact. Aggregators preserve provenance and conflicts rather than inventing consensus.
+A specialist’s output is evidence, not automatically a fact. Aggregators preserve provenance and conflicts rather than inventing consensus. In a controlled comparison plan with inline evidence, `evidence.fingerprint` is SHA-256 of UTF-8 canonical JSON for the full evidence object excluding only the asserted `fingerprint` member: sorted keys, compact `(',', ':')` separators, `ensure_ascii=false`, and no non-finite values. This binds the inline declaration content claim-by-claim rather than treating the digest as an unverified label.
 
 ## Research tree behavior
 

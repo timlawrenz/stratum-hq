@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -19,19 +20,31 @@ def _sha(char: str) -> str:
     return char * 64
 
 
+def _evidence_fingerprint(evidence: dict) -> str:
+    payload = {key: value for key, value in evidence.items() if key != "fingerprint"}
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def no_specialist_evidence() -> dict:
-    return {
+    evidence = {
         "kind": "none",
         "id": "no-specialist-evidence-v1",
-        "fingerprint": _sha("d"),
     }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
 
 
 def inline_geometry_evidence() -> dict:
-    return {
+    evidence = {
         "kind": "specialist_bundle",
         "id": "geometry-v1",
-        "fingerprint": _sha("0"),
         "specialists": [
             {
                 "id": "geometry-determinations-v1",
@@ -40,10 +53,13 @@ def inline_geometry_evidence() -> dict:
                 "output_semantics": "Provenance-bearing measurements and relations, not caption facts.",
                 "provenance": "Synthetic fixture declaration; no specialist model execution.",
                 "abstention_policy": "Abstain when required artifacts are missing or contradictory.",
+                "known_failure_modes": "Tight crops, missing artifacts, and detector disagreement can make geometry unavailable or unreliable.",
                 "qualification_gate": "Must pass the pre-registered controlled comparison gate.",
             }
         ],
     }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
 
 
 def program() -> dict:
@@ -225,6 +241,7 @@ def test_comparison_parity_plan_requires_frozen_hashed_canonical_pilot() -> None
         "nested/../../outside.webp",
         "nested/./outside.webp",
         r"nested\outside.webp",
+        " fixture-image-001.webp ",
     ],
 )
 def test_comparison_parity_plan_rejects_escaped_canonical_relative_paths(
@@ -277,7 +294,7 @@ def test_comparison_parity_plan_rejects_declarations_on_no_evidence_baseline() -
         copy.deepcopy(inline_geometry_evidence()["specialists"][0])
     ]
 
-    with pytest.raises(ContractError, match="evidence.specialists"):
+    with pytest.raises(ContractError, match="undeclared fields: specialists"):
         validate_comparison_parity_plan(invalid, program())
 
 
@@ -288,6 +305,199 @@ def test_comparison_parity_plan_rejects_duplicate_inline_specialist_ids() -> Non
     )
 
     with pytest.raises(ContractError, match="specialist.id"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+@pytest.mark.parametrize(
+    ("target", "extra_field"),
+    [
+        ("none_envelopes", "undeclared_payload"),
+        ("specialist_bundle", "undeclared_payload"),
+        ("inline_declaration", "undeclared_semantics"),
+    ],
+)
+def test_comparison_parity_plan_rejects_undeclared_evidence_fields(
+    target: str,
+    extra_field: str,
+) -> None:
+    invalid = parity_plan()
+    if target == "none_envelopes":
+        for condition in invalid["conditions"][:3]:
+            condition["evidence"][extra_field] = {"claims": ["concealed"]}
+    elif target == "specialist_bundle":
+        invalid["conditions"][3]["evidence"][extra_field] = {"claims": ["concealed"]}
+    else:
+        invalid["conditions"][3]["evidence"]["specialists"][0][extra_field] = "concealed"
+
+    with pytest.raises(ContractError, match="must not contain undeclared fields"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_requires_known_failure_modes() -> None:
+    invalid = parity_plan()
+    del invalid["conditions"][3]["evidence"]["specialists"][0]["known_failure_modes"]
+
+    with pytest.raises(ContractError, match="specialist.known_failure_modes"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_binds_fingerprint_to_inline_evidence_content() -> None:
+    invalid = parity_plan()
+    evidence = invalid["conditions"][3]["evidence"]
+    original_fingerprint = evidence["fingerprint"]
+    evidence["specialists"][0]["scope"] = "A materially different declared observable scope."
+    assert evidence["fingerprint"] == original_fingerprint
+
+    with pytest.raises(ContractError, match="evidence.fingerprint must match canonical evidence content"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_accepts_recomputed_inline_evidence_fingerprint() -> None:
+    plan = parity_plan()
+    evidence = plan["conditions"][3]["evidence"]
+    evidence["specialists"][0]["scope"] = "A revised but explicit geometry-only scope."
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+
+    validate_comparison_parity_plan(plan, program())
+
+
+def test_comparison_parity_plan_binds_fingerprint_to_no_specialist_evidence_content() -> None:
+    invalid = parity_plan()
+    evidence = invalid["conditions"][0]["evidence"]
+    evidence["id"] = "different-no-specialist-evidence-v1"
+
+    with pytest.raises(ContractError, match="evidence.fingerprint must match canonical evidence content"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_fingerprint_is_independent_of_mapping_key_order() -> None:
+    plan = parity_plan()
+    evidence = plan["conditions"][3]["evidence"]
+    plan["conditions"][3]["evidence"] = {
+        "specialists": evidence["specialists"],
+        "id": evidence["id"],
+        "kind": evidence["kind"],
+        "fingerprint": evidence["fingerprint"],
+    }
+
+    validate_comparison_parity_plan(plan, program())
+
+
+def test_comparison_parity_plan_rejects_non_utf8_evidence_content() -> None:
+    invalid = parity_plan()
+    invalid["conditions"][3]["evidence"]["specialists"][0]["scope"] = chr(0xD800)
+
+    with pytest.raises(ContractError, match="canonical JSON-serializable content"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+@pytest.mark.parametrize(
+    ("target", "value"),
+    [
+        ("none_kind", " none "),
+        ("bundle_kind", " specialist_bundle "),
+        ("specialist_id", " geometry-determinations-v1 "),
+    ],
+)
+def test_comparison_parity_plan_rejects_whitespace_aliases(target: str, value: str) -> None:
+    invalid = parity_plan()
+    if target == "none_kind":
+        for condition in invalid["conditions"][:3]:
+            condition["evidence"]["kind"] = value
+    elif target == "bundle_kind":
+        invalid["conditions"][3]["evidence"]["kind"] = value
+    else:
+        invalid["conditions"][3]["evidence"]["specialists"][0]["id"] = value
+
+    with pytest.raises(ContractError):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_rejects_whitespace_provenance_identifiers() -> None:
+    invalid = parity_plan()
+    invalid["program_id"] = " stratum-contextual-specialist-research "
+
+    with pytest.raises(ContractError, match="program_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid_program = program()
+    invalid_program["program_id"] = " stratum-contextual-specialist-research "
+
+    with pytest.raises(ContractError, match="program_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(parity_plan(), invalid_program)
+
+    invalid = parity_plan()
+    invalid["pilot_manifest"]["id"] = " synthetic-parity-pilot-v1 "
+    for condition in invalid["conditions"]:
+        condition["pilot_manifest_id"] = " synthetic-parity-pilot-v1 "
+
+    with pytest.raises(ContractError, match="pilot_manifest.id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["pilot_manifest"]["items"][0]["image_id"] = " fixture-image-001 "
+
+    with pytest.raises(ContractError, match="pilot item.image_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["conditions"][0]["id"] = " legacy-bucketed "
+    invalid["contrasts"][0]["baseline_condition"] = " legacy-bucketed "
+
+    with pytest.raises(ContractError, match="condition.id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["contrasts"][0]["id"] = " view-only "
+
+    with pytest.raises(ContractError, match="contrast.id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["metric_version"] = " caption-context-parity-fixture-v1 "
+
+    with pytest.raises(ContractError, match="metric_version must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["metric_self_audit"]["known_case_item_id"] = " fixture-image-001 "
+
+    with pytest.raises(ContractError, match="known_case_item_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["metric_self_audit"]["null_output_id"] = " empty-caption-null-v1 "
+
+    with pytest.raises(ContractError, match="null_output_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["metric_self_audit"]["evaluator_version"] = " claim-support-rubric-fixture-v1 "
+
+    with pytest.raises(ContractError, match="evaluator_version must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    for condition in invalid["conditions"]:
+        condition["aggregator"]["model_id"] = " local-captioner-fixture-v1 "
+
+    with pytest.raises(ContractError, match="aggregator.model_id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_rejects_whitespace_only_axis_contrasts() -> None:
+    invalid = parity_plan()
+    invalid["conditions"][0]["input_view"] = {"id": "raw", "fingerprint": _sha("e")}
+    invalid["conditions"][1]["input_view"]["id"] = " raw "
+
+    with pytest.raises(ContractError, match="condition.input_view.id must not have leading or trailing whitespace"):
+        validate_comparison_parity_plan(invalid, program())
+
+    invalid = parity_plan()
+    invalid["conditions"][1]["prompt"] = {"id": "context", "fingerprint": _sha("f")}
+    invalid["conditions"][2]["prompt"]["id"] = " context "
+
+    with pytest.raises(ContractError, match="condition.prompt.id must not have leading or trailing whitespace"):
         validate_comparison_parity_plan(invalid, program())
 
 
@@ -307,8 +517,9 @@ def test_comparison_parity_plan_requires_one_axis_contrasts_for_all_registered_a
 
 def test_comparison_parity_plan_rejects_hidden_noncontrast_and_aggregator_changes() -> None:
     invalid = parity_plan()
-    invalid["conditions"][1]["evidence"]["id"] = "geometry-v1"
-    invalid["conditions"][1]["evidence"]["fingerprint"] = _sha("0")
+    evidence = invalid["conditions"][1]["evidence"]
+    evidence["id"] = "geometry-v1"
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
 
     with pytest.raises(ContractError, match="non-contrast axis"):
         validate_comparison_parity_plan(invalid, program())
@@ -393,5 +604,6 @@ def test_comparison_template_is_explicitly_non_validating_until_filled() -> None
         "output_semantics",
         "provenance",
         "abstention_policy",
+        "known_failure_modes",
         "qualification_gate",
     }.issubset(evidence["specialists"][0])

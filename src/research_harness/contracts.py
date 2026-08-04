@@ -7,6 +7,7 @@ dataset. Those actions remain separately reviewed and auditable.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -98,6 +99,48 @@ def _require_meaningful_string(value: Any, field: str) -> str:
     return result
 
 
+def _require_canonical_nonempty_string(value: Any, field: str) -> str:
+    """Reject serialization aliases such as leading/trailing whitespace."""
+    result = _require_nonempty_string(value, field)
+    if value != result:
+        raise ContractError(f"{field} must not have leading or trailing whitespace")
+    return result
+
+
+def _require_canonical_meaningful_string(value: Any, field: str) -> str:
+    result = _require_canonical_nonempty_string(value, field)
+    normalized = result.upper()
+    if normalized in _PLACEHOLDERS or result.startswith("{{") or result.startswith("<"):
+        raise ContractError(f"{field} must not be a placeholder")
+    return result
+
+
+def _reject_undeclared_fields(value: Mapping[str, Any], allowed: frozenset[str], field: str) -> None:
+    unexpected = set(value) - allowed
+    if unexpected:
+        rendered = ", ".join(sorted(str(name) for name in unexpected))
+        raise ContractError(f"{field} must not contain undeclared fields: {rendered}")
+
+
+def _canonical_evidence_fingerprint(evidence: Mapping[str, Any], field: str) -> str:
+    """Hash exact inline evidence identity/content, excluding its asserted digest."""
+    payload = {key: value for key, value in evidence.items() if key != "fingerprint"}
+    try:
+        canonical = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ContractError(f"{field} must have canonical JSON-serializable content") from exc
+    try:
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    except UnicodeEncodeError as exc:
+        raise ContractError(f"{field} must have canonical JSON-serializable content") from exc
+
+
 def _require_bool(value: Any, field: str) -> bool:
     if not isinstance(value, bool):
         raise ContractError(f"{field} must be a boolean")
@@ -125,14 +168,14 @@ def _require_positive_int(value: Any, field: str) -> int:
 
 
 def _require_sha256(value: Any, field: str) -> str:
-    result = _require_nonempty_string(value, field)
+    result = _require_canonical_meaningful_string(value, field)
     if _SHA256.fullmatch(result) is None:
         raise ContractError(f"{field} must be a 64-character lowercase SHA-256 hex digest")
     return result
 
 
 def _require_absolute_path(value: Any, field: str) -> str:
-    raw = _require_nonempty_string(value, field)
+    raw = _require_canonical_meaningful_string(value, field)
     path = PurePosixPath(raw)
     if not path.is_absolute() or ".." in path.parts:
         raise ContractError(f"{field} must be an absolute path without '..'")
@@ -148,7 +191,7 @@ def _is_at_or_below(path: str, root: str) -> bool:
 
 def _require_safe_relative_path(value: Any, field: str) -> str:
     """Require a normalized POSIX path that cannot escape a declared root."""
-    raw = _require_meaningful_string(value, field)
+    raw = _require_canonical_meaningful_string(value, field)
     if "\x00" in raw or "\\" in raw:
         raise ContractError(f"{field} must be a normalized relative POSIX path")
     path = PurePosixPath(raw)
@@ -172,40 +215,48 @@ def _validate_inline_specialist_evidence(
 ) -> dict[str, Any]:
     """Validate an explicit no-evidence baseline or inline specialist bundle."""
     evidence = _require_mapping(value, field)
-    kind = _require_nonempty_string(evidence.get("kind"), f"{field}.kind")
-    _require_meaningful_string(evidence.get("id"), f"{field}.id")
+    kind = _require_canonical_nonempty_string(evidence.get("kind"), f"{field}.kind")
+    _require_canonical_meaningful_string(evidence.get("id"), f"{field}.id")
     _require_sha256(evidence.get("fingerprint"), f"{field}.fingerprint")
 
     if kind == "none":
-        if "specialists" in evidence:
-            raise ContractError(
-                f"{field}.specialists must be omitted when {field}.kind is 'none'"
-            )
-        return dict(evidence)
-    if kind != "specialist_bundle":
+        _reject_undeclared_fields(evidence, frozenset({"kind", "id", "fingerprint"}), field)
+    elif kind != "specialist_bundle":
         raise ContractError(
             f"{field}.kind must be 'none' or 'specialist_bundle'"
         )
-
-    specialists = evidence.get("specialists")
-    if not isinstance(specialists, list) or not specialists:
-        raise ContractError(
-            f"{field}.specialists must be a non-empty list for specialist_bundle"
+    else:
+        _reject_undeclared_fields(
+            evidence,
+            frozenset({"kind", "id", "fingerprint", "specialists"}),
+            field,
         )
-    specialist_ids: set[str] = set()
-    for raw_specialist in specialists:
-        specialist = _require_mapping(raw_specialist, f"{field}.specialist")
-        specialist_id = _require_meaningful_string(
-            specialist.get("id"), f"{field}.specialist.id"
-        )
-        if specialist_id in specialist_ids:
-            raise ContractError(f"{field}.specialist.id must not contain duplicates")
-        specialist_ids.add(specialist_id)
-        for declaration_field in required_declaration_fields:
-            _require_meaningful_string(
-                specialist.get(declaration_field),
-                f"{field}.specialist.{declaration_field}",
+        specialists = evidence.get("specialists")
+        if not isinstance(specialists, list) or not specialists:
+            raise ContractError(
+                f"{field}.specialists must be a non-empty list for specialist_bundle"
             )
+        specialist_ids: set[str] = set()
+        for raw_specialist in specialists:
+            specialist = _require_mapping(raw_specialist, f"{field}.specialist")
+            _reject_undeclared_fields(
+                specialist,
+                frozenset({"id", *required_declaration_fields}),
+                f"{field}.specialist",
+            )
+            specialist_id = _require_canonical_meaningful_string(
+                specialist.get("id"), f"{field}.specialist.id"
+            )
+            if specialist_id in specialist_ids:
+                raise ContractError(f"{field}.specialist.id must not contain duplicates")
+            specialist_ids.add(specialist_id)
+            for declaration_field in required_declaration_fields:
+                _require_meaningful_string(
+                    specialist.get(declaration_field),
+                    f"{field}.specialist.{declaration_field}",
+                )
+    if _canonical_evidence_fingerprint(evidence, field) != evidence["fingerprint"]:
+        raise ContractError(f"{field}.fingerprint must match canonical evidence content")
     return dict(evidence)
 
 
@@ -378,7 +429,7 @@ def validate_program(program: Mapping[str, Any]) -> None:
     program = _require_mapping(program, "program")
     if program.get("schema_version") != 1:
         raise ContractError("program schema_version must be 1")
-    _require_nonempty_string(program.get("program_id"), "program_id")
+    _require_canonical_meaningful_string(program.get("program_id"), "program_id")
 
     source = _require_mapping(program.get("canonical_source"), "canonical_source")
     _require_absolute_path(source.get("path"), "canonical_source.path")
@@ -463,6 +514,7 @@ def validate_program(program: Mapping[str, Any]) -> None:
         "output_semantics",
         "provenance",
         "abstention_policy",
+        "known_failure_modes",
         "qualification_gate",
     }
     if not required_declarations.issubset(set(declarations)):
@@ -525,13 +577,18 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
         raise ContractError("comparison parity plan schema_version must be 1")
     if plan.get("kind") != _COMPARISON_PLAN_KIND:
         raise ContractError(f"comparison parity plan kind must be {_COMPARISON_PLAN_KIND!r}")
-    if _require_nonempty_string(plan.get("program_id"), "comparison parity plan program_id") != program["program_id"]:
+    if _require_canonical_meaningful_string(
+        plan.get("program_id"), "comparison parity plan program_id"
+    ) != program["program_id"]:
         raise ContractError("comparison parity plan program_id must match program.program_id")
     if plan.get("status") != "PENDING":
         raise ContractError("comparison parity plan status must remain PENDING before comparative inference")
     _metadata_issue_reference(plan.get("parent_issue"), "comparison parity plan parent_issue")
-    for field in ("hypothesis", "falsified_if", "metric_version"):
+    for field in ("hypothesis", "falsified_if"):
         _require_meaningful_string(plan.get(field), f"comparison parity plan {field}")
+    _require_canonical_meaningful_string(
+        plan.get("metric_version"), "comparison parity plan metric_version"
+    )
 
     specialists = _require_mapping(program["specialists"], "specialists")
     required_declaration_fields = _require_string_list(
@@ -540,7 +597,9 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
     )
 
     pilot = _require_mapping(plan.get("pilot_manifest"), "comparison parity plan pilot_manifest")
-    pilot_id = _require_meaningful_string(pilot.get("id"), "comparison parity plan pilot_manifest.id")
+    pilot_id = _require_canonical_meaningful_string(
+        pilot.get("id"), "comparison parity plan pilot_manifest.id"
+    )
     canonical_source = _require_mapping(program["canonical_source"], "canonical_source")
     expected_source_root = _require_absolute_path(canonical_source["path"], "canonical_source.path")
     source_root = _require_absolute_path(
@@ -559,7 +618,9 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
     item_ids: set[str] = set()
     for raw_item in raw_items:
         item = _require_mapping(raw_item, "comparison parity plan pilot item")
-        image_id = _require_meaningful_string(item.get("image_id"), "comparison parity plan pilot item.image_id")
+        image_id = _require_canonical_meaningful_string(
+            item.get("image_id"), "comparison parity plan pilot item.image_id"
+        )
         if image_id in item_ids:
             raise ContractError("comparison parity plan pilot item.image_id must not contain duplicates")
         item_ids.add(image_id)
@@ -582,10 +643,12 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
     fixed_aggregator: dict[str, Any] | None = None
     for raw_condition in raw_conditions:
         condition = _require_mapping(raw_condition, "comparison parity plan condition")
-        condition_id = _require_meaningful_string(condition.get("id"), "comparison parity plan condition.id")
+        condition_id = _require_canonical_meaningful_string(
+            condition.get("id"), "comparison parity plan condition.id"
+        )
         if condition_id in condition_axes:
             raise ContractError("comparison parity plan condition.id must not contain duplicates")
-        if _require_meaningful_string(
+        if _require_canonical_meaningful_string(
             condition.get("pilot_manifest_id"), "comparison parity plan condition.pilot_manifest_id"
         ) != pilot_id:
             raise ContractError("comparison parity plan condition.pilot_manifest_id must match pilot manifest")
@@ -595,7 +658,9 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
             component = _require_mapping(
                 condition.get(axis), f"comparison parity plan condition.{axis}"
             )
-            _require_meaningful_string(component.get("id"), f"comparison parity plan condition.{axis}.id")
+            _require_canonical_meaningful_string(
+                component.get("id"), f"comparison parity plan condition.{axis}.id"
+            )
             _require_sha256(component.get("fingerprint"), f"comparison parity plan condition.{axis}.fingerprint")
             components[axis] = dict(component)
         components["evidence"] = _validate_inline_specialist_evidence(
@@ -606,7 +671,9 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
         condition_axes[condition_id] = components
 
         aggregator = _require_mapping(condition.get("aggregator"), "comparison parity plan condition.aggregator")
-        _require_meaningful_string(aggregator.get("model_id"), "comparison parity plan condition.aggregator.model_id")
+        _require_canonical_meaningful_string(
+            aggregator.get("model_id"), "comparison parity plan condition.aggregator.model_id"
+        )
         _require_meaningful_string(aggregator.get("provenance"), "comparison parity plan condition.aggregator.provenance")
         _require_sha256(
             aggregator.get("generation_fingerprint"),
@@ -629,14 +696,16 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
     covered_axes: set[str] = set()
     for raw_contrast in raw_contrasts:
         contrast = _require_mapping(raw_contrast, "comparison parity plan contrast")
-        contrast_id = _require_meaningful_string(contrast.get("id"), "comparison parity plan contrast.id")
+        contrast_id = _require_canonical_meaningful_string(
+            contrast.get("id"), "comparison parity plan contrast.id"
+        )
         if contrast_id in contrast_ids:
             raise ContractError("comparison parity plan contrast.id must not contain duplicates")
         contrast_ids.add(contrast_id)
-        baseline_id = _require_meaningful_string(
+        baseline_id = _require_canonical_meaningful_string(
             contrast.get("baseline_condition"), "comparison parity plan contrast.baseline_condition"
         )
-        variant_id = _require_meaningful_string(
+        variant_id = _require_canonical_meaningful_string(
             contrast.get("variant_condition"), "comparison parity plan contrast.variant_condition"
         )
         if baseline_id == variant_id or baseline_id not in condition_axes or variant_id not in condition_axes:
@@ -682,15 +751,15 @@ def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[st
         "comparison parity plan metric_self_audit.before_comparative_inference",
     ) is not True:
         raise ContractError("comparison parity plan metric_self_audit must occur before comparative inference")
-    known_case = _require_meaningful_string(
+    known_case = _require_canonical_meaningful_string(
         audit.get("known_case_item_id"), "comparison parity plan metric_self_audit.known_case_item_id"
     )
     if known_case not in item_ids:
         raise ContractError("comparison parity plan metric_self_audit.known_case_item_id must reference a pilot item")
-    _require_meaningful_string(
+    _require_canonical_meaningful_string(
         audit.get("null_output_id"), "comparison parity plan metric_self_audit.null_output_id"
     )
-    _require_meaningful_string(
+    _require_canonical_meaningful_string(
         audit.get("evaluator_version"), "comparison parity plan metric_self_audit.evaluator_version"
     )
 

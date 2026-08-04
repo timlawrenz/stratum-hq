@@ -42,6 +42,7 @@
       "output_semantics",
       "provenance",
       "abstention_policy",
+      "known_failure_modes",
       "qualification_gate"
     ],
     "rule": "A specialist may be deterministic code, a foundation model, a fine-tune, an ensemble, an embedding, or another measurable process. Candidate models are not an exhaustive or privileged roster."

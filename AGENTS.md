@@ -15,7 +15,7 @@
 - Every source image is curated to contain exactly one woman. Detector disagreement is a quality anomaly, not caption content.
 - Preserve Stratum1 compatibility. New research artifacts must be additive; never overwrite `caption.txt`, `t5_*`, `pose.npy`, or another legacy artifact.
 - Treat `crawlr/stratum` as a partial derived tree. Do not launch a backfill or mutate it without an approved research arm and GPU/data authority.
-- Specialists are open-world candidates, not a fixed model roster. Each needs scope, provenance, abstention behavior, and a qualification gate.
+- Specialists are open-world candidates, not a fixed model roster. Each needs scope, provenance, abstention behavior, known failure modes, and a qualification gate.
 - A compact context representation must preserve evidence links claim-by-claim and must not be silently truncated into the current 512-token T5 path. The Stratum profile requires a 100K-token dossier and 4K-token compact context, not merely ordered budgets.
 - GitHub issues are the research tree and routing state, not a FIFO queue. Survey the whole open tree before selecting an action, record the selected arm's parent, full-tree survey, and selection rationale, and maintain exactly one open program root.
 - Exactly one `research:active` arm is allowed unless the program is held.

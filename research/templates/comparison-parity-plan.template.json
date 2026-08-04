@@ -40,7 +40,7 @@
       "evidence": {
         "kind": "specialist_bundle",
         "id": "<evidence-bundle-or-no-specialist-evidence>",
-        "fingerprint": "<64-lowercase-hex-evidence-fingerprint>",
+        "fingerprint": "<sha256-of-utf8-canonical-json-evidence-excluding-fingerprint>",
         "specialists": [
           {
             "id": "<stable-specialist-id>",
@@ -49,6 +49,7 @@
             "output_semantics": "<what-the-output-means-and-does-not-mean>",
             "provenance": "<model-code-config-or-deterministic-method-provenance>",
             "abstention_policy": "<when-and-how-the-specialist-abstains>",
+            "known_failure_modes": "<known-input-data-model-or-view-failure-modes>",
             "qualification_gate": "<pre-registered-specialist-qualification-gate>"
           }
         ]
