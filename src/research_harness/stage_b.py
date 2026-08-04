@@ -959,7 +959,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260804)
     parser.add_argument("--num-predict", type=int, default=384)
     parser.add_argument("--context-window", type=int, default=4096)
-    parser.add_argument("--timeout-seconds", type=int, default=120)
+    parser.add_argument("--timeout-seconds", type=int, default=300)
     return parser.parse_args(argv)
 
 

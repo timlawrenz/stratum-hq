@@ -355,7 +355,7 @@ def _local_vram_used_gb() -> float:
 
 
 def _wait_for_launch_gpu_activity(
-    child: subprocess.Popen[Any], log_path: Path, *, minimum_vram_gb: float = 1.0, timeout_seconds: int = 120
+    child: subprocess.Popen[Any], log_path: Path, *, minimum_vram_gb: float = 1.0, timeout_seconds: int = 360
 ) -> float:
     """Verify the launched child is alive, logging, and has loaded local GPU memory."""
     deadline = time.monotonic() + timeout_seconds
