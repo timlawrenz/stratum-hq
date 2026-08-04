@@ -260,8 +260,10 @@ def _scheduler_subprocess(manifest: Mapping[str, Any], action: str, args: list[s
     command = _require_mapping(manifest.get("_launcher_program"), "internal launcher program")
     scheduler_path = command["gpu_scheduler_command"]
     try:
+        # The NAS mount is noexec, so the scheduler must run through the Python
+        # interpreter rather than as a direct executable.
         completed = subprocess.run(
-            [scheduler_path, action, *args],
+            [sys.executable, scheduler_path, action, *args],
             capture_output=True,
             text=True,
             check=False,
