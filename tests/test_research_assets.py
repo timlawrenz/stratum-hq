@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
+import re
 from pathlib import Path
+from typing import cast
+from unittest.mock import patch
 
 import pytest
 
 from research_harness import validate_compression_bundle, validate_program
 
 ROOT = Path(__file__).resolve().parents[1]
+_STAGE_A_PROPOSAL_PATH = (
+    ROOT / "research" / "proposals" / "stage-a-caption-context-parity-preparation.md"
+)
 
 _STAGE_A_ALLOWED_ACTIONS = (
     "Select no more than `<maximum item count>` canonical-source pilot candidates using the stated selection protocol.",
@@ -36,6 +43,38 @@ _EXPLICIT_NON_AUTHORIZATIONS = (
     "No scheduler operation without the separately approved manifest and registered launcher.",
     "No overwrite of `caption.txt`, `t5_*`, `pose.npy`, or other Stratum1 artifacts.",
     "No empirical PASS claim merely because a plan validates or an inference job completes.",
+)
+
+_STAGE_A_PROPOSAL_ALLOWED_ACTIONS = (
+    "Select no more than 24 canonical-source candidates using the selection protocol above.",
+    "Read and SHA-256 hash only the selected canonical-source images once each.",
+    "Read only the selected candidates’ existing derived-artifact availability/readability facts; do not mutate `crawlr/stratum`.",
+    "Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.",
+)
+
+_STAGE_A_PROPOSAL_AUTHORITY_INTRO = (
+    "The owner may approve only the checked items below. Any unchecked item remains denied."
+)
+
+_STAGE_A_PROPOSAL_NONAUTHORIZATION_SUMMARY = (
+    "This request explicitly denies model invocation, model download/installation, GPU scheduling, "
+    "GPU claims, additive artifact generation, corpus mutation, derived-tree mutation, backfill, "
+    "external image-model use, merge, direct `main` push, and any Stage-B execution."
+)
+
+_STAGE_A_PROPOSAL_NONAUTHORIZATION_BULLETS = (
+    "- no inference or caption generation;",
+    "- no repair or invocation of `caption2`;",
+    "- no `context4k` production or consumption;",
+    "- no new specialist qualification claim;",
+    "- no empirical result or PASS/FAIL verdict;",
+    "- no scheduler request, poll, claim, launch, activate, heartbeat, release, or kill action;",
+    "- no modification of `caption.txt`, `t5_*`, `pose.npy`, `pose2.npy`, `seg2.npy`, "
+    "`determinations.json`, `caption2.txt`, `t52_*`, or any other corpus artifact.",
+)
+
+_STAGE_A_PROPOSAL_STAGE_B_DENIAL = (
+    "**Stage B execution is not requested or authorized by this document.**"
 )
 
 
@@ -339,6 +378,139 @@ def test_resumption_documents_preserve_the_sole_active_arm_and_two_stage_boundar
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[ACTIVE — PENDING]`" not in ledger
     assert "Stage A" in research_readme
     assert "Stage B" in research_readme
+
+
+def _assert_stage_a_proposal_is_bounded(proposal: str) -> None:
+    assert "**Arm:** #4" in proposal
+    assert "**Parent program:** #2" in proposal
+    assert "`DRAFT / STAGE A REQUEST / NO EXECUTION AUTHORITY`" in proposal
+    assert "maximum 24 candidates" in proposal
+    assert not re.search(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", proposal, flags=re.IGNORECASE)
+    assert "source file names" not in proposal
+    assert "image IDs" not in proposal
+    assert "no candidate has been selected, no source has been read or hashed" in proposal
+    assert "**Canonical root:** `/mnt/nas-ai-models/training-data/crawlr/approved`" in proposal
+
+    selection = _section(
+        proposal,
+        "### Selection protocol after approval",
+        "## Stage-A requested authority",
+    )
+    assert "Selection happens only after Stage-A approval" in selection
+    assert "no entry is opened or decoded before selection" in selection
+    assert "six equal ordinal slices" in selection
+    assert "[floor(j*N/6), floor((j+1)*N/6))" in selection
+    assert "No source content, dimensions, or derived artifacts are read for unselected candidates" in selection
+
+    authority = _section(
+        proposal,
+        "## Stage-A requested authority",
+        "## Stage-A non-authorizations",
+    )
+    assert tuple(line for line in authority.splitlines() if line) == (
+        _STAGE_A_PROPOSAL_AUTHORITY_INTRO,
+        *(f"- [ ] {action}" for action in _STAGE_A_PROPOSAL_ALLOWED_ACTIONS),
+    )
+    assert _checked_actions(authority) == _STAGE_A_PROPOSAL_ALLOWED_ACTIONS
+
+    non_authorizations = _section(
+        proposal,
+        "## Stage-A non-authorizations",
+        "## Required freeze before any Stage-B request",
+    )
+    assert tuple(line for line in non_authorizations.splitlines() if line) == (
+        _STAGE_A_PROPOSAL_NONAUTHORIZATION_SUMMARY,
+        "In particular:",
+        *_STAGE_A_PROPOSAL_NONAUTHORIZATION_BULLETS,
+        _STAGE_A_PROPOSAL_STAGE_B_DENIAL,
+    )
+
+    freeze = _section(
+        proposal,
+        "## Required freeze before any Stage-B request",
+        "## Owner decision — unfilled",
+    )
+    assert "repair and test the prototype backend forwarding of `caption_max_tokens`" in freeze
+
+
+def test_stage_a_caption_context_parity_proposal_is_preparation_only() -> None:
+    proposal = _STAGE_A_PROPOSAL_PATH.read_text()
+    status = (ROOT / "PROJECT_STATUS.md").read_text()
+    tree = (ROOT / "docs" / "EXPERIMENT_TREE.md").read_text()
+    research_readme = (ROOT / "research" / "README.md").read_text()
+
+    _assert_stage_a_proposal_is_bounded(proposal)
+    assert "research/proposals/stage-a-caption-context-parity-preparation.md" in status
+    assert "research/proposals/stage-a-caption-context-parity-preparation.md" in tree
+    assert "- `proposals/` — filled, draft-only owner-decision requests." in research_readme
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda text: text.replace(
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.",
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.\n"
+            "- [ ] Invoke an already-installed local model for the selected candidates.",
+            1,
+        ),
+        lambda text: text.replace(
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.",
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.\n"
+            "- [ ] Request GPU scheduling for the selected candidates.",
+            1,
+        ),
+        lambda text: text.replace(
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.",
+            "- [ ] Write only the listed manifest, preparation log, review record, and non-executing comparison-plan draft beneath the preparation output root.\n"
+            "- [ ] Generate additive artifacts for the selected candidates.",
+            1,
+        ),
+        lambda text: text.replace(
+            "The owner may approve only the checked items below. Any unchecked item remains denied.",
+            "The owner may approve only the checked items below. Any unchecked item remains denied. "
+            "The owner may also invoke an already-installed local model for selected candidates.",
+            1,
+        ),
+        lambda text: text.replace(
+            _STAGE_A_PROPOSAL_NONAUTHORIZATION_SUMMARY,
+            _STAGE_A_PROPOSAL_NONAUTHORIZATION_SUMMARY
+            + " However, model invocation is permitted for selected candidates.",
+            1,
+        ),
+        lambda text: text.replace(
+            "Selection happens only after Stage-A approval",
+            "Selection happens before Stage-A approval",
+            1,
+        ),
+        lambda text: text.replace(
+            "4. repair and test the prototype backend forwarding of `caption_max_tokens` before any comparison using the prototype path;\n",
+            "",
+            1,
+        ),
+    ),
+    ids=(
+        "extra_stage_a_local_model_authority",
+        "extra_stage_a_gpu_authority",
+        "extra_stage_a_artifact_authority",
+        "plain_prose_stage_a_model_authority",
+        "keyword_preserving_nonauthorization_rewrite_with_model_permission",
+        "selection_before_approval",
+        "removed_caption_max_tokens_prerequisite",
+    ),
+)
+def test_stage_a_proposal_rejects_unsafe_public_entrypoint_mutations(
+    mutate: Callable[[str], str],
+) -> None:
+    original_read_text = cast(Callable[..., str], Path.read_text)
+
+    def patched_read_text(path: Path, *args: object, **kwargs: object) -> str:
+        text = original_read_text(path, *args, **kwargs)
+        return mutate(text) if path == _STAGE_A_PROPOSAL_PATH else text
+
+    with patch.object(Path, "read_text", patched_read_text):
+        with pytest.raises(AssertionError):
+            test_stage_a_caption_context_parity_proposal_is_preparation_only()
 
 
 def test_program_keeps_compact_context_separate_from_legacy_t5() -> None:

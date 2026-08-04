@@ -31,9 +31,9 @@ The current accepted top is draft PR #11, commit `a7cecb89f55eef9375137e7e70dafc
 
 ## Immediate next action
 
-Prepare a draft-only **Stage A preparation-authorization proposal** from `research/templates/pilot-authorization-proposal.md` for arm #4. It may name the canonical root, selection protocol, maximum item count, preparation output root, and future evaluation design **without selected item identities or source hashes**. Stage A must request only bounded selection/read/hash and manifest-materialization authority.
+Review the draft-only **Stage A preparation-authorization proposal** for arm #4 at `research/proposals/stage-a-caption-context-parity-preparation.md`. It requests a deterministic maximum-24-candidate selection/read/hash and manifest-materialization pass under an approved noncanonical root, without any selected item identities or source hashes in the request.
 
-Do not select or hash pilot images before direct Stage A approval. Stage A must explicitly deny model invocation, GPU scheduling, additive artifact generation, corpus mutation, and backfill. After Stage A, freeze and validate the exact manifest and comparison plan; only a fresh Stage B owner approval tied to those immutable identities may individually authorize any model, GPU, data, or additive-artifact execution.
+Do not select or hash pilot images before direct Stage A approval. Stage A explicitly denies model invocation, GPU scheduling, additive artifact generation, corpus mutation, and backfill. After approved Stage A, freeze and validate the exact manifest and comparison plan; only a fresh Stage B owner approval tied to those immutable identities may individually authorize any model, GPU, data, or additive-artifact execution.
 
 ## Automation state
 

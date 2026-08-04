@@ -14,7 +14,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[ACTIVE / METRIC-RISK / PRE-COMPUTE] #4 — Baseline and comparison parity**
   * The sole `research:active` arm.
   * The provenance guard is resolved, but no comparative inference is authorized yet.
-  * Immediate bounded task: prepare a draft Stage-A preparation-authorization proposal that names a selection protocol, maximum item count, and output root without real item identities/hashes. Only a direct Stage-A approval may permit bounded read/hash preparation; freeze/validate the exact plan, then require a fresh Stage-B execution approval before any model, GPU, or artifact action.
+  * Immediate bounded task: owner review of `research/proposals/stage-a-caption-context-parity-preparation.md`, a draft request for a deterministic maximum-24-candidate selection/read/hash preparation pass with no real item identities/hashes in the request. Only a direct Stage-A approval may permit bounded read/hash preparation; freeze/validate the exact plan, then require a fresh Stage-B execution approval before any model, GPU, or artifact action.
 
 * **[PROPOSAL / PENDING] #5 — Geometry-grounded captioning prototype** (`exp/geometry-grounded-captioning`, draft PR #1)
   * Additive chain: `pose2 + seg2 + optional pointmap → determinations → caption2 → t52`.
