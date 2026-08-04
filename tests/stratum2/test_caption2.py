@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 from stratum2.pipeline.caption2 import process
@@ -69,3 +68,22 @@ def test_caption2_idempotency(mock_generate, tmp_path):
     # Ollama was NOT called
     mock_generate.assert_not_called()
     assert (tmp_path / "caption2.txt").read_text() == "Existing caption"
+
+
+@patch("stratum.pipeline.caption.OllamaCaptionBackend.generate")
+def test_caption2_forwards_nondefault_max_tokens_to_backend(mock_generate, tmp_path):
+    """The CLI/orchestrator budget reaches the actual caption backend call."""
+    from PIL import Image
+    import numpy as np
+
+    Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8)).save(tmp_path / "dummy.jpg")
+    (tmp_path / "determinations.json").write_text(json.dumps({"schema_version": 2}))
+    mock_generate.return_value = "Budget-controlled caption."
+
+    assert process(
+        image_path=tmp_path / "dummy.jpg",
+        output_dir=tmp_path,
+        max_tokens=731,
+    ) is True
+
+    assert mock_generate.call_args.kwargs["max_tokens"] == 731

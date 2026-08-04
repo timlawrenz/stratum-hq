@@ -32,8 +32,8 @@ def build_prompt(determinations_json: dict) -> str:
     ext = determinations_json.get("subject_extent", {})
     if subj.get("n_detections", 1) == 1:
         lines.append("- exactly one primary subject detected")
-    else:
-        lines.append(f"- detector anomaly: {subj.get('detector_anomaly')}")
+    # The curated corpus invariant is exactly one woman. A detector disagreement
+    # is a quality/anomaly signal for review and abstention, never caption input.
 
     if "h_position" in ext:
         lines.append(f"- subject horizontal position: {ext['h_position']}")
@@ -72,7 +72,7 @@ def process(
     output_dir: Path,
     ollama_url: str = "http://192.168.86.137:11434/api/generate",
     ollama_model: str = "gemma3:27b",
-    **kwargs,
+    max_tokens: int = 500,
 ) -> bool:
     """Run Ollama with the determinations-grounded prompt."""
     out_path = output_dir / "caption2.txt"
@@ -102,7 +102,7 @@ def process(
     backend = OllamaCaptionBackend(url=ollama_url, model_name=ollama_model)
     try:
         img = Image.open(image_path).convert("RGB")
-        raw_text = backend.generate(img, prompt=prompt)
+        raw_text = backend.generate(img, max_tokens=max_tokens, prompt=prompt)
         text = ensure_single_paragraph(raw_text)
     except Exception as exc:
         import sys
