@@ -73,7 +73,7 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD` — the frozen cohort makes a later request precise, but its zero existing later-chain coverage rules out an evidence-only comparison using only current caption-chain files. [#18](https://github.com/timlawrenz/stratum-hq/issues/18) now requires a direct owner decision on aggregator/generation provenance, metric self-audit/adversarial review, and execution authority.
 
-## Stage-B authority boundary observation — `[NO RESULT / NEEDS-HUMAN]`
+## Stage-B authority boundary observation — `[COMPLETED RUN / UNREVIEWED / NEEDS-HUMAN]`
 
 **Date:** 2026-08-04
 **Arm:** #4 — baseline and comparison parity
@@ -84,10 +84,17 @@ This ledger records empirical findings and negative results permanently. A green
 **Read-only evidence (no corpus/model/GPU action by this round):**
 
 - Issue #18 remains OPEN/held; its comments are agent-authored records only and state no Stage-B execution is authorized. PR #20 has no comments or reviews. No durable approval record exists anywhere in the repo. The asserted approval is therefore unverifiable from the durable record and is **not** treated as authorization.
-- Scheduler events log (`/mnt/nas-ai-models/gpu-scheduler/logs/events.log`) documents actual lifecycle actions for `stratum-stage-b-first500-parity-v1` (GPU 4090, 22GB, 2h): request→claim→activate→release-failed at 21:47–21:53Z; request→claim→release-failed at 21:59–22:03Z; additional requests re-queued (22:03Z, 22:08Z). Stage-B launcher log: `local Ollama generation failed: HTTPConnectionPool(host='127.0.0.1', port=11434): Read timed out.`
-- No Stage-B output root exists (`/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1` absent), so no Stage-B output was produced by any attempt.
+- Scheduler events log (`/mnt/nas-ai-models/gpu-scheduler/logs/events.log`) documents multiple lifecycle attempts for `stratum-stage-b-first500-parity-v1` (GPU 4090, 22GB, 2h). The first three failed: 21:47:57Z request→21:51:19Z claim→21:52:08Z activate→21:53:22Z release-failed; 21:59:26Z→22:02:04Z claim→22:03:15Z release-failed; 22:03:33Z→22:05:41Z claim→22:05:43Z release-failed — each with `local Ollama generation failed: HTTPConnectionPool(host='127.0.0.1', port=11434): Read timed out`.
+- **The fourth lifecycle COMPLETED.**
+- **Correction to the earlier record:** the previous round asserted "No Stage-B output root exists … so no empirical Stage-B result was produced by any attempt." This is **disproven**. The durable scheduler log shows the run that started at 22:08:29Z (claim 22:08:40Z, activate 22:10:07Z) was released `status=completed` at **22:20:22Z**, and a complete output root exists at `/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1` (created 22:20:21Z) — all **before** the previous round's PR #21 commit (22:23:34Z) that claimed the root was absent.
+- **Evidence that the completed run is real and structurally sound (read-only verification this round):**
+  - `records.jsonl` has 96 records = 24 frozen images × 4 conditions (`legacy-bucketed-no-evidence`, `legacy-raw-no-evidence`, `context-raw-no-evidence`, `context-raw-geometry`); 24 non-empty captions per condition dir (word counts 108–191, zero empty files).
+  - 96/96 `source_sha256` bind to the frozen 24-item manifest; 96/96 evidence fingerprints pass canonical-JSON fingerprint validation; 96/96 prompt and input-view fingerprints match the frozen plan; 96/96 `rendered_sha256` bind `rendered_text`; the frozen plan binds its content fingerprint.
+  - The four conditions isolate exactly one axis: input-view (legacy-bucketed vs legacy-raw, identical prompt), prompt (legacy-raw vs context-raw, identical view), evidence (context-raw-no-evidence vs context-raw-geometry, identical prompt+view).
+  - `run-provenance.json` declares `status: PENDING_INDEPENDENT_REVIEW`, `semantic_verdict: PENDING`, and metric self-audit `PENDING_HUMAN_SELF_AUDIT`; `scheduler-provenance.json` records `status: completed` started 22:08:40Z finished 22:20:22Z.
+- **The run is UNREVIEWED and carries no verdict:** all 96 `review-queue.jsonl` rows remain `unreviewed` / `PENDING`; no claim-support scoring, known-case/null self-audit, or adversarial review has been performed.
 
-**Verdict:** `NO EMPIRICAL RESULT / NEEDS-HUMAN`. This is not a PASS, FAIL, or non-improving experiment. The owner must confirm or deny the asserted WebUI approval for frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, record that decision durably, and separately decide whether any Stage-B scheduler/model action is authorized. This round performed no scheduler, model, corpus, merge, or main-push action.
+**Verdict:** `COMPLETED RUN / UNREVIEWED / NEEDS-HUMAN`. This is **not** a PASS, FAIL, or validated result. The asserted approval remains unverifiable and is not accepted as authorization; the 96-record output set is real but unreviewed. The owner must (a) confirm or deny the asserted WebUI approval for frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, record that decision durably, and (b) decide whether to accept the completed output root for the sequential claim-support self-audit plus adversarial review, or treat it as invalid and require a re-run under a durable approved manifest. This round performed no scheduler, model, corpus, merge, or main-push action.
 
 ## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
 

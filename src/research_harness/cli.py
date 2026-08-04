@@ -17,6 +17,7 @@ from .contracts import (
     validate_research_tree,
 )
 from .labels import load_label_specs, plan_label_sync
+from .stage_b_verify import verify_stage_b_output_root
 
 
 def _read_json_value(path: Path, label: str) -> Any:
@@ -77,6 +78,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     gpu.add_argument("program", type=Path)
     gpu.add_argument("manifest", type=Path)
 
+    stage_b = sub.add_parser(
+        "verify-stage-b-output",
+        help="structurally verify a completed Stage-B output root (observer-only)",
+    )
+    stage_b.add_argument("root", type=Path)
+
     labels = sub.add_parser("plan-labels", help="plan additive GitHub label changes from JSON snapshots")
     labels.add_argument("desired", type=Path, help="tracked desired label-specification JSON")
     labels.add_argument("current", type=Path, help="read-only GitHub label-list JSON")
@@ -113,6 +120,11 @@ def main(argv: list[str] | None = None) -> int:
             if len(current_by_name) != len(current):
                 raise ContractError("label snapshot contains invalid or duplicate label names")
             print(json.dumps(plan_label_sync(desired, current_by_name), indent=2))
+            return 0
+
+        if args.command == "verify-stage-b-output":
+            verify_stage_b_output_root(args.root)
+            print("valid")
             return 0
 
         program = _read_json(args.program)
