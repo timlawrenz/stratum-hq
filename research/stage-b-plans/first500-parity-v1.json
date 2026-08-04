@@ -8,15 +8,15 @@
     "planned": true
   },
   "candidate_manifest_fingerprint": "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
-  "comparison_plan_fingerprint": "fef8c779cf016cba104cbb30284b3439bf4971395d698abb50cfb3572c67f5d2",
+  "comparison_plan_fingerprint": "1e06d5c84c770b7343561f7fa1c1a164cb6dd5b078415194db0aa38c65b6ebd2",
   "comparison_plan_id": "stage-b-first500-parity-v1",
   "conditions": [
     {
       "aggregator": {
-        "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
         "local_only": true,
         "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
-        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6."
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
       },
       "evidence": {
         "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
@@ -36,10 +36,10 @@
     },
     {
       "aggregator": {
-        "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
         "local_only": true,
         "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
-        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6."
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
       },
       "evidence": {
         "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
@@ -59,10 +59,10 @@
     },
     {
       "aggregator": {
-        "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
         "local_only": true,
         "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
-        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6."
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
       },
       "evidence": {
         "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
@@ -82,10 +82,10 @@
     },
     {
       "aggregator": {
-        "generation_fingerprint": "a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6",
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
         "local_only": true,
         "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
-        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint a2d624f5002b54e1cc6dd70dd8c05fead712c985c663ac96042a1fd2eda775a6."
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
       },
       "evidence": {
         "fingerprint": "baba903a8439c360d8cf6230ced17f3432b026ccc6afedc5ed857ca9cd54d80f",

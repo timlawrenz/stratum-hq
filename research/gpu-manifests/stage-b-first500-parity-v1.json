@@ -8,9 +8,9 @@
   "execution": {
     "candidate_manifest_fingerprint": "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
-    "comparison_plan_fingerprint": "fef8c779cf016cba104cbb30284b3439bf4971395d698abb50cfb3572c67f5d2",
+    "comparison_plan_fingerprint": "1e06d5c84c770b7343561f7fa1c1a164cb6dd5b078415194db0aa38c65b6ebd2",
     "comparison_plan_relative_path": "research/stage-b-plans/first500-parity-v1.json",
-    "comparison_plan_sha256": "2f8583d9bf77135207842a4d934f8d378f00d8a443e15c240705ff5eeda3d793",
+    "comparison_plan_sha256": "cf68a40af9e14ed991b8b4f62ad79023de831c7eeaa0da1a719c842f7fc3f349",
     "expected_record_count": 96,
     "generation": {
       "context_window": 4096,
