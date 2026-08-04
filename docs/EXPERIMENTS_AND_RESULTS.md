@@ -27,7 +27,7 @@ This ledger records empirical findings and negative results permanently. A green
 - Stage A is completed and independently audited as pre-compute evidence. The historic record set remains byte-for-byte untouched; it is not silently reissued as a first-500 or coverage-aware cohort.
 - No model invocation/download, GPU or scheduler action, corpus mutation, derived-tree mutation, backfill, comparison, merge, or direct `main` push occurred.
 
-**Verdict:** `PENDING` — structural provenance only. Stage B still needs fixed local-model/generation provenance, independent review of draft PR #15's `caption_max_tokens` forwarding repair, metric self-audit, adversarial review, and separately explicit execution authority.
+**Verdict:** `PENDING` — structural provenance only. Draft PR #15's `caption_max_tokens` forwarding repair was independently reviewed at `db85fe9bacc55e1c444615b027a2734d63398f61`, and stacked draft PR #16 adds a mocked CLI-to-backend regression. Stage B still needs fixed local-model/generation provenance, metric self-audit, adversarial review, and separately explicit execution authority.
 
 ## First-500 core-artifact coverage audit — `[PENDING / PRE-COMPUTE]`
 
@@ -96,6 +96,6 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Pre-registered gate:** A controlled evaluation must hold source-image preprocessing, prompt structure, model/generation settings, item set, and review rubric fixed.
 
-**Known confounds / prerequisites:** Legacy captions use a bucketed/cropped image while current `caption2` opens the raw source. Existing caption output therefore cannot be interpreted as evidence-only. Draft PR #15 repairs/tests `caption_max_tokens` forwarding and removes detector-anomaly prompt content; it remains pending independent review before a controlled prototype comparison. `t52` remains a legacy-compatible 512-token artifact rather than `context4k`.
+**Known confounds / prerequisites:** Legacy captions use a bucketed/cropped image while current `caption2` opens the raw source. Existing caption output therefore cannot be interpreted as evidence-only. Draft PR #15 repairs `caption_max_tokens` forwarding and removes detector-anomaly prompt content; an independent non-executing review at `db85fe9bacc55e1c444615b027a2734d63398f61` found no implementation blocker, and stacked draft PR #16 adds a mocked CLI-to-backend regression. The unmerged stack does not authorize a controlled comparison. `t52` remains a legacy-compatible 512-token artifact rather than `context4k`.
 
 **Verdict:** `PENDING` — preserve as a prototype; do not infer quality or downstream usefulness.
