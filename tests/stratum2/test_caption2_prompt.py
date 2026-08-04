@@ -1,5 +1,4 @@
-import json
-from stratum2.pipeline.caption2 import build_prompt, CAPTION2_PROMPT_TEMPLATE
+from stratum2.pipeline.caption2 import build_prompt
 
 
 def test_caption2_prompt_builder():
@@ -30,6 +29,19 @@ def test_caption2_prompt_builder():
     # Assert instructions
     assert "NEVER contradict them" in prompt
     assert "ADD what the determinations omit" in prompt
+
+
+def test_caption2_prompt_omits_detector_disagreement_from_caption_content():
+    prompt = build_prompt(
+        {
+            "schema_version": 2,
+            "subject": {"n_detections": 2, "detector_anomaly": "extra_detections(2)"},
+        }
+    )
+
+    assert "detector anomaly" not in prompt.lower()
+    assert "extra_detections" not in prompt
+    assert "exactly one primary subject detected" not in prompt
 
 
 def test_stratum1_caption_prompt_untouched():
