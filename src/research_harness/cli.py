@@ -10,6 +10,7 @@ from typing import Any
 
 from .contracts import (
     ContractError,
+    validate_comparison_parity_plan,
     validate_compression_bundle,
     validate_gpu_manifest,
     validate_program,
@@ -66,6 +67,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     compression.add_argument("program", type=Path)
     compression.add_argument("bundle", type=Path)
 
+    comparison = sub.add_parser(
+        "validate-comparison-plan", help="validate a frozen controlled-comparison plan"
+    )
+    comparison.add_argument("program", type=Path)
+    comparison.add_argument("plan", type=Path)
+
     gpu = sub.add_parser("validate-gpu-manifest", help="validate a GPU job manifest")
     gpu.add_argument("program", type=Path)
     gpu.add_argument("manifest", type=Path)
@@ -115,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
             validate_research_tree(_read_issue_tree_snapshot(args.snapshot), program)
         elif args.command == "validate-compression":
             validate_compression_bundle(_read_json(args.bundle), program)
+        elif args.command == "validate-comparison-plan":
+            validate_comparison_parity_plan(_read_json(args.plan), program)
         elif args.command == "validate-gpu-manifest":
             validate_gpu_manifest(_read_json(args.manifest), program)
         else:  # pragma: no cover - argparse enforces this branch set.
