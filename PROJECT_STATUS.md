@@ -1,7 +1,7 @@
 # Project Status — Stratum Contextual Specialist Research
 
 **Last updated:** 2026-08-04
-**Phase / status:** **ACTIVE METHODOLOGY / PRE-COMPUTE** — #4 is the sole `research:active` and remains `research:metric-risk`. Stage A is completed and independently audited, but remains `PENDING` / non-executing; no Stage-B action is authorized.
+**Phase / status:** **ACTIVE METHODOLOGY / PRE-COMPUTE HOLD** — #4 is the sole `research:active` / `research:metric-risk` arm, while #18 holds Stage B pending a direct owner decision. Stage A is completed and independently audited, but remains `PENDING` / non-executing; no Stage-B action is authorized.
 
 ## Current state
 
@@ -19,9 +19,11 @@ They are noncanonical pre-compute provenance records and must not be overwritten
 
 A new read-only audit at `research/coverage/first-500-core-coverage-v1.json` confirms readable `pose2.npy`, `seg2.npy`, `normal2.npy`, `pointmap.npy`, and `matting.npy` coverage for all 500 first bytewise-ordered eligible filenames. It also confirms that only 10 have the complete later `determinations` → `caption2` → `t52` chain. `docs/FIRST_500_CORE_COHORT_PILOT_DESIGN.md` records the resulting coverage-aware, one-axis feasibility design.
 
+The new immutable noncanonical candidate record is `/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json` (file SHA-256 `8684c6e38c90b12898135235164677d780a4c897122f26a4b386f07283a9c5e0`; manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`). It source-hashes a 12 portrait / 6 squareish / 6 landscape subset after the first-500 audit binding revalidated. All 24 retain core and legacy coverage; none has the complete existing later chain. See `docs/FIRST_500_COVERAGE_BALANCED_CANDIDATE_FREEZE.md`.
+
 ## Immediate next action
 
-Use the first-500 design only as a pre-compute decision instrument. Draft PR #15's prototype `caption_max_tokens` forwarding and detector-anomaly prompt repair received an independent non-executing review at `db85fe9bacc55e1c444615b027a2734d63398f61`; draft PR #16 adds the durable mocked CLI-to-backend regression. Those draft artifacts do not authorize Stage B. Before any Stage-B request, bind a proposed 24-item coverage-balanced subset to source hashes, a fixed already-installed local aggregator, generation settings, the claim-support self-audit, and adversarial review.
+The source-hashed coverage-balanced subset is frozen. Respect #18: await an owner decision that names an already-installed local aggregator and immutable generation settings, freezes the claim-support known-case/null self-audit and adversarial-review plan, and separately authorizes or denies model invocation and GPU/scheduler action for the exact manifest. Draft PR #15's prototype `caption_max_tokens` repair and PR #16's CLI-to-backend regression remain pre-inference controls only.
 
 Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files cannot substitute for the missing 490-item evidence condition or for `context4k`.
 
@@ -32,13 +34,14 @@ Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add 
 - #4 is the sole active baseline/comparison-parity arm.
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 is closed; it resolved a comparison-plan provenance gate only.
+- #18 is the open `research:hold` / `research:needs-human` Stage-B boundary.
 
 ## Automation and authority
 
 The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.
 
-It may not merge, push `main`, mutate either corpus tree, backfill, install/download/invoke an image model, call the GPU scheduler, or execute Stage B. A detector disagreement is a quality anomaly, never caption content. Any uncertainty about metric, model, data, GPU, policy, or architecture requires a hold issue.
+It may not merge, push `main`, mutate either corpus tree, backfill, install/download/invoke an image model, call the GPU scheduler, or execute Stage B. A detector disagreement is a quality anomaly, never caption content. #18 now blocks the model, metric, and Stage-B boundary until a direct owner decision is recorded.
 
 ## Headline result so far
 
-**PENDING.** The comparison instrument and Stage-A provenance are structurally available; the first-500 core cohort makes a future controlled view/prompt design feasible, but the evidence-only comparison remains blocked by the 490-item later-chain gap, fixed local-aggregator provenance, metric self-audit, adversarial review, and separate Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` forwarding synthetic unit and CLI-to-backend coverage only; it is not execution authority.
+**PENDING / HELD.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. Input-view/prompt comparisons remain designable, but the frozen subset has **0 / 24** complete existing later chains, so evidence-only remains blocked absent separately authorized deterministic preparation. #18 also blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and separate Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.

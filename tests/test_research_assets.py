@@ -556,3 +556,20 @@ def test_first_500_core_coverage_design_is_precompute_and_not_a_stage_a_substitu
     assert "The Stage-A manifest's six global ordinal slices are not the first-500 cohort." in design
     assert "**Only 10 / 500**" in design
     assert "No Stage-B action is authorized." in design
+
+
+def test_coverage_balanced_candidate_freeze_is_nonexecuting_and_preserves_stage_a() -> None:
+    freeze_path = ROOT / "docs" / "FIRST_500_COVERAGE_BALANCED_CANDIDATE_FREEZE.md"
+    freeze = freeze_path.read_text()
+
+    for expected in (
+        "PENDING_PRE_COMPUTE_NON_EXECUTING",
+        "first-500-coverage-balanced-candidate-manifest-v1.json",
+        "8684c6e38c90b12898135235164677d780a4c897122f26a4b386f07283a9c5e0",
+        "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
+        "12 portrait, 6 squareish, and 6 landscape",
+        "0 / 24",
+        "immutable Stage-A",
+        "Stage-B execution",
+    ):
+        assert expected in freeze
