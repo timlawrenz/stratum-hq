@@ -16,14 +16,14 @@ The live GitHub tree is strict and non-FIFO:
 - #4 is the pending baseline/comparison-parity methodology arm;
 - #5 records the preserved Arm 0 prototype.
 
-## Paused automation
+## Active automation
 
-The `stratum-ffhq` profile has two persisted, **paused** records with zero execution attempts:
+Tim authorized activation of both `stratum-ffhq` records on 2026-08-04:
 
-- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`.
+- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`, restricted to `web`, `terminal`, and `file`.
 - `ae13cfe18a81` — no-agent GPU-manifest observer, `every 5m`, running only `stratum_gpu_observer.sh`.
 
-The observer emits `[SILENT]` without an approved manifest and can only emit a hold; it cannot operate the scheduler or launch a workload. Do not resume either job until draft PR #6 is reviewed and an explicit activation decision is made.
+The observer emits `[SILENT]` without an approved manifest and can only emit a hold; it cannot operate the scheduler or launch a workload. Starting either record does **not** authorize GPU request/claim/launch, model download, canonical-data mutation, backfill, merge, or direct `main` push; the research contract’s hold conditions remain in force.
 
 ## Immediate next action
 
