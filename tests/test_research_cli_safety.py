@@ -46,6 +46,7 @@ def valid_program() -> dict:
                 "output_semantics",
                 "provenance",
                 "abstention_policy",
+                "known_failure_modes",
                 "qualification_gate",
             ],
         },

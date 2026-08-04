@@ -29,9 +29,9 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Trigger:** An adversarial synthetic audit found that the initial comparison-plan validator accepted absolute and parent-traversal `source_relative_path` values and accepted a non-null evidence bundle containing only an ID and fingerprint. That made a nominally frozen canonical pilot and provenance-bearing evidence condition unauditable before inference.
 
-**Human decision:** Tim approved **inline specialist declarations** for non-null evidence bundles. A real comparison plan must carry the complete open-world declaration for each specialist: stable ID, scope, inputs/view policy, output semantics, provenance, abstention policy, and qualification gate. The explicit no-specialist baseline remains `kind: "none"` and must omit declarations.
+**Human decision:** Tim approved **inline specialist declarations** for non-null evidence bundles. A real comparison plan must carry the complete open-world declaration for each specialist: stable ID, scope, inputs/view policy, output semantics, provenance, abstention policy, known failure modes, and qualification gate. The explicit no-specialist baseline remains the closed `kind: "none"` envelope with only its kind, ID, and fingerprint.
 
-**Required remediation gate:** A remediation must reject absolute, parent-traversal, redundant-segment, and backslash pilot paths; reject opaque, incomplete, duplicate, or non-explicit non-null bundles; accept a valid inline bundle and explicit no-evidence baseline; and pass independent review plus program/tree validation.
+**Required remediation gate:** A remediation must reject absolute, parent-traversal, redundant-segment, backslash, and whitespace-alias pilot paths, comparison identities, or audit identifiers; reject opaque, incomplete, duplicate, non-explicit, or undeclared-payload bundles/declarations; bind each evidence SHA-256 to canonical inline content excluding only the asserted digest; accept a valid closed inline bundle and explicit payload-free no-evidence baseline; and pass independent review plus program/tree validation.
 
 **Verdict:** `PENDING / HOLD` — no empirical comparison, image inference, GPU action, model installation, corpus mutation, or backfill occurred. The hold remains open until the reviewed remediation is accepted and revalidated.
 

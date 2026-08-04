@@ -19,9 +19,9 @@ The live GitHub tree is strict and non-FIFO:
 
 ## Global hold
 
-Issue #9 found that draft PR #8's comparison-plan validator accepted escaped pilot item paths and opaque non-null specialist bundles. Tim approved **inline specialist declarations** as the minimal durable binding representation.
+Issue #9 found that draft PR #8's comparison-plan validator accepted escaped pilot item paths and opaque non-null specialist bundles. Tim approved **inline specialist declarations** as the minimal durable binding representation. Independent review found the first remediation still accepted undeclared envelope payloads, omitted contract-required known failure modes, and left its evidence fingerprint unbound to inline content; the strict-envelope follow-up remains pending review.
 
-No model inference, GPU action, model installation, canonical/derived-tree mutation, backfill, merge, or direct `main` push is authorized while the hold remains open. The hold may close only after the inline remediation rejects the documented adversarial probes, receives independent review, and revalidates the live tree.
+No model inference, GPU action, model installation, canonical/derived-tree mutation, backfill, merge, or direct `main` push is authorized while the hold remains open. The hold may close only after the strict-envelope remediation rejects the documented adversarial probes, receives independent review, and revalidates the live tree.
 
 ## Active automation
 
@@ -37,7 +37,7 @@ The observer emits `[SILENT]` without an approved manifest and can only emit a h
 
 ## Immediate next action
 
-Independently review and validate the #9 inline-binding remediation: pilot `source_relative_path` must be safely relative to `crawlr/approved`, and every non-null evidence bundle must carry complete inline open-world specialist declarations. Keep #9 open until that review is complete.
+Independently review and validate the #9 strict-envelope follow-up: pilot paths, comparison identities, and audit identifiers must use canonical spellings; evidence envelopes must reject undeclared payload; the evidence fingerprint must bind canonical inline content; and every non-null specialist declaration must include known failure modes as well as the other open-world fields. Keep #9 open until that review is complete.
 
 ## Headline result so far
 

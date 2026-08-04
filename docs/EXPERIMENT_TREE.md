@@ -6,8 +6,8 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 
 * **[HOLD / HARNESS-GAP] #9 — Bind comparison plans to canonical paths and specialist declarations**
   * Blocks autonomous comparison-plan selection/execution while the pre-compute provenance instrument can accept an escaping canonical-source item path or opaque non-null evidence bundle.
-  * Tim approved inline declarations for non-null evidence bundles: each carries stable specialist ID, scope, inputs/view policy, output semantics, provenance, abstention policy, and qualification gate.
-  * The remediation must reject absolute/parent-traversal paths, retain the explicit no-specialist baseline, receive synthetic regression coverage and independent review, then revalidate before #9 can close.
+  * Tim approved inline declarations for non-null evidence bundles: each carries stable specialist ID, scope, inputs/view policy, output semantics, provenance, abstention policy, known failure modes, and qualification gate.
+  * Independent review found the first inline remediation permissive about undeclared payloads and an unbound evidence fingerprint. The stacked strict-envelope follow-up must reject absolute/parent-traversal and whitespace-alias paths/identity/audit fields, retain a payload-free explicit no-specialist baseline, reject unknown envelope/declaration fields, bind the evidence digest to canonical inline content, receive synthetic regression coverage and independent review, then revalidate before #9 can close.
   * The hold does not authorize model inference, GPU scheduling, model installation, corpus/derived-tree mutation, backfill, merge, or direct `main` push.
 
 ## Live issue tree
@@ -37,13 +37,13 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[DRAFT-PR REVIEW] Controlled comparison plan guard** (draft PR #8)
   * Freezes the shape of a one-axis-at-a-time plan before any real pilot selection or inference.
 
-* **[DRAFT REMEDIATION] Inline declaration and canonical-path binding** (issue #9 follow-up)
-  * Stacked on the comparison-plan guard; pending independent review before the hold can close.
+* **[DRAFT REMEDIATION] Strict inline declaration and canonical-path binding** (issue #9 follow-up)
+  * Stacked on the first inline remediation; pending independent review before the hold can close.
 
 ## Future candidate branches
 
 * **[TBD] Open-world specialist qualification**
-  * Candidate models, fine-tunes, deterministic measurements, embeddings, and future discoveries must each earn a role through a declared scope, provenance, abstention behavior, and qualification gate.
+  * Candidate models, fine-tunes, deterministic measurements, embeddings, and future discoveries must each earn a role through a declared scope, provenance, abstention behavior, known failure modes, and qualification gate.
 
 * **[TBD] Downstream representation and generative utility**
   * Test how `context4k` should be consumed without truncating it into the legacy 512-token T5 path, then test controlled downstream usefulness.
