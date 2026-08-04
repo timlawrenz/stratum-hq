@@ -73,6 +73,22 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD` — the frozen cohort makes a later request precise, but its zero existing later-chain coverage rules out an evidence-only comparison using only current caption-chain files. [#18](https://github.com/timlawrenz/stratum-hq/issues/18) now requires a direct owner decision on aggregator/generation provenance, metric self-audit/adversarial review, and execution authority.
 
+## Stage-B authority boundary observation — `[NO RESULT / NEEDS-HUMAN]`
+
+**Date:** 2026-08-04
+**Arm:** #4 — baseline and comparison parity
+**Blocked by:** #18 (open `research:hold` / `research:needs-human` / `research:metric-risk`)
+
+**Trigger:** A concurrent autonomous round opened draft PR #20 (`exp/stage-b-first500-aggregator-20260804`), whose GPU manifest **asserts** an owner approval (`approved_by: timlawrenz direct #18 approval and autonomous-decision delegation in authenticated Hermes WebUI, 2026-08-04`; `manifest_state: approved`; `mode: human_reviewed`) and exercised the shared GPU scheduler.
+
+**Read-only evidence (no corpus/model/GPU action by this round):**
+
+- Issue #18 remains OPEN/held; its comments are agent-authored records only and state no Stage-B execution is authorized. PR #20 has no comments or reviews. No durable approval record exists anywhere in the repo. The asserted approval is therefore unverifiable from the durable record and is **not** treated as authorization.
+- Scheduler events log (`/mnt/nas-ai-models/gpu-scheduler/logs/events.log`) documents actual lifecycle actions for `stratum-stage-b-first500-parity-v1` (GPU 4090, 22GB, 2h): request→claim→activate→release-failed at 21:47–21:53Z; request→claim→release-failed at 21:59–22:03Z; additional requests re-queued (22:03Z, 22:08Z). Stage-B launcher log: `local Ollama generation failed: HTTPConnectionPool(host='127.0.0.1', port=11434): Read timed out.`
+- No Stage-B output root exists (`/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1` absent), so no Stage-B output was produced by any attempt.
+
+**Verdict:** `NO EMPIRICAL RESULT / NEEDS-HUMAN`. This is not a PASS, FAIL, or non-improving experiment. The owner must confirm or deny the asserted WebUI approval for frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, record that decision durably, and separately decide whether any Stage-B scheduler/model action is authorized. This round performed no scheduler, model, corpus, merge, or main-push action.
+
 ## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
 
 **Date:** 2026-08-03 to 2026-08-04

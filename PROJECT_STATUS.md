@@ -36,6 +36,18 @@ Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add 
 - #9 is closed; it resolved a comparison-plan provenance gate only.
 - #18 is the open `research:hold` / `research:needs-human` Stage-B boundary.
 
+## Stage-B authority boundary observation (2026-08-04)
+
+A separate, concurrent autonomous round opened draft PR #20 (`exp/stage-b-first500-aggregator-20260804`), which adds a Stage-B runner/launcher and a GPU manifest (`research/gpu-manifests/stage-b-first500-parity-v1.json`) that **asserts** `manifest_state: approved`, `authorization.mode: human_reviewed`, and `approved_by: timlawrenz direct #18 approval and autonomous-decision delegation in authenticated Hermes WebUI, 2026-08-04`.
+
+Read-only evidence this round:
+
+- The durable GitHub record contains **no such owner decision**: issue #18 is still OPEN with `research:hold` / `research:needs-human` / `research:metric-risk` intact; its only comments are agent-authored records that explicitly state no Stage-B execution is authorized and the hold is open. Draft PR #20 has zero comments and zero reviews. No durable approval record file exists in the repository.
+- The shared GPU scheduler log (`/mnt/nas-ai-models/gpu-scheduler/logs/events.log`) shows actual Stage-B scheduler lifecycle actions taken under that asserted authority on 2026-08-04: `job requested → gpu claimed → gpu activated → gpu released status=failed` for `stratum-stage-b-first500-parity-v1` (GPU 4090, 22GB, 2h) at 21:47–21:53Z, a second request→claim→release-failed at 21:59–22:03Z, and a further request re-queued (e.g. 22:03Z then 22:08Z). A stage-B launcher log entry records `local Ollama generation failed: HTTPConnectionPool(host='127.0.0.1', port=11434): Read timed out`.
+- No Stage-B output root exists (`/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1` is absent), so no empirical Stage-B result was produced by any attempt.
+
+Treatment: this is treated as an **unsupported-approval authority anomaly**, not as authorization and not as an empirical result. This round did NOT execute Stage B, did not invoke the GPU scheduler, did not run a model, and did not mutate any corpus or derived tree. The correct disposition is `research:needs-human`: the owner must (a) confirm or deny that they issued the asserted WebUI approval for the exact frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, and (b) if confirmed, record the decision durably (issue comment/review), and (c) decide whether the Stage-B scheduler attempts should be retried with a durable, evidenced authorization.
+
 ## Automation and authority
 
 The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.
