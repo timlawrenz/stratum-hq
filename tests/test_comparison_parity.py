@@ -19,6 +19,33 @@ def _sha(char: str) -> str:
     return char * 64
 
 
+def no_specialist_evidence() -> dict:
+    return {
+        "kind": "none",
+        "id": "no-specialist-evidence-v1",
+        "fingerprint": _sha("d"),
+    }
+
+
+def inline_geometry_evidence() -> dict:
+    return {
+        "kind": "specialist_bundle",
+        "id": "geometry-v1",
+        "fingerprint": _sha("0"),
+        "specialists": [
+            {
+                "id": "geometry-determinations-v1",
+                "scope": "Pose and segmentation-derived relational geometry only.",
+                "inputs": "Frozen pose2 and seg2 artifacts for the selected input view.",
+                "output_semantics": "Provenance-bearing measurements and relations, not caption facts.",
+                "provenance": "Synthetic fixture declaration; no specialist model execution.",
+                "abstention_policy": "Abstain when required artifacts are missing or contradictory.",
+                "qualification_gate": "Must pass the pre-registered controlled comparison gate.",
+            }
+        ],
+    }
+
+
 def program() -> dict:
     return json.loads((ROOT / "research" / "program.json").read_text())
 
@@ -38,15 +65,14 @@ def parity_plan() -> dict:
         view_hash: str,
         prompt_id: str,
         prompt_hash: str,
-        evidence_id: str,
-        evidence_hash: str,
+        evidence: dict,
     ) -> dict:
         return {
             "id": condition_id,
             "pilot_manifest_id": "synthetic-parity-pilot-v1",
             "input_view": {"id": view_id, "fingerprint": view_hash},
             "prompt": {"id": prompt_id, "fingerprint": prompt_hash},
-            "evidence": {"id": evidence_id, "fingerprint": evidence_hash},
+            "evidence": copy.deepcopy(evidence),
             "aggregator": copy.deepcopy(fixed_aggregator),
         }
 
@@ -87,8 +113,7 @@ def parity_plan() -> dict:
                 view_hash=_sha("b"),
                 prompt_id="legacy",
                 prompt_hash=_sha("c"),
-                evidence_id="no-specialist-evidence-v1",
-                evidence_hash=_sha("d"),
+                evidence=no_specialist_evidence(),
             ),
             condition(
                 "legacy-raw",
@@ -96,8 +121,7 @@ def parity_plan() -> dict:
                 view_hash=_sha("e"),
                 prompt_id="legacy",
                 prompt_hash=_sha("c"),
-                evidence_id="no-specialist-evidence-v1",
-                evidence_hash=_sha("d"),
+                evidence=no_specialist_evidence(),
             ),
             condition(
                 "context-raw-no-evidence",
@@ -105,8 +129,7 @@ def parity_plan() -> dict:
                 view_hash=_sha("e"),
                 prompt_id="context",
                 prompt_hash=_sha("f"),
-                evidence_id="no-specialist-evidence-v1",
-                evidence_hash=_sha("d"),
+                evidence=no_specialist_evidence(),
             ),
             condition(
                 "context-raw-geometry",
@@ -114,8 +137,7 @@ def parity_plan() -> dict:
                 view_hash=_sha("e"),
                 prompt_id="context",
                 prompt_hash=_sha("f"),
-                evidence_id="geometry-v1",
-                evidence_hash=_sha("0"),
+                evidence=inline_geometry_evidence(),
             ),
         ],
         "contrasts": [
@@ -192,6 +214,80 @@ def test_comparison_parity_plan_requires_frozen_hashed_canonical_pilot() -> None
     invalid["pilot_manifest"]["items"][0]["source_sha256"] = "not-a-sha"
 
     with pytest.raises(ContractError, match="source_sha256"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    [
+        "../outside.webp",
+        "/tmp/outside.webp",
+        "nested/../../outside.webp",
+        "nested/./outside.webp",
+        r"nested\outside.webp",
+    ],
+)
+def test_comparison_parity_plan_rejects_escaped_canonical_relative_paths(
+    unsafe_path: str,
+) -> None:
+    invalid = parity_plan()
+    invalid["pilot_manifest"]["items"][0]["source_relative_path"] = unsafe_path
+
+    with pytest.raises(ContractError, match="source_relative_path"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_accepts_explicit_no_specialist_evidence() -> None:
+    plan = parity_plan()
+
+    validate_comparison_parity_plan(plan, program())
+
+
+def test_comparison_parity_plan_rejects_opaque_non_null_evidence_bundle() -> None:
+    invalid = parity_plan()
+    invalid["conditions"][3]["evidence"] = {
+        "kind": "specialist_bundle",
+        "id": "opaque-unproven-specialist-bundle",
+        "fingerprint": _sha("9"),
+    }
+
+    with pytest.raises(ContractError, match="evidence.specialists"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_requires_complete_inline_specialist_declarations() -> None:
+    invalid = parity_plan()
+    del invalid["conditions"][3]["evidence"]["specialists"][0]["abstention_policy"]
+
+    with pytest.raises(ContractError, match="specialist.abstention_policy"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_rejects_non_explicit_evidence_kind() -> None:
+    invalid = parity_plan()
+    del invalid["conditions"][3]["evidence"]["kind"]
+
+    with pytest.raises(ContractError, match="evidence.kind"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_rejects_declarations_on_no_evidence_baseline() -> None:
+    invalid = parity_plan()
+    invalid["conditions"][0]["evidence"]["specialists"] = [
+        copy.deepcopy(inline_geometry_evidence()["specialists"][0])
+    ]
+
+    with pytest.raises(ContractError, match="evidence.specialists"):
+        validate_comparison_parity_plan(invalid, program())
+
+
+def test_comparison_parity_plan_rejects_duplicate_inline_specialist_ids() -> None:
+    invalid = parity_plan()
+    invalid["conditions"][3]["evidence"]["specialists"].append(
+        copy.deepcopy(invalid["conditions"][3]["evidence"]["specialists"][0])
+    )
+
+    with pytest.raises(ContractError, match="specialist.id"):
         validate_comparison_parity_plan(invalid, program())
 
 
@@ -287,3 +383,15 @@ def test_comparison_template_is_explicitly_non_validating_until_filled() -> None
 
     assert template["kind"] == "comparison-parity-plan"
     assert template["template_status"] == "fill_before_validation"
+    assert "without-dotdot" in template["pilot_manifest"]["items"][0]["source_relative_path"]
+    evidence = template["conditions"][0]["evidence"]
+    assert evidence["kind"] == "specialist_bundle"
+    assert {
+        "id",
+        "scope",
+        "inputs",
+        "output_semantics",
+        "provenance",
+        "abstention_policy",
+        "qualification_gate",
+    }.issubset(evidence["specialists"][0])

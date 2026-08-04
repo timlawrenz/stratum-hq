@@ -19,6 +19,22 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING` — harness implementation passed local verification and must undergo draft-PR review. No GPU work or corpus mutation is authorized by this entry.
 
+## Comparison-plan provenance hold — `[ACTIVE HOLD / PENDING]`
+
+**Date:** 2026-08-04
+
+**Blocked arm:** #4 — baseline and comparison parity.
+**Hold issue:** #9.
+**Affected draft:** PR #8 (`feat(research): validate controlled comparison plans`).
+
+**Trigger:** An adversarial synthetic audit found that the initial comparison-plan validator accepted absolute and parent-traversal `source_relative_path` values and accepted a non-null evidence bundle containing only an ID and fingerprint. That made a nominally frozen canonical pilot and provenance-bearing evidence condition unauditable before inference.
+
+**Human decision:** Tim approved **inline specialist declarations** for non-null evidence bundles. A real comparison plan must carry the complete open-world declaration for each specialist: stable ID, scope, inputs/view policy, output semantics, provenance, abstention policy, and qualification gate. The explicit no-specialist baseline remains `kind: "none"` and must omit declarations.
+
+**Required remediation gate:** A remediation must reject absolute, parent-traversal, redundant-segment, and backslash pilot paths; reject opaque, incomplete, duplicate, or non-explicit non-null bundles; accept a valid inline bundle and explicit no-evidence baseline; and pass independent review plus program/tree validation.
+
+**Verdict:** `PENDING / HOLD` — no empirical comparison, image inference, GPU action, model installation, corpus mutation, or backfill occurred. The hold remains open until the reviewed remediation is accepted and revalidated.
+
 ## Arm 0 — Geometry-grounded captioning prototype — `[ACTIVE — PENDING]`
 
 **Branch / PR:** `exp/geometry-grounded-captioning`, draft PR #1.
