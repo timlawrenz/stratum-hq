@@ -10,7 +10,7 @@
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
     "comparison_plan_fingerprint": "fef8c779cf016cba104cbb30284b3439bf4971395d698abb50cfb3572c67f5d2",
     "comparison_plan_relative_path": "research/stage-b-plans/first500-parity-v1.json",
-    "comparison_plan_sha256": "1ad389035e7688b217acb568a7fdf712a07f3d77d1204db7afd893616e90be7f",
+    "comparison_plan_sha256": "2f8583d9bf77135207842a4d934f8d378f00d8a443e15c240705ff5eeda3d793",
     "expected_record_count": 96,
     "generation": {
       "context_window": 4096,
