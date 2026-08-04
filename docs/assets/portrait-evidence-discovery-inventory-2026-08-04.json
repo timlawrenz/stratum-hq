@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "artifact": "portrait-evidence-discovery-inventory",
+  "captured_date": "2026-08-04",
+  "provenance": {
+    "workspace_commit": "de3a2918223c8b313f5d4ceecb4a22ea61461cdf",
+    "prototype_commit": "dd9807794f893f89e04758cc9b76170de3d0b36d",
+    "method": [
+      "One flat os.scandir listing of the canonical source root.",
+      "One immediate os.scandir listing of the derived root; no recursive derived-tree scan.",
+      "Seven lexicographically evenly spaced source-file spot checks for source metadata and derived-leaf artifact presence.",
+      "One observed prototype leaf inspected for artifact schema, array shape/dtype, and text length only.",
+      "No image model invocation, semantic image inference, source/derived-tree write, corpus backfill, or hash/full-completion scan."
+    ],
+    "sampling_limit": "Spot checks establish topology and concrete parity risks only. They are not a modality-completeness estimate."
+  },
+  "canonical_source": {
+    "path": "/mnt/nas-ai-models/training-data/crawlr/approved",
+    "file_count": 11825,
+    "extensions": {
+      ".jpg": 10857,
+      ".png": 445,
+      ".webp": 523
+    },
+    "subject_invariant": "exactly_one_curated_woman",
+    "write_allowed": false
+  },
+  "derived_tree": {
+    "path": "/mnt/nas-ai-models/training-data/crawlr/stratum",
+    "immediate_entry_count": 4901,
+    "bounded_sample_source_files": 7,
+    "bounded_sample_resolved_derived_leaves": 3,
+    "interpretation": "Partial, heterogeneous derived tree; no completion percentage is inferred from this inventory.",
+    "write_allowed": false
+  },
+  "observed_prototype_leaf": {
+    "image_id": "001qdamsc03hoqrxer8juxsk9im2",
+    "source": {
+      "filename": "001qdamsc03hoqrxer8juxsk9im2.webp",
+      "format": "WEBP",
+      "width": 1080,
+      "height": 1350
+    },
+    "legacy_view_artifact": {
+      "filename": "pixel.npy",
+      "shape": [3, 1216, 832],
+      "dtype": "float16"
+    },
+    "raw_aligned_v2_artifacts": {
+      "pose2.npy": {
+        "shape": [1, 308, 3],
+        "dtype": "float32"
+      },
+      "seg2.npy": {
+        "shape": [1350, 1080],
+        "dtype": "uint8"
+      },
+      "pointmap.npy": {
+        "shape": [1350, 1080, 3],
+        "dtype": "float16"
+      }
+    },
+    "prototype_artifacts": {
+      "determinations.json": {
+        "top_level_keys": [
+          "body_parts_visible",
+          "camera",
+          "orientation",
+          "relations",
+          "schema_version",
+          "subject",
+          "subject_extent"
+        ]
+      },
+      "caption2.txt": {
+        "characters": 731,
+        "whitespace_tokens": 120
+      },
+      "t52_hidden.npy": {
+        "shape": [512, 1024],
+        "dtype": "float16"
+      },
+      "t52_mask.npy": {
+        "shape": [512],
+        "dtype": "uint8"
+      }
+    },
+    "compact_context_artifacts_present": {
+      "context4k.json": false,
+      "context4k.md": false,
+      "compression.json": false
+    },
+    "interpretation": "The raw-versus-bucketed view difference is a concrete comparison-parity axis. The observed prototype t52 output remains a legacy 512-token artifact and is not evidence of a 4K context representation."
+  }
+}

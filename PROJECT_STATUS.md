@@ -1,6 +1,6 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-08-04
 **Phase / status:** HARNESS READY FOR DRAFT-PR REVIEW — draft-PR-only, GPU supervisor observer-only
 
 ## Current state
@@ -12,7 +12,7 @@ The program studies open-world specialist evidence and contextual aggregation. I
 The live GitHub tree is strict and non-FIFO:
 
 - #2 is the open program root;
-- #3, portrait-evidence discovery, is the sole `research:active` arm and records its full-tree survey/selection rationale;
+- #3, portrait-evidence discovery, is the sole `research:active` arm and records its full-tree survey/selection rationale; its draft evidence map is `docs/PORTRAIT_EVIDENCE_DISCOVERY_MAP.md` on `docs/portrait-evidence-discovery-map-20260804`, still `PENDING` review;
 - #4 is the pending baseline/comparison-parity methodology arm;
 - #5 records the preserved Arm 0 prototype.
 
@@ -29,7 +29,7 @@ The observer emits `[SILENT]` without an approved manifest and can only emit a h
 
 ## Immediate next action
 
-Active arm #3 should survey the research tree and produce the portrait-evidence discovery map or a documented hold. It may use only the contract-authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
+Review the draft portrait-evidence map from active arm #3, including its bounded raw-versus-bucketed view evidence and open-world qualification gates. Only after review should #4 freeze a source-hashed pilot, matched input views, claim-support rubric, null/evaluator checks, and adversarial-review plan. This remains documentation/test/issue work only: no model install, GPU action, canonical-corpus write, or backfill is authorized.
 
 ## Headline result so far
 
