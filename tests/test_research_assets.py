@@ -371,8 +371,8 @@ def test_resumption_documents_preserve_the_sole_active_arm_and_two_stage_boundar
     research_readme = (ROOT / "research" / "README.md").read_text()
 
     assert "#4 is the sole `research:active`" in status
-    assert "The `stratum-ffhq` strategist is paused" in status
-    assert "strategist and observer records remain enabled" not in status
+    assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
+    assert "The `stratum-ffhq` strategist is paused" not in status
     assert "[ACTIVE / METRIC-RISK / PRE-COMPUTE] #4" in tree
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[PROPOSAL — PENDING]`" in ledger
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[ACTIVE — PENDING]`" not in ledger
@@ -528,3 +528,31 @@ def test_stratum_context_bundle_template_matches_the_project_contract() -> None:
     program = json.loads((ROOT / "research" / "program.json").read_text())
     bundle = json.loads((ROOT / "research" / "templates" / "context4k-bundle.json").read_text())
     validate_compression_bundle(bundle, program)
+
+
+def test_first_500_core_coverage_design_is_precompute_and_not_a_stage_a_substitute() -> None:
+    report_path = ROOT / "research" / "coverage" / "first-500-core-coverage-v1.json"
+    design_path = ROOT / "docs" / "FIRST_500_CORE_COHORT_PILOT_DESIGN.md"
+    report = json.loads(report_path.read_text())
+    design = design_path.read_text()
+
+    assert report["kind"] == "core-artifact-coverage-audit"
+    assert report["status"] == "PRE_COMPUTE_READ_ONLY"
+    assert report["source_content_read_count"] == 0
+    cohort = report["cohort"]
+    assert cohort["eligible_source_count"] == 11825
+    assert cohort["membership_sha256"] == "4e9f8ca775a6e62e308afcccb1e36cce2a5d0bf1f5579631c4a76af0bc80f57c"
+    assert cohort["requested_limit"] == 500
+    assert cohort["selected_count"] == 500
+    assert cohort["selection_rule"] == "first limit eligible flat source filenames in bytewise POSIX relative-path order"
+    assert len(cohort["source_relative_paths"]) == 500
+    assert report["summary"]["core_complete_count"] == 500
+    assert report["summary"]["later_chain_complete_count"] == 10
+    assert report["summary"]["legacy_chain_complete_count"] == 500
+    assert report["detail_provenance"]["item_details_included"] is False
+    assert "items" not in report
+
+    assert "It is **not** a replacement, interpretation, or extension of the immutable Stage-A 24-item ordinal-slice manifest" in design
+    assert "The Stage-A manifest's six global ordinal slices are not the first-500 cohort." in design
+    assert "**Only 10 / 500**" in design
+    assert "No Stage-B action is authorized." in design

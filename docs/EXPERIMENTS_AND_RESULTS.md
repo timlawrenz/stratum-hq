@@ -1,48 +1,86 @@
 # Experiments & Results — Stratum Contextual Specialist Research
 
-This ledger records empirical findings and negative results permanently. A green implementation or passing unit test is not an empirical PASS.
+This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
-## Harness initialization — `[PENDING / OWNER-APPROVED DRAFT]`
+## Stage-A caption/context parity preparation — `[COMPLETED / PENDING / NON-EXECUTING]`
 
-**Date:** 2026-08-03 to 2026-08-04
+**Date:** 2026-08-04
+**Arm:** #4 — baseline and comparison parity
+**Proposal baseline:** draft PR #13 / commit `b3667ce077ff13aa86bae545a10bfa03d22edea9`
 
-**Goal:** Establish a reusable, project-neutral autonomous-research control plane while grounding it in the Stratum `crawlr/approved` program.
+**Goal:** Materialize only the bounded, source-hashed pre-compute provenance required to judge whether a later controlled comparison could be specified. Stage A was not an inference or model-readiness exercise.
+
+**Immutable records:**
+
+```text
+/mnt/nas-ai-models/research/stratum/stage-a-caption-context-parity/
+  pilot-manifest.json
+  comparison-parity-plan.json
+  preparation-log.md
+  review-record.md
+```
 
 **Evidence:**
 
-- Canonical source inventory: 11,825 flat source images at `/mnt/nas-ai-models/training-data/crawlr/approved`.
-- The current derived tree is partial: 4,901 metadata leaves, 4,845 legacy captions, 2,113 `seg2`, 11 `pose2`, 11 `pointmap`, and 10 `caption2`/`determinations`/`t52` examples at the time of inventory.
-- The existing `t5_*` and `t52_*` encoders are fixed to 512 tokens, so a target ~4K compact context requires separate artifacts and a new downstream-consumption research arm.
-- Existing NAS GPU scheduler: 4090 local route; Strix remote route `ssh:max395` with 10GB evergreen reservation. Its `poll` operation performs the atomic claim; the harness supervisor is observer-only.
-- The repository owner directly reviewed and accepted the unmerged draft stack: PR #6 (harness), #7 (evidence map), #8 (comparison-plan guard), #10 (inline declarations), and #11 (strict envelopes and content-bound fingerprints).
+- The immutable manifest records 24 selected items from six global ordinal slices, source hashes/dimensions, and selected-only availability/readability probes.
+- The immutable comparison plan names the three intended one-axis contrasts (input view, prompt, evidence), but retains `stage-b-local-aggregator-pending-v1` as an intentional non-executing placeholder.
+- Stage A is completed and independently audited as pre-compute evidence. The historic record set remains byte-for-byte untouched; it is not silently reissued as a first-500 or coverage-aware cohort.
+- No model invocation/download, GPU or scheduler action, corpus mutation, derived-tree mutation, backfill, comparison, merge, or direct `main` push occurred.
 
-**Accepted top:** draft PR #11, commit `a7cecb89f55eef9375137e7e70dafccac7427f41`.
+**Verdict:** `PENDING` — structural provenance only. Stage B still needs fixed local-model/generation provenance, `caption_max_tokens` forwarding repair, metric self-audit, adversarial review, and separately explicit execution authority.
 
-**Verdict:** `PENDING` — the governance stack is accepted as a draft working baseline. It does not authorize GPU work, model invocation, corpus mutation, or an empirical conclusion.
+## First-500 core-artifact coverage audit — `[PENDING / PRE-COMPUTE]`
+
+**Date:** 2026-08-04
+**Arm:** #4 — baseline and comparison parity
+**Artifact:** [`research/coverage/first-500-core-coverage-v1.json`](../research/coverage/first-500-core-coverage-v1.json)
+**Design:** [`FIRST_500_CORE_COHORT_PILOT_DESIGN.md`](FIRST_500_CORE_COHORT_PILOT_DESIGN.md)
+
+**Goal:** Test whether existing artifacts can support the declared one-axis comparison design without a backfill or new inference.
+
+**Read-only evidence:**
+
+- The first 500 eligible bytewise-ordered canonical filenames have readable `pose2.npy`, `seg2.npy`, `normal2.npy`, `pointmap.npy`, and `matting.npy`: **500 / 500** for every core artifact.
+- Legacy caption/T5 artifacts are readable for **500 / 500**.
+- Only **10 / 500** have every later-chain record: `determinations.json`, `caption2.txt`, `t52_hidden.npy`, and `t52_mask.npy`.
+- The core-only cohort has 437 portrait, 23 squareish, and 40 landscape framing-proxy rows. 478 rows have one pose detection; 22 detector disagreements are quality/anomaly abstention rows, never caption content.
+- The audit read no source-image bytes, decoded no image, invoked no model, and made no corpus write. It records source-membership and detail digests, not an empirical sample claim.
+
+**Controlled-comparison assessment:**
+
+- Input-view-only and prompt-only contrasts are designable on the 478 one-pose/core-complete rows, but neither is executable without the separately authorized fixed local aggregator and review protocol.
+- The evidence-only contrast cannot use only the current materialized determinations chain for a coverage-aware 24-item design: it has 10 rows and no squareish coverage.
+- A future evidence-only contrast may use an explicitly authorized deterministic computation from existing core `pose2`/`seg2` inputs, but that is new computation and must not mutate `crawlr/stratum`.
+- Existing `t52_*` remains 512-token legacy output and cannot substitute for `context4k`.
+
+**Verdict:** `PENDING` — the audit resolves the core-availability question and makes the exact later-chain gap explicit. It does not run, score, PASS, or FAIL a model.
+
+## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
+
+**Date:** 2026-08-03 to 2026-08-04
+
+**Goal:** Establish a reusable, project-neutral autonomous-research control plane grounded in the Stratum `crawlr/approved` program.
+
+**Evidence:**
+
+- Canonical source discovery found 11,825 flat eligible source images.
+- The program keeps a 100K dossier target and a 4K compact-context target separate from legacy 512-token T5/T52 artifacts.
+- Open-world specialist declarations require scope, inputs, output semantics, provenance, abstention, known failure modes, and qualification gates.
+- The current GPU supervisor is observer-only; no scheduler lifecycle action is authorized.
+
+**Verdict:** `PENDING` — the governance stack is a draft working baseline, not empirical authority.
 
 ## Comparison-plan provenance hold — `[CONCLUDED — HARNESS GATE RESOLVED]`
 
 **Date:** 2026-08-04
+**Blocked arm:** #4
+**Hold issue:** #9 (closed)
 
-**Blocked arm:** #4 — baseline and comparison parity.
-**Hold issue:** #9 (closed after owner acceptance and fresh validation).
-**Affected drafts:** PR #8, followed by PR #10 and PR #11.
+**Trigger:** An adversarial synthetic audit showed that an earlier comparison-plan validator accepted escaping source paths and opaque evidence bundles.
 
-**Trigger:** An adversarial synthetic audit found that the initial comparison-plan validator accepted absolute and parent-traversal `source_relative_path` values and accepted a non-null evidence bundle containing only an ID and fingerprint. That made a nominally frozen canonical pilot and provenance-bearing evidence condition unauditable before inference.
+**Remediation evidence:** Canonical relative paths, strict evidence envelopes, complete inline specialist declarations, content-bound fingerprints, canonical identities, synthetic regression coverage, and fresh live-tree validation were added and reviewed.
 
-**Human decision:** Tim approved **inline specialist declarations** for non-null evidence bundles. A real comparison plan must carry the complete open-world declaration for each specialist: stable ID, scope, inputs/view policy, output semantics, provenance, abstention policy, known failure modes, and qualification gate. The explicit no-specialist baseline remains the closed `kind: "none"` envelope with only its kind, ID, and fingerprint.
-
-**Remediation evidence:**
-
-- Strict canonical relative pilot paths reject absolute paths, traversal, redundant segments, backslashes, and whitespace aliases.
-- `none`, `specialist_bundle`, and inline specialist declarations are closed envelopes; hidden payload cannot masquerade as baseline evidence.
-- Evidence fingerprints bind canonical UTF-8 JSON for the complete evidence object excluding its asserted fingerprint.
-- Program-required `known_failure_modes` and canonical comparison/audit identities are enforced.
-- The exact PR #11 staged index received independent review with no Critical/High/Medium/Low publish blockers.
-- PR #11 hosted `pytest` and GitGuardian checks passed; local and clean-Python-3.11 full suites each passed 229 tests.
-- At accepted commit `a7cecb89f55eef9375137e7e70dafccac7427f41`, program validation and a fresh live issue-tree validation passed before #9 closed.
-
-**Verdict:** `CONCLUDED — HARNESS GATE RESOLVED`. No empirical comparison, image inference, GPU action, model installation, corpus mutation, or backfill occurred. The closure only permits arm #4 to prepare a separate Stage-A preparation-authorization proposal; a fresh Stage-B approval is required after the exact pilot manifest and comparison plan are frozen and validated.
+**Verdict:** `CONCLUDED — HARNESS GATE RESOLVED`. This is a governance result only; no empirical comparison, image inference, GPU action, corpus mutation, or backfill occurred.
 
 ## Arm 0 — Geometry-grounded captioning prototype — `[PROPOSAL — PENDING]`
 
@@ -56,8 +94,8 @@ This ledger records empirical findings and negative results permanently. A green
 - Legacy `caption.txt` and `t5_*` remain untouched.
 - Synthetic fixtures test geometry, determinations schema, relations, and pass isolation.
 
-**Pre-registered gate:** Not yet valid. A controlled evaluation must first hold constant the source-image preprocessing, prompt structure, model/generation settings, item set, and review rubric.
+**Pre-registered gate:** A controlled evaluation must hold source-image preprocessing, prompt structure, model/generation settings, item set, and review rubric fixed.
 
-**Known confound:** The legacy caption path uses a bucketed/cropped image while current `caption2` opens the raw source image. Any apparent output difference currently combines preprocessing, prompt, and evidence changes. `caption_max_tokens` forwarding must also be fixed and tested before a controlled prototype comparison.
+**Known confounds / prerequisites:** Legacy captions use a bucketed/cropped image while current `caption2` opens the raw source. Existing caption output therefore cannot be interpreted as evidence-only. `caption_max_tokens` forwarding must be repaired and tested before a controlled prototype comparison. `t52` remains a legacy-compatible 512-token artifact rather than `context4k`.
 
 **Verdict:** `PENDING` — preserve as a prototype; do not infer quality or downstream usefulness.
