@@ -7,6 +7,7 @@ dataset. Those actions remain separately reviewed and auditable.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -73,6 +74,21 @@ _REQUIRED_TREE_FLAGS = (
     "require_selection_rationale",
 )
 _STRATUM_PROFILE = "stratum-single-woman-v1"
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_COMPARISON_PLAN_KIND = "comparison-parity-plan"
+_COMPARISON_AXES = frozenset({"input_view", "prompt", "evidence"})
+_COMPARISON_REVIEW_SEQUENCE = (
+    "selected_input_view",
+    "provenance_evidence",
+    "candidate_output_or_context",
+    "decision_rubric",
+)
+_COMPARISON_REVIEW_FIELDS = frozenset(
+    {"supported_claims", "unsupported_claims", "omissions", "contradictions", "abstentions"}
+)
+_COMPARISON_ADVERSARIAL_CHECKS = frozenset(
+    {"metric_definition_stable", "fresh_process_or_second_review", "edge_case_inspection"}
+)
 
 
 def _require_mapping(value: Any, field: str) -> Mapping[str, Any]:
@@ -93,6 +109,48 @@ def _require_meaningful_string(value: Any, field: str) -> str:
     if normalized in _PLACEHOLDERS or result.startswith("{{") or result.startswith("<"):
         raise ContractError(f"{field} must not be a placeholder")
     return result
+
+
+def _require_canonical_nonempty_string(value: Any, field: str) -> str:
+    """Reject serialization aliases such as leading/trailing whitespace."""
+    result = _require_nonempty_string(value, field)
+    if value != result:
+        raise ContractError(f"{field} must not have leading or trailing whitespace")
+    return result
+
+
+def _require_canonical_meaningful_string(value: Any, field: str) -> str:
+    result = _require_canonical_nonempty_string(value, field)
+    normalized = result.upper()
+    if normalized in _PLACEHOLDERS or result.startswith("{{") or result.startswith("<"):
+        raise ContractError(f"{field} must not be a placeholder")
+    return result
+
+
+def _reject_undeclared_fields(value: Mapping[str, Any], allowed: frozenset[str], field: str) -> None:
+    unexpected = set(value) - allowed
+    if unexpected:
+        rendered = ", ".join(sorted(str(name) for name in unexpected))
+        raise ContractError(f"{field} must not contain undeclared fields: {rendered}")
+
+
+def _canonical_evidence_fingerprint(evidence: Mapping[str, Any], field: str) -> str:
+    """Hash exact inline evidence identity/content, excluding its asserted digest."""
+    payload = {key: value for key, value in evidence.items() if key != "fingerprint"}
+    try:
+        canonical = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ContractError(f"{field} must have canonical JSON-serializable content") from exc
+    try:
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    except UnicodeEncodeError as exc:
+        raise ContractError(f"{field} must have canonical JSON-serializable content") from exc
 
 
 def _require_bool(value: Any, field: str) -> bool:
@@ -121,8 +179,15 @@ def _require_positive_int(value: Any, field: str) -> int:
     return value
 
 
+def _require_sha256(value: Any, field: str) -> str:
+    result = _require_canonical_meaningful_string(value, field)
+    if _SHA256.fullmatch(result) is None:
+        raise ContractError(f"{field} must be a 64-character lowercase SHA-256 hex digest")
+    return result
+
+
 def _require_absolute_path(value: Any, field: str) -> str:
-    raw = _require_nonempty_string(value, field)
+    raw = _require_canonical_meaningful_string(value, field)
     path = PurePosixPath(raw)
     if not path.is_absolute() or ".." in path.parts:
         raise ContractError(f"{field} must be an absolute path without '..'")
@@ -134,6 +199,77 @@ def _require_absolute_path(value: Any, field: str) -> str:
 
 def _is_at_or_below(path: str, root: str) -> bool:
     return path == root or path.startswith(f"{root}/")
+
+
+def _require_safe_relative_path(value: Any, field: str) -> str:
+    """Require a normalized POSIX path that cannot escape a declared root."""
+    raw = _require_canonical_meaningful_string(value, field)
+    if "\x00" in raw or "\\" in raw:
+        raise ContractError(f"{field} must be a normalized relative POSIX path")
+    path = PurePosixPath(raw)
+    normalized = str(path)
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or normalized in {"", "."}
+        or raw != normalized
+    ):
+        raise ContractError(
+            f"{field} must be a normalized relative POSIX path without '..'"
+        )
+    return normalized
+
+
+def _validate_inline_specialist_evidence(
+    value: Any,
+    field: str,
+    required_declaration_fields: list[str],
+) -> dict[str, Any]:
+    """Validate an explicit no-evidence baseline or inline specialist bundle."""
+    evidence = _require_mapping(value, field)
+    kind = _require_canonical_nonempty_string(evidence.get("kind"), f"{field}.kind")
+    _require_canonical_meaningful_string(evidence.get("id"), f"{field}.id")
+    _require_sha256(evidence.get("fingerprint"), f"{field}.fingerprint")
+
+    if kind == "none":
+        _reject_undeclared_fields(evidence, frozenset({"kind", "id", "fingerprint"}), field)
+    elif kind != "specialist_bundle":
+        raise ContractError(
+            f"{field}.kind must be 'none' or 'specialist_bundle'"
+        )
+    else:
+        _reject_undeclared_fields(
+            evidence,
+            frozenset({"kind", "id", "fingerprint", "specialists"}),
+            field,
+        )
+        specialists = evidence.get("specialists")
+        if not isinstance(specialists, list) or not specialists:
+            raise ContractError(
+                f"{field}.specialists must be a non-empty list for specialist_bundle"
+            )
+        specialist_ids: set[str] = set()
+        for raw_specialist in specialists:
+            specialist = _require_mapping(raw_specialist, f"{field}.specialist")
+            _reject_undeclared_fields(
+                specialist,
+                frozenset({"id", *required_declaration_fields}),
+                f"{field}.specialist",
+            )
+            specialist_id = _require_canonical_meaningful_string(
+                specialist.get("id"), f"{field}.specialist.id"
+            )
+            if specialist_id in specialist_ids:
+                raise ContractError(f"{field}.specialist.id must not contain duplicates")
+            specialist_ids.add(specialist_id)
+            for declaration_field in required_declaration_fields:
+                _require_meaningful_string(
+                    specialist.get(declaration_field),
+                    f"{field}.specialist.{declaration_field}",
+                )
+    if _canonical_evidence_fingerprint(evidence, field) != evidence["fingerprint"]:
+        raise ContractError(f"{field}.fingerprint must match canonical evidence content")
+    return dict(evidence)
 
 
 def _parse_duration_hours(value: Any, field: str) -> float:
@@ -305,7 +441,7 @@ def validate_program(program: Mapping[str, Any]) -> None:
     program = _require_mapping(program, "program")
     if program.get("schema_version") != 1:
         raise ContractError("program schema_version must be 1")
-    _require_nonempty_string(program.get("program_id"), "program_id")
+    _require_canonical_meaningful_string(program.get("program_id"), "program_id")
 
     source = _require_mapping(program.get("canonical_source"), "canonical_source")
     _require_absolute_path(source.get("path"), "canonical_source.path")
@@ -390,6 +526,7 @@ def validate_program(program: Mapping[str, Any]) -> None:
         "output_semantics",
         "provenance",
         "abstention_policy",
+        "known_failure_modes",
         "qualification_gate",
     }
     if not required_declarations.issubset(set(declarations)):
@@ -444,6 +581,234 @@ def validate_program(program: Mapping[str, Any]) -> None:
         if profile != _STRATUM_PROFILE:
             raise ContractError(f"unsupported policy_profile: {profile}")
         _validate_stratum_policy_profile(program)
+
+
+def validate_comparison_parity_plan(plan: Mapping[str, Any], program: Mapping[str, Any]) -> None:
+    """Require a frozen, one-axis-at-a-time comparison plan before inference."""
+    validate_program(program)
+    plan = _require_mapping(plan, "comparison parity plan")
+    if plan.get("schema_version") != 1:
+        raise ContractError("comparison parity plan schema_version must be 1")
+    if plan.get("kind") != _COMPARISON_PLAN_KIND:
+        raise ContractError(f"comparison parity plan kind must be {_COMPARISON_PLAN_KIND!r}")
+    if _require_canonical_meaningful_string(
+        plan.get("program_id"), "comparison parity plan program_id"
+    ) != program["program_id"]:
+        raise ContractError("comparison parity plan program_id must match program.program_id")
+    if plan.get("status") != "PENDING":
+        raise ContractError("comparison parity plan status must remain PENDING before comparative inference")
+    _metadata_issue_reference(plan.get("parent_issue"), "comparison parity plan parent_issue")
+    for field in ("hypothesis", "falsified_if"):
+        _require_meaningful_string(plan.get(field), f"comparison parity plan {field}")
+    _require_canonical_meaningful_string(
+        plan.get("metric_version"), "comparison parity plan metric_version"
+    )
+
+    specialists = _require_mapping(program["specialists"], "specialists")
+    required_declaration_fields = _require_string_list(
+        specialists.get("required_declaration_fields"),
+        "comparison parity plan specialist declaration fields",
+    )
+
+    pilot = _require_mapping(plan.get("pilot_manifest"), "comparison parity plan pilot_manifest")
+    pilot_id = _require_canonical_meaningful_string(
+        pilot.get("id"), "comparison parity plan pilot_manifest.id"
+    )
+    canonical_source = _require_mapping(program["canonical_source"], "canonical_source")
+    expected_source_root = _require_absolute_path(canonical_source["path"], "canonical_source.path")
+    source_root = _require_absolute_path(
+        pilot.get("source_root"), "comparison parity plan pilot_manifest.source_root"
+    )
+    if source_root != expected_source_root:
+        raise ContractError("comparison parity plan pilot_manifest.source_root must match canonical_source.path")
+    if _require_bool(pilot.get("frozen"), "comparison parity plan pilot_manifest.frozen") is not True:
+        raise ContractError("comparison parity plan pilot_manifest.frozen must be true")
+    for field in ("selection_rationale", "coverage_notes"):
+        _require_meaningful_string(pilot.get(field), f"comparison parity plan pilot_manifest.{field}")
+
+    raw_items = pilot.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ContractError("comparison parity plan pilot_manifest.items must be a non-empty list")
+    item_ids: set[str] = set()
+    for raw_item in raw_items:
+        item = _require_mapping(raw_item, "comparison parity plan pilot item")
+        image_id = _require_canonical_meaningful_string(
+            item.get("image_id"), "comparison parity plan pilot item.image_id"
+        )
+        if image_id in item_ids:
+            raise ContractError("comparison parity plan pilot item.image_id must not contain duplicates")
+        item_ids.add(image_id)
+        _require_safe_relative_path(
+            item.get("source_relative_path"), "comparison parity plan pilot item.source_relative_path"
+        )
+        _require_sha256(item.get("source_sha256"), "comparison parity plan pilot item.source_sha256")
+        availability = _require_mapping(
+            item.get("artifact_availability"), "comparison parity plan pilot item.artifact_availability"
+        )
+        if not availability or not all(isinstance(value, bool) for value in availability.values()):
+            raise ContractError(
+                "comparison parity plan pilot item.artifact_availability must be a non-empty boolean mapping"
+            )
+
+    raw_conditions = plan.get("conditions")
+    if not isinstance(raw_conditions, list) or not raw_conditions:
+        raise ContractError("comparison parity plan conditions must be a non-empty list")
+    condition_axes: dict[str, dict[str, dict[str, Any]]] = {}
+    fixed_aggregator: dict[str, Any] | None = None
+    for raw_condition in raw_conditions:
+        condition = _require_mapping(raw_condition, "comparison parity plan condition")
+        condition_id = _require_canonical_meaningful_string(
+            condition.get("id"), "comparison parity plan condition.id"
+        )
+        if condition_id in condition_axes:
+            raise ContractError("comparison parity plan condition.id must not contain duplicates")
+        if _require_canonical_meaningful_string(
+            condition.get("pilot_manifest_id"), "comparison parity plan condition.pilot_manifest_id"
+        ) != pilot_id:
+            raise ContractError("comparison parity plan condition.pilot_manifest_id must match pilot manifest")
+
+        components: dict[str, dict[str, Any]] = {}
+        for axis in _COMPARISON_AXES - {"evidence"}:
+            component = _require_mapping(
+                condition.get(axis), f"comparison parity plan condition.{axis}"
+            )
+            _require_canonical_meaningful_string(
+                component.get("id"), f"comparison parity plan condition.{axis}.id"
+            )
+            _require_sha256(component.get("fingerprint"), f"comparison parity plan condition.{axis}.fingerprint")
+            components[axis] = dict(component)
+        components["evidence"] = _validate_inline_specialist_evidence(
+            condition.get("evidence"),
+            "comparison parity plan condition.evidence",
+            required_declaration_fields,
+        )
+        condition_axes[condition_id] = components
+
+        aggregator = _require_mapping(condition.get("aggregator"), "comparison parity plan condition.aggregator")
+        _require_canonical_meaningful_string(
+            aggregator.get("model_id"), "comparison parity plan condition.aggregator.model_id"
+        )
+        _require_meaningful_string(aggregator.get("provenance"), "comparison parity plan condition.aggregator.provenance")
+        _require_sha256(
+            aggregator.get("generation_fingerprint"),
+            "comparison parity plan condition.aggregator.generation_fingerprint",
+        )
+        if _require_bool(aggregator.get("local_only"), "comparison parity plan condition.aggregator.local_only") is not True:
+            raise ContractError("comparison parity plan condition.aggregator.local_only must be true")
+        aggregator_record = dict(aggregator)
+        if fixed_aggregator is None:
+            fixed_aggregator = aggregator_record
+        elif aggregator_record != fixed_aggregator:
+            raise ContractError(
+                "comparison parity plan conditions must share a fixed local aggregator and generation settings"
+            )
+
+    raw_contrasts = plan.get("contrasts")
+    if not isinstance(raw_contrasts, list) or not raw_contrasts:
+        raise ContractError("comparison parity plan contrasts must be a non-empty list")
+    contrast_ids: set[str] = set()
+    covered_axes: set[str] = set()
+    for raw_contrast in raw_contrasts:
+        contrast = _require_mapping(raw_contrast, "comparison parity plan contrast")
+        contrast_id = _require_canonical_meaningful_string(
+            contrast.get("id"), "comparison parity plan contrast.id"
+        )
+        if contrast_id in contrast_ids:
+            raise ContractError("comparison parity plan contrast.id must not contain duplicates")
+        contrast_ids.add(contrast_id)
+        baseline_id = _require_canonical_meaningful_string(
+            contrast.get("baseline_condition"), "comparison parity plan contrast.baseline_condition"
+        )
+        variant_id = _require_canonical_meaningful_string(
+            contrast.get("variant_condition"), "comparison parity plan contrast.variant_condition"
+        )
+        if baseline_id == variant_id or baseline_id not in condition_axes or variant_id not in condition_axes:
+            raise ContractError("comparison parity plan contrast must reference two distinct declared conditions")
+        changed_axes = _require_string_list(
+            contrast.get("changed_axes"), "comparison parity plan contrast.changed_axes"
+        )
+        if len(changed_axes) != 1:
+            raise ContractError("comparison parity plan contrast must change exactly one registered axis")
+        changed_axis = changed_axes[0]
+        if changed_axis not in _COMPARISON_AXES:
+            raise ContractError("comparison parity plan contrast.changed_axes contains an unsupported axis")
+        baseline = condition_axes[baseline_id]
+        variant = condition_axes[variant_id]
+        if baseline[changed_axis] == variant[changed_axis]:
+            raise ContractError("comparison parity plan contrast must differ on its declared changed axis")
+        for axis in _COMPARISON_AXES - {changed_axis}:
+            if baseline[axis] != variant[axis]:
+                raise ContractError(f"comparison parity plan contrast changes non-contrast axis {axis}")
+        covered_axes.add(changed_axis)
+    if covered_axes != _COMPARISON_AXES:
+        raise ContractError("comparison parity plan contrasts must cover input_view, prompt, and evidence")
+
+    review = _require_mapping(plan.get("review_protocol"), "comparison parity plan review_protocol")
+    if _require_bool(review.get("human_review_required"), "comparison parity plan review_protocol.human_review_required") is not True:
+        raise ContractError("comparison parity plan review_protocol.human_review_required must be true")
+    sequence = review.get("sequence")
+    if not isinstance(sequence, list) or tuple(sequence) != _COMPARISON_REVIEW_SEQUENCE:
+        raise ContractError("comparison parity plan review_protocol.sequence must preserve the required review order")
+    review_fields = set(
+        _require_string_list(review.get("fields"), "comparison parity plan review_protocol.fields")
+    )
+    if not _COMPARISON_REVIEW_FIELDS.issubset(review_fields):
+        raise ContractError("comparison parity plan review_protocol.fields omits a required claim-support field")
+    if review.get("detector_disagreement_handling") != "quality_anomaly_not_caption_content":
+        raise ContractError(
+            "comparison parity plan review_protocol.detector_disagreement_handling must preserve the corpus invariant"
+        )
+
+    audit = _require_mapping(plan.get("metric_self_audit"), "comparison parity plan metric_self_audit")
+    if _require_bool(
+        audit.get("before_comparative_inference"),
+        "comparison parity plan metric_self_audit.before_comparative_inference",
+    ) is not True:
+        raise ContractError("comparison parity plan metric_self_audit must occur before comparative inference")
+    known_case = _require_canonical_meaningful_string(
+        audit.get("known_case_item_id"), "comparison parity plan metric_self_audit.known_case_item_id"
+    )
+    if known_case not in item_ids:
+        raise ContractError("comparison parity plan metric_self_audit.known_case_item_id must reference a pilot item")
+    _require_canonical_meaningful_string(
+        audit.get("null_output_id"), "comparison parity plan metric_self_audit.null_output_id"
+    )
+    _require_canonical_meaningful_string(
+        audit.get("evaluator_version"), "comparison parity plan metric_self_audit.evaluator_version"
+    )
+
+    adversarial = _require_mapping(plan.get("adversarial_review"), "comparison parity plan adversarial_review")
+    if _require_bool(adversarial.get("planned"), "comparison parity plan adversarial_review.planned") is not True:
+        raise ContractError("comparison parity plan adversarial_review.planned must be true")
+    checks = set(
+        _require_string_list(adversarial.get("checks"), "comparison parity plan adversarial_review.checks")
+    )
+    if not _COMPARISON_ADVERSARIAL_CHECKS.issubset(checks):
+        raise ContractError("comparison parity plan adversarial_review.checks omits a required check")
+
+    boundary = _require_mapping(
+        plan.get("representation_boundary"), "comparison parity plan representation_boundary"
+    )
+    representation = _require_mapping(program["representation"], "representation")
+    expected_legacy_tokens = _require_positive_int(
+        representation["legacy_text_encoder_max_tokens"], "representation.legacy_text_encoder_max_tokens"
+    )
+    if _require_positive_int(
+        boundary.get("legacy_text_encoder_max_tokens"),
+        "comparison parity plan representation_boundary.legacy_text_encoder_max_tokens",
+    ) != expected_legacy_tokens:
+        raise ContractError(
+            "comparison parity plan representation_boundary.legacy_text_encoder_max_tokens must match the program"
+        )
+    if boundary.get("compact_context_routing") != "out_of_scope":
+        raise ContractError(
+            "comparison parity plan representation_boundary.compact_context_routing must be out_of_scope"
+        )
+    if _require_bool(
+        boundary.get("no_silent_legacy_routing"),
+        "comparison parity plan representation_boundary.no_silent_legacy_routing",
+    ) is not True:
+        raise ContractError("comparison parity plan representation boundary must forbid silent legacy routing")
 
 
 def validate_research_tree(snapshot: Mapping[str, Any], program: Mapping[str, Any]) -> None:

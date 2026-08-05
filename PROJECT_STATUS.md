@@ -1,40 +1,36 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-03
-**Phase / status:** HARNESS READY FOR DRAFT-PR REVIEW — draft-PR-only, GPU supervisor observer-only
+**Last updated:** 2026-08-05
+**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously.** Hold #18 is RELEASED. **#4 is the sole `research:active`** arm / `research:metric-risk` marker in the issue tree (baseline/comparison parity), empirically complete with an empirical verdict of **BETTER** (support ratio 32%→80%, sign-test p≈0.003; `PENDING_HUMAN_SPOT_CHECK` advisory, not a gate). Arm #32 (body-type) completed its full scheduler lifecycle run: **VERDICT: BETTER** (support ratio 32.2%→93.3%, sign-test p≈0.000244). **Arm #29 (clothing/apparel) completed its full scheduler lifecycle run: VERDICT: BETTER** (support ratio 41.9%→76.7%, sign-test p≈0.0173); the registry advanced clothing `active → validated`. Next selector pick: **hair (arm #30, EIG 0.6)**. Stage A stays bounded and non-executing at `research/proposals/stage-a-caption-context-parity-preparation.md`.
 
 ## Current state
 
-The canonical research corpus is `crawlr/approved` (11,825 source images); `crawlr/stratum` is a partial derived-artifact tree. An early geometry-grounded captioning prototype is preserved as draft PR #1 on `exp/geometry-grounded-captioning`.
+The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains a partial derived tree (never mutated by us). Stage-A records, the first-500 coverage audit, and the frozen first-500 coverage-balanced candidate manifest remain intact and noncanonical.
 
-The program studies open-world specialist evidence and contextual aggregation. Its target architecture expands an image into a provenance-bearing dossier (exactly 100K tokens in the Stratum policy profile) and compresses it into a first-class 4K context representation. The existing 512-token T5 artifacts are not assumed to be the long-context consumer.
-
-The live GitHub tree is strict and non-FIFO:
-
-- #2 is the open program root;
-- #3, portrait-evidence discovery, is the sole `research:active` arm and records its full-tree survey/selection rationale;
-- #4 is the pending baseline/comparison-parity methodology arm;
-- #5 records the preserved Arm 0 prototype.
-
-## Active automation
-
-Tim authorized activation of both `stratum-ffhq` records on 2026-08-04:
-
-- `1c25ada8ed0b` — strategist, `every 60m`, pinned to `openrouter` / `openai/gpt-5.6-terra`, restricted to `web`, `terminal`, `file`, and read-only skill access.
-- `ae13cfe18a81` — no-agent GPU-manifest observer, `every 5m`, running only `stratum_gpu_observer.sh`.
-
-The strategist runs from the clean isolated worktree `/home/tim/source/activity/stratum-hq-research-agent` on `research/autonomous-workspace`. Until draft PR #6 merges, downstream experiment/documentation PRs must target `feat/autonomous-research-harness`, not `main`, so the harness diff is not duplicated.
-
-The observer emits `[SILENT]` without an approved manifest and can only emit a hold; it cannot operate the scheduler or launch a workload. Starting either record does **not** authorize GPU request/claim/launch, model download, canonical-data mutation, backfill, merge, or direct `main` push; the research contract’s hold conditions remain in force.
+- Arm #4 empirical evidence: 96/96 captions + 96/96 independent gemma4 reviews + reviewer calibration. Evidence-only delta supported 47→156, unsupported 99→40, ratio 32%→80%, sign-test p≈0.003 → **BETTER**.
+- Arm #32 empirical evidence: frozen `stage-b-first500-bodytype-v1` plan (evidence condition `context-raw-body-type` = deterministic `compute_proportions` on pose2). Generation (job `stratum-stage-b-bodytype-v1`) + independent review (job `stratum-stage-b-adversarial-review-bodytype-v1`) both completed cleanly on the local 4090. Evidence-only delta supported 47→195, unsupported 99→14, ratio 32.2%→93.3%, sign-test p≈0.000244 → **BETTER**; registry `validated`.
+- Arm #29 empirical evidence: frozen `stage-b-first500-clothing-v1` plan (evidence condition `context-raw-clothing` = deterministic `compute_clothing` on seg2 + source pixels). Generation (job `stratum-stage-b-clothing-v1`) + independent review (job `stratum-stage-b-adversarial-review-clothing-v1`) both completed cleanly on the local 4090. Evidence-only delta supported 72→151, unsupported 100→46, ratio 41.9%→76.7%, sign-test p≈0.0173 → **BETTER**; registry `validated`.
+- The dimension registry (`research/dimensions/evidence-dimension-registry-v1.json`) now marks body-type + clothing validated; 6 proposals remain; sweep not exhausted. `autonomous-select` next picks hair (#30).
 
 ## Immediate next action
 
-Active arm #3 should survey the research tree and produce the portrait-evidence discovery map or a documented hold. It may use only the contract-authorized documentation, code-reading, artifact-inventory, issue-tree, test, branch, commit, and draft-PR work. No model install, GPU action, canonical-corpus write, or backfill is authorized.
+Run the next selector-chosen arm (hair #30) through the same frozen-cohort scheduler lifecycle once the determinism contract for hair measurements (seg2 Hair class region area/position + dominant color from source pixels) is wired into the Stage-B evidence-kinds path, then record its verdict and advance the registry. All runs are additive/noncanonical; no corpus mutation, no backfill, no legacy overwrite.
+
+## Live research tree
+
+- #2 is the sole open program root.
+- #3 is the preserved PENDING portrait-evidence map.
+- #4 is the active baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
+- #5 is the preserved geometry-grounded-captioning prototype.
+- #9 is closed (comparison-plan provenance gate resolved).
+- #18 is CLOSED/released (owner directive 2026-08-04, confirmed by draft PR #28).
+- #29–#37 are registered proposal arms; #32 and #29 validated (both BETTER); #30 hair is the next selector pick.
+
+## Automation and authority
+
+The `stratum-ffhq` strategist is re-engaged for autonomous research and is executing the autonomous decide→research→conclude→advance loop under the frozen-cohort protocol: deterministic selector, deterministic evidence from existing artifacts, scheduler-managed 4090 generation + independent review, noncanonical outputs under `/mnt/nas-ai-models/research`, verdict recording, and registry advancement. It may not mutate either corpus tree, backfill, install/download new image models, use external image services, merge, or push `main` directly (draft-PR-only).
 
 ## Headline result so far
 
-**PENDING.** The geometry-grounded prototype has synthetic-fixture tests but has no controlled caption-quality or downstream-conditioning verdict.
+**Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER.** Declared deterministic evidence (geometry; body-type proportions; then DOME-29 clothing coverage + dominant colors) each significantly improves supported claims on the frozen 24-item cohort under fixed view/prompt/model/settings. The empirical verdicts await only the advisory human rubric spot-check for a formal PASS. Next: hair (arm #30).
 
-## Authority boundary
-
-Draft PRs, tests, documents, issue-tree state, and harness code are authorized. GPU claims/launches, model installation, canonical-corpus writes, full backfills, merges, and direct `main` pushes require a future explicit arm decision.

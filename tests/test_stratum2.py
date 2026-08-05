@@ -143,6 +143,55 @@ class TestStratum2Loader:
 
 
 # ---------------------------------------------------------------------------
+# CLI forwarding tests
+# ---------------------------------------------------------------------------
+
+
+def test_cmd_process_forwards_caption_max_tokens_to_orchestrator(monkeypatch, tmp_path):
+    """A non-default caption budget reaches orchestration without loading a model."""
+    from stratum import discovery
+    from stratum2 import orchestrator
+    from stratum2.cli import cmd_process, parse_args
+
+    source = tmp_path / "source"
+    image = source / "candidate.jpg"
+    output = tmp_path / "output"
+    captured: dict = {}
+
+    def fake_discover_images(input_dir, image_list_path=None):
+        assert input_dir == source
+        assert image_list_path is None
+        return [image]
+
+    def fake_run_passes(**kwargs):
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(discovery, "discover_images", fake_discover_images)
+    monkeypatch.setattr(orchestrator, "run_passes", fake_run_passes)
+
+    args = parse_args(
+        [
+            "process",
+            str(source),
+            "--output",
+            str(output),
+            "--passes",
+            "caption",
+            "--caption-max-tokens",
+            "731",
+            "--device",
+            "cpu",
+        ]
+    )
+
+    assert cmd_process(args) == 0
+    assert captured["caption_max_tokens"] == 731
+    assert captured["passes"] == ["caption"]
+    assert captured["images"] == [image]
+
+
+# ---------------------------------------------------------------------------
 # Pipeline tests
 # ---------------------------------------------------------------------------
 
