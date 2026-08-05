@@ -2,6 +2,31 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #33 — lighting evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-05
+**Arm:** #33 — lighting evidence specialist
+**Code / PR:** `exp/stage-b-lighting-arm33-20260805` (draft PR), stacked on the arm-#31 execution harness
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arms #4/#29/#30/#31/#32)
+**Deterministic specialist:** `research_harness.lighting.compute_lighting` (camera-space normal2 direction statistics + source luminance/histogram/dynamic-range: luma band, dynamic-range band, shadow fraction, subject-vs-surround ratio, Lambertian least-squares key-light direction fit; gate-floor abstention). Evidence inputs bound: `seg2.npy + normal2.npy`. Only scale-invariant facts are verbalized (bands/fractions/direction name); continuous values and the fitted light vector stay in `evidence_payload`.
+**Deterministic probe (CPU, pre-run):** 24/24 subject present; 24/24 lighting measurable; 24/24 light direction resolved. Luma bands 6 brightly-lit / 18 moderately-lit; shadow 3 heavy / 11 some / 10 little; DR 24/24 high contrast; direction 15 front / 5 front-left / 4 front-right. All 24 captions carry lighting evidence.
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), temperature=0, seed=20260804, num_predict=384, num_ctx=4096, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family), temperature=0, seed=20260804, num_predict=2000, 512×512 input, same reviewer calibration as arms #4/#29/#30/#31/#32.
+**Plan:** frozen `research/stage-b-plans/stage-b-lighting-v1.json` (fingerprint `87498692900653675bdd6a856d433bc9d94d5377489c1bb8c7ff5cab29bedeb3`); conditions identical to prior arms except the evidence condition is `context-raw-lighting`. All 24/24 cohort items measured and generated.
+**Scheduler lifecycle (local 4090):** request → poll/claim → launch → verify GPU activity → activate → heartbeat → release. Generation job `stratum-stage-b-lighting-v2`, completed 2026-08-05 ~19:53Z, `gpu_activity_seen: true`, 96/96, plan fingerprint verified (an initial `-v1` claim was consumed as failed before publish by the evidence-hash guard and produced no metric — an infrastructure failure, not a strike). Independent review job `stratum-stage-b-adversarial-review-lighting-v2`, 96/96 reviewed by gemma4:e4b, completed ~16:08Z, GPU released. Both slots released cleanly (4090 idle).
+
+**Evidence-only delta (cond 3 → 4):**
+- supported claims **47 → 194**; unsupported **99 → 10**; omissions 11 → 9; contradictions 1 → 4; abstentions 0 → 1.
+- Support ratio **32.2% → 95.1%** (Δ +0.6291) — the largest delta seen across the cohort so far.
+- Paired per-item sign test on supported claims: 19 improve / 4 not (23 paired), one-sided binomial **p ≈ 0.0013**.
+- Deterministic cross-check independent of the LLM review: 21/24 lighting-condition captions carry ≥1 declared lighting-vocab trace beyond their matched baseline (contrast/bright/dim/shadow/highlight/key light); the remaining 3 already described lighting in baseline. Supported-claim gain is traceable to carried lighting evidence.
+
+**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 194 --base-unsupported 99 --variant-unsupported 10 --items 23 --p-supported 0.0013` → **BETTER** (significant p=0.0013 ≤ 0.05; support-ratio improvement 0.322→0.951; unsupported reduced 99→10, not ballooning; `inconclusive: false`). Confirmed by harness `autonomous-tick` from the review dir.
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root `/mnt/nas-ai-models/research/stratum/stage-b-lighting-v2(-review)`; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `normal2.npy`/`seg2.npy`/source pixels only; scale-invariant verbalization retained (owner px→ratios rule).
+
+**Registry advance:** lighting dimension `active → validated` (0 strikes, confirmed by harness `autonomous-tick`). Next selector pick: **dossier-context4k (arm #36, EIG 0.19)** now `research:active`. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+
 ## Arm #31 — skin-color/tone evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-05
