@@ -52,6 +52,18 @@ _REQUIRED_AUTONOMY_DENIALS = (
     "autonomous_merge_allowed",
     "autonomous_direct_main_push_allowed",
     "autonomous_gpu_execution_allowed",
+    # NOTE: autonomous_model_installation_allowed is deliberately NOT a denial.
+    # Owner policy (2026-08-05): model SOURCING is open-world — the loop may
+    # download/install/qualify new candidate models when local options are
+    # exhausted. Only hosted third-party inference of the sensitive canonical
+    # corpus stays gated (see content_policy / requires_hold).
+    "autonomous_canonical_source_write_allowed",
+)
+# autonomy flags that must be booleans but whose value is policy-configurable
+_REQUIRED_AUTONOMY_BOOL = (
+    "autonomous_merge_allowed",
+    "autonomous_direct_main_push_allowed",
+    "autonomous_gpu_execution_allowed",
     "autonomous_model_installation_allowed",
     "autonomous_canonical_source_write_allowed",
 )
@@ -390,6 +402,8 @@ def validate_program(program: Mapping[str, Any]) -> None:
     autonomy = _require_mapping(program.get("autonomy"), "autonomy")
     if autonomy.get("mode") != "draft_pr_only":
         raise ContractError("autonomy.mode must be draft_pr_only")
+    for field in _REQUIRED_AUTONOMY_BOOL:
+        _require_bool(autonomy.get(field), f"autonomy.{field}")
     for field in _REQUIRED_AUTONOMY_DENIALS:
         _require_false(autonomy.get(field), f"autonomy.{field}")
     for field in ("authorized_without_new_human_approval", "requires_hold"):
