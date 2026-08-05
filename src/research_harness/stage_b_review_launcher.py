@@ -43,7 +43,7 @@ def _settings() -> ReviewSettings:
         endpoint="http://127.0.0.1:11434/api/generate",
         temperature=0.0,
         seed=20260804,
-        num_predict=1400,
+        num_predict=2000,
         review_items="all",
     )
 

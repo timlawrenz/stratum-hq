@@ -63,6 +63,7 @@ REVIEW_PROMPT_TEMPLATE = (
     "unsupported (the image or evidence does not support it), or omitted (an important "
     "visible fact is missing). List contradictions with the declared evidence and any "
     "abstentions (leave empty in this pass). "
+    "Use ONE short phrase per item (never quote whole sentences). "
     "Output JSON ONLY with exactly these five keys, as arrays of short string notes: {shape}.\n\n"
     "DECLARED EVIDENCE:\n{evidence}\n\nCAPTION:\n{caption}"
 )

@@ -98,7 +98,7 @@ def test_build_review_plan_is_checked(tmp_path: Path) -> None:
     settings = ReviewSettings(model_name="gemma4:e4b",
                               digest="c6eb396dbd59",
                               endpoint="http://127.0.0.1:11434/api/generate",
-                              temperature=0.0, seed=20260804, num_predict=1400,
+                              temperature=0.0, seed=20260804, num_predict=2000,
                               review_items="all")
     plan = build_review_plan(settings, run_root, candidate_fingerprint="cand1")
     assert plan["review_plan_id"] == "stage-b-adversarial-review-v1"
