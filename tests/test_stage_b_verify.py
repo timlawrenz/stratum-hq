@@ -12,6 +12,7 @@ from research_harness.stage_b_verify import (
     check_stage_b_contrast_divergence,
     check_stage_b_evidence_axis,
     check_stage_b_evidence_prompt_clean,
+    check_stage_b_input_view_axis,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
 )
@@ -142,6 +143,12 @@ def build_root(
                 "source_sha256": _sha(image_id),
                 "condition_id": cid,
                 "input_view": dict(condition["input_view"]),
+                # Per-image digest of the exact view bytes fed to the aggregator:
+                # bucketed and raw views must differ per image; the three raw
+                # conditions share one raw digest per image (stimulus isolation).
+                "input_view_sha256": _sha(
+                    ("bucketed" if cid == "legacy-bucketed-no-evidence" else "raw") + ":" + image_id
+                ),
                 "prompt": {
                     **condition["prompt"],
                     "rendered_sha256": _sha(rendered_prompt),
@@ -207,6 +214,7 @@ def build_root(
             "source_sha256": _sha("img-a"),
             "condition_id": null_cid,
             "input_view": dict(conditions[0]["input_view"]),
+            "input_view_sha256": _sha("bucketed:img-a"),
             "prompt": {
                 **conditions[0]["prompt"],
                 "rendered_sha256": _sha("null"),
@@ -363,6 +371,33 @@ def build_root(
                     slot = slot + leaked_tail
                 record["prompt"]["rendered_sha256"] = _sha(slot)
                 record["prompt"]["rendered_text"] = slot
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "input-view-not-materialized":
+        records_mutated = list(records)
+        for record in records_mutated:
+            record.pop("input_view_sha256", None)
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "input-view-binding-drift":
+        records_mutated = list(records)
+        records_mutated[0]["input_view"]["fingerprint"] = "2" * 64
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "input-view-declaration-collapse":
+        collapsed = conditions[0]["input_view"]
+        conditions_mutated = [
+            {**condition, "input_view": dict(collapsed)} for condition in conditions
+        ]
+        plan_mutated = dict(plan)
+        plan_mutated["conditions"] = conditions_mutated
+        write("stage-b-plan.json", plan_mutated)
+        records_mutated = list(records)
+        for record in records_mutated:
+            record["input_view"] = dict(collapsed)
         with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
             for record in records_mutated:
                 handle.write(_canonical_json(record) + "\n")
@@ -566,3 +601,46 @@ def test_evidence_prompt_clean_rejects_instruction_leak(tmp_path):
 def test_evidence_prompt_clean_rejects_missing_root(tmp_path):
     with pytest.raises(ContractError, match="must be an existing directory"):
         check_stage_b_evidence_prompt_clean(tmp_path / "does-not-exist")
+
+
+def test_input_view_axis_ok_on_wellformed_root(tmp_path):
+    root, _plan = build_root(tmp_path)
+    report = check_stage_b_input_view_axis(root)
+    assert report["input_view_axis_ok"] is True
+    assert report["input_view_axis_declared"] is True
+    assert report["input_view_axis_materialized"] is True
+    assert report["checks_failed"] == 0
+    assert report["per_image_view_digest_count"] == 8
+    assert report["baseline_view_id"] == "legacy-bucketed-crop-view-v1"
+    assert report["variant_view_id"] == "legacy-raw-view-v1"
+    assert len(report["view_ids"]) == 2
+
+
+def test_input_view_axis_rejects_not_materialized(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="input-view-not-materialized")
+    report = check_stage_b_input_view_axis(root)
+    assert report["input_view_axis_ok"] is False
+    assert report["input_view_axis_materialized"] is False
+    assert report["per_image_view_digest_count"] == 0
+    assert any("per-image view-content digest" in finding for finding in report["findings"])
+    assert "NOT fully documented" in report["summary"]
+
+
+def test_input_view_axis_rejects_binding_drift(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="input-view-binding-drift")
+    report = check_stage_b_input_view_axis(root)
+    assert report["input_view_axis_ok"] is False
+    assert any("must bind the declared plan view" in finding for finding in report["findings"])
+
+
+def test_input_view_axis_rejects_declaration_collapse(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="input-view-declaration-collapse")
+    report = check_stage_b_input_view_axis(root)
+    assert report["input_view_axis_ok"] is False
+    assert report["input_view_axis_declared"] is False
+    assert any("exactly two distinct input-view components" in finding for finding in report["findings"])
+
+
+def test_input_view_axis_rejects_missing_root(tmp_path):
+    with pytest.raises(ContractError, match="must be an existing directory"):
+        check_stage_b_input_view_axis(tmp_path / "does-not-exist")

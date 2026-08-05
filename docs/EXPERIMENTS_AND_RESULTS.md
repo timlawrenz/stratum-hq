@@ -147,6 +147,23 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD`. Shapes the #18 owner decision: if the completed root is considered for the claim-support self-audit + adversarial review, the evidence-only contrast must be interpreted with the documented evidence+instructions confound, or a re-run must use a data-only evidence renderer (only the determinations block, no surrounding instructions). The smallest exact decisions are unchanged (confirm/deny the asserted approval; decide the missing `empty-caption-null-v1` null fixture; freeze the self-audit/adversarial protocol; decide the evidence-rendering confound). No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
 
+## Stage-B input-view axis integrity — `[METRIC-READINESS FINDING / NON-EXECUTING]`
+
+**Date:** 2026-08-05
+**Arm:** #4 — baseline and comparison parity (held by #18)
+**Artifact:** [`STAGE_B_INPUT_VIEW_AXIS.md`](STAGE_B_INPUT_VIEW_AXIS.md) and additive observer-only check `research_harness.stage_b_verify.check_stage_b_input_view_axis` (+ CLI `check-stage-b-input-view-axis`).
+
+**Read-only evidence:**
+
+- Question answered: the evidence-axis check proved the evidence payload was real and the contrast-divergence check proved the outputs differ, but nobody had inspected the **input-view side** — whether the run's own records demonstrate that the bucketed and raw conditions fed different view bytes to the aggregator.
+- `check-stage-b-input-view-axis stage-b-first500-parity-v1` → `input_view_axis_declared: **true**` (104 checks passed), `input_view_axis_materialized: **false**` (0/96 records), `input_view_axis_ok: false`.
+- The plan declares exactly two distinct view components — `legacy-bucketed-crop-view-v1` (resize-to-cover + center-crop renderer) used by exactly one condition (`legacy-bucketed-no-evidence`) and `raw-source-view-v1` (decoded-source renderer) shared by the other three conditions — with distinct fingerprints; the `input-view-only` contrast pairs them with `changed_axes: ["input_view"]`; 96/96 records bind their condition's declared view id/fingerprint.
+- **No record carries a per-image view-content digest** (no `input_view_sha256`/equivalent), so the run cannot demonstrate from its own records that the bucketed and raw views differed per image — unlike the evidence axis, which stores per-image `selected_evidence_input_artifact_sha256` bound byte-for-byte to disk. The executor in draft PR #20 does implement `_bucketed_view` vs raw, so this is an evidentiary gap in the records, not proof the views were identical.
+- Structural only, not semantic: `run-provenance.json` still declares `PENDING_INDEPENDENT_REVIEW`, `semantic_verdict: PENDING`, metric self-audit `PENDING_HUMAN_SELF_AUDIT`; 96/96 review rows stay `unreviewed`/`PENDING`. No claim-support scoring, known-case/null self-audit, or adversarial review has run.
+- Full suite: **299 passed** (5 new synthetic tests); `validate-program` and fresh-open-snapshot `validate-tree` remain `valid`.
+
+**Verdict:** `PENDING / HELD`. Two of the three declared one-axis contrasts now carry a documented caveat at the model-input boundary: evidence-only (evidence+instructions confound) and input-view-only (declared-and-bound but not input-documented). The #18 decisions are unchanged in kind, plus: the owner must decide whether the input-view-only contrast may be interpreted with the declared-but-not-input-documented caveat, or whether any re-run must record a per-image view-content digest (e.g. `input_view_sha256` of the exact encoded bytes) so the view axis is certifiable from the run's own records. No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
+
 ## Stage-B contrast divergence — `[METRIC-READINESS FINDING / NON-EXECUTING]`
 
 **Date:** 2026-08-05

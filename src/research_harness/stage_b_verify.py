@@ -847,3 +847,250 @@ def check_stage_b_evidence_prompt_clean(root: Path) -> dict[str, Any]:
         ),
         "evidence_prompt_clean": bad == 0,
     }
+
+
+# Record-level fields that may carry a per-image digest of the exact view bytes
+# fed to the aggregator. Absence of all of them means the run's records do not
+# document the input-view materialization per image.
+_VIEW_DIGEST_RECORD_KEYS = ("input_view_sha256", "view_sha256", "view_content_sha256")
+# Keys inside the input_view object itself that may carry the same per-image
+# digest (never the identity/fingerprint members).
+_VIEW_DIGEST_VIEW_KEYS = ("content_sha256", "sha256", "view_sha256", "bytes_sha256")
+
+
+def _record_view_digest(record: Mapping[str, Any]) -> str | None:
+    """Return the record's per-image view-content digest, if any is recorded."""
+    for key in _VIEW_DIGEST_RECORD_KEYS:
+        value = record.get(key)
+        if isinstance(value, str) and value:
+            return value
+    view = record.get("input_view")
+    if isinstance(view, Mapping):
+        for key in _VIEW_DIGEST_VIEW_KEYS:
+            value = view.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def check_stage_b_input_view_axis(root: Path) -> dict[str, Any]:
+    """Observer-only report on whether a completed Stage-B run's declared
+    input-view-only contrast is isolated and materialized at the input level.
+
+    The evidence-axis check inspects the recorded evidence payload, and the
+    contrast-divergence check inspects output captions. Neither inspects the
+    input-view side: whether the run's own records demonstrate that the
+    bucketed and raw conditions actually fed different view bytes to the
+    aggregator. This check covers that side in three layers:
+
+    - *Declaration*: the plan must declare exactly two distinct view components
+      — the input-view-only baseline condition's view used by exactly one
+      condition and the variant condition's view shared by every other
+      condition — with distinct fingerprints, plus an ``input-view-only``
+      contrast whose single changed axis is ``input_view``.
+    - *Binding*: every record's ``input_view`` {id, fingerprint} must match its
+      condition's declaration exactly.
+    - *Materialization*: the run must record a per-image view-content digest
+      (e.g. ``input_view_sha256`` on the record or ``content_sha256`` inside
+      the ``input_view`` object). When digests exist, per image the baseline
+      view digest must differ from the variant view digest (the axis is
+      actually exercised) and records sharing one view id must share one digest
+      (stimulus isolation for the prompt/evidence contrasts).
+
+    A run that declares and binds the axis but records no per-image view
+    digest is reported ``input_view_axis_materialized: false``: the run's own
+    records cannot demonstrate that the bucketed and raw conditions fed
+    different views, so the input-view-only contrast is declared-but-not-input-
+    documented. This is a metric-readiness finding, never a semantic/quality
+    PASS or FAIL, and never an authorization. No model, GPU, scheduler, corpus,
+    or derived-tree action occurs.
+    """
+    if not root.exists():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"Stage-B output root is unavailable: {root}: {exc}") from exc
+    if not root.is_dir():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+
+    plan = _read_json(_require_file(root / "stage-b-plan.json"))
+    records = _read_jsonl(_require_file(root / "records.jsonl"))
+
+    conditions = plan.get("conditions") or []
+    if not isinstance(conditions, list) or not all(isinstance(c, dict) for c in conditions):
+        raise ContractError("stage-b-plan.json conditions must be a list of objects")
+    if not conditions:
+        raise ContractError("stage-b-plan.json must declare at least one condition")
+
+    checks: dict[str, int] = {"ok": 0, "bad": 0}
+    findings: list[str] = []
+
+    def check(condition: bool, label: str) -> None:
+        checks["ok" if condition else "bad"] += 1
+        if not condition:
+            findings.append(label)
+
+    # --- Declaration layer -------------------------------------------------
+    condition_views: dict[str, dict[str, Any]] = {}
+    for condition in conditions:
+        cid = condition.get("id")
+        view = condition.get("input_view")
+        if not isinstance(cid, str) or not cid:
+            check(False, "each comparison condition must declare a string id")
+            continue
+        if not isinstance(view, Mapping) or not isinstance(view.get("id"), str) or not isinstance(
+            view.get("fingerprint"), str
+        ):
+            check(False, f"condition {cid!r} must declare input_view id and fingerprint")
+            continue
+        condition_views[cid] = {"id": view["id"], "fingerprint": view["fingerprint"]}
+
+    view_by_id: dict[str, list[str]] = {}
+    for cid, view in condition_views.items():
+        view_by_id.setdefault(view["id"], []).append(cid)
+    view_fingerprints = {
+        view["id"]: view["fingerprint"] for view in condition_views.values()
+    }
+
+    contrasts = plan.get("contrasts")
+    if not isinstance(contrasts, list) or not contrasts:
+        raise ContractError("stage-b-plan.json must declare at least one one-axis contrast in 'contrasts'")
+    input_view_contrast = None
+    for contrast in contrasts:
+        if not isinstance(contrast, Mapping):
+            continue
+        if contrast.get("changed_axes") == ["input_view"]:
+            input_view_contrast = contrast
+            break
+    check(input_view_contrast is not None, "plan must declare an input-view-only contrast with changed_axes [input_view]")
+
+    baseline_view_id: str | None = None
+    variant_view_id: str | None = None
+    if input_view_contrast is not None:
+        baseline_cid = input_view_contrast.get("baseline_condition")
+        variant_cid = input_view_contrast.get("variant_condition")
+        check(
+            isinstance(baseline_cid, str) and isinstance(variant_cid, str),
+            "input-view-only contrast must declare baseline_condition and variant_condition",
+        )
+        if isinstance(baseline_cid, str) and isinstance(variant_cid, str):
+            check(
+                baseline_cid in condition_views and variant_cid in condition_views,
+                "input-view-only contrast must reference declared plan conditions",
+            )
+            if baseline_cid in condition_views and variant_cid in condition_views:
+                baseline_view_id = condition_views[baseline_cid]["id"]
+                variant_view_id = condition_views[variant_cid]["id"]
+
+    if baseline_view_id is not None and variant_view_id is not None:
+        check(
+            baseline_view_id != variant_view_id,
+            "input-view-only contrast must pair two distinct view components",
+        )
+        check(
+            len({view["id"] for view in condition_views.values()}) == 2,
+            "plan must declare exactly two distinct input-view components (one baseline view, one variant view)",
+        )
+        check(
+            len(view_by_id.get(baseline_view_id, [])) == 1,
+            f"baseline view {baseline_view_id!r} must be used by exactly one condition (the input-view-only baseline)",
+        )
+        check(
+            len(view_by_id.get(variant_view_id, [])) == len(conditions) - 1,
+            f"variant view {variant_view_id!r} must be shared by every other condition",
+        )
+        check(
+            view_fingerprints.get(baseline_view_id) != view_fingerprints.get(variant_view_id),
+            "baseline and variant view components must carry distinct fingerprints",
+        )
+
+    # --- Binding layer ------------------------------------------------------
+    plan_view_by_condition = {
+        cid: view for cid, view in condition_views.items()
+    }
+    for record in records:
+        cid = record.get("condition_id")
+        view = record.get("input_view")
+        declared = plan_view_by_condition.get(cid) if isinstance(cid, str) else None
+        if declared is None:
+            check(False, f"{record.get('record_id')}: condition missing from plan")
+            continue
+        check(
+            isinstance(view, Mapping)
+            and view.get("id") == declared["id"]
+            and view.get("fingerprint") == declared["fingerprint"],
+            f"{record.get('record_id')}: input_view must bind the declared plan view component",
+        )
+
+    # --- Materialization layer ----------------------------------------------
+    digest_by_record: dict[str, str] = {}
+    missing_digest_count = 0
+    for record in records:
+        digest = _record_view_digest(record)
+        if digest is None:
+            missing_digest_count += 1
+            check(
+                False,
+                f"{record.get('record_id')}: no per-image view-content digest recorded (expected e.g. input_view_sha256)",
+            )
+        else:
+            digest_by_record[record.get("record_id", "")] = digest
+
+    view_digests: dict[tuple[str, str], set[str]] = {}
+    for record in records:
+        view = record.get("input_view")
+        digest = _record_view_digest(record)
+        if isinstance(view, Mapping) and isinstance(view.get("id"), str) and digest is not None:
+            image_id = record.get("image_id")
+            if isinstance(image_id, str):
+                view_digests.setdefault((image_id, view["id"]), set()).add(digest)
+
+    for (image_id, view_id), digests in sorted(view_digests.items()):
+        check(
+            len(digests) == 1,
+            f"{image_id}: view {view_id!r} must record one consistent per-image digest (got {len(digests)})",
+        )
+
+    if baseline_view_id is not None and variant_view_id is not None and digest_by_record:
+        for image_id in {
+            record.get("image_id")
+            for record in records
+            if isinstance(record.get("image_id"), str)
+        }:
+            baseline_digests = view_digests.get((image_id, baseline_view_id), set())
+            variant_digests = view_digests.get((image_id, variant_view_id), set())
+            if baseline_digests and variant_digests:
+                check(
+                    baseline_digests != variant_digests,
+                    f"{image_id}: baseline and variant view digests must differ (the views fed must actually differ)",
+                )
+
+    materialized = missing_digest_count == 0
+
+    bad = checks["bad"]
+    return {
+        "root": str(root),
+        "record_count": len(records),
+        "view_ids": sorted(view_by_id),
+        "baseline_view_id": baseline_view_id,
+        "variant_view_id": variant_view_id,
+        "condition_view_ids": {cid: view["id"] for cid, view in condition_views.items()},
+        "input_view_axis_declared": (
+            baseline_view_id is not None
+            and variant_view_id is not None
+            and baseline_view_id != variant_view_id
+            and len({view["id"] for view in condition_views.values()}) == 2
+        ),
+        "input_view_axis_materialized": materialized,
+        "per_image_view_digest_count": len(digest_by_record),
+        "checks_passed": checks["ok"],
+        "checks_failed": checks["bad"],
+        "findings": findings,
+        "summary": (
+            "input-view axis declared, bound, and input-materialized per image"
+            if bad == 0
+            else "input-view axis NOT fully documented: " + "; ".join(findings)
+        ),
+        "input_view_axis_ok": bad == 0,
+    }

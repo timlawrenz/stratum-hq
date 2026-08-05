@@ -21,6 +21,7 @@ from .stage_b_verify import (
     check_stage_b_contrast_divergence,
     check_stage_b_evidence_axis,
     check_stage_b_evidence_prompt_clean,
+    check_stage_b_input_view_axis,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
 )
@@ -114,6 +115,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     stage_b_prompt_clean.add_argument("root", type=Path)
 
+    stage_b_input_view = sub.add_parser(
+        "check-stage-b-input-view-axis",
+        help="report whether a completed Stage-B run's input-view-only contrast is isolated and input-materialized (observer-only)",
+    )
+    stage_b_input_view.add_argument("root", type=Path)
+
     labels = sub.add_parser("plan-labels", help="plan additive GitHub label changes from JSON snapshots")
     labels.add_argument("desired", type=Path, help="tracked desired label-specification JSON")
     labels.add_argument("current", type=Path, help="read-only GitHub label-list JSON")
@@ -174,6 +181,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "check-stage-b-evidence-prompt-clean":
             report = check_stage_b_evidence_prompt_clean(args.root)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0
+
+        if args.command == "check-stage-b-input-view-axis":
+            report = check_stage_b_input_view_axis(args.root)
             print(json.dumps(report, indent=2, sort_keys=True))
             return 0
 
