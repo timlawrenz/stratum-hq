@@ -122,16 +122,43 @@ def test_better_or_not_requires_items() -> None:
         )
 
 
-def _write_reviews(tmp_path, *, geometry_supported=6, base_supported=2, base_unsupported=0) -> str:
+def _write_reviews(
+    tmp_path,
+    *,
+    geometry_supported=6,
+    base_supported=2,
+    base_unsupported=0,
+    evidence_condition="context-raw-geometry",
+    evidence_evidence_id="in-memory-pose2-seg2-geometry-v1",
+    with_plan=True,
+) -> str:
     import json as _json
 
-    review_dir = tmp_path / "review"
-    review_dir.mkdir()
+    run_root = tmp_path / "run-root"
+    run_root.mkdir(exist_ok=True)
+    review_dir = run_root.parent / (run_root.name + "-review")
+    review_dir.mkdir(exist_ok=True)
+    if with_plan:
+        plan = {
+            "comparison_plan_id": "test-plan",
+            "conditions": [
+                {"id": "legacy-bucketed-no-evidence",
+                 "evidence": {"id": "no-specialist-evidence-v1"}},
+                {"id": "legacy-raw-no-evidence",
+                 "evidence": {"id": "no-specialist-evidence-v1"}},
+                {"id": "context-raw-no-evidence",
+                 "evidence": {"id": "no-specialist-evidence-v1"}},
+                {"id": evidence_condition,
+                 "evidence": {"id": evidence_evidence_id}},
+            ],
+        }
+        (run_root / "stage-b-plan.json").write_text(
+            _json.dumps(plan) + "\n", encoding="utf-8")
     lines = []
     for i in range(24):
         row = {
             "image_id": f"img-{i}",
-            "condition_id": "context-raw-geometry",
+            "condition_id": evidence_condition,
             "supported": ["s"] * geometry_supported,
             "unsupported": [],
             "omissions": [],
@@ -151,6 +178,36 @@ def _write_reviews(tmp_path, *, geometry_supported=6, base_supported=2, base_uns
         lines.append(_json.dumps(row))
     (review_dir / "reviews.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return str(review_dir)
+
+
+def test_aggregate_auto_derives_non_geometry_evidence_condition(tmp_path) -> None:
+    """Auto-derivation must pick up ANY specialist evidence condition (e.g.
+    body-type proportions), not just the hardcoded geometry one — regression
+    guard for the bug that silently flipped body-type to NOT_BETTER."""
+    from research_harness.autonomous import aggregate_claim_support
+
+    review_dir = _write_reviews(
+        tmp_path,
+        geometry_supported=9,
+        base_supported=4,
+        base_unsupported=2,
+        evidence_condition="context-raw-body-type",
+        evidence_evidence_id="in-memory-body-type-proportions-v1",
+    )
+    agg = aggregate_claim_support(review_dir)
+    assert agg["evidence_supported"] == 9 * 24
+    assert agg["baseline_supported"] == 4 * 24
+    assert "context-raw-body-type" in agg["per_condition"]
+
+
+def test_aggregate_requires_conditions_without_plan(tmp_path) -> None:
+    """Without a plan and without explicit conditions, fail closed rather than
+    silently assuming the geometry condition names."""
+    from research_harness.autonomous import AutonomousError, aggregate_claim_support
+
+    review_dir = _write_reviews(tmp_path, with_plan=False)
+    with pytest.raises(AutonomousError):
+        aggregate_claim_support(review_dir)
 
 
 def test_run_tick_activates_when_none_active() -> None:

@@ -183,11 +183,62 @@ def _binom_right_tail(n: int, k: int, p: float = 0.5) -> float:
     return sum(comb(n, i) * (p**i) * ((1 - p) ** (n - i)) for i in range(max(0, k), n + 1))
 
 
+def _derive_conditions_from_plan(review_dir: str) -> tuple[str, str] | None:
+    """Find baseline/evidence condition ids from the run plan beside the review root.
+
+    The run publishes `stage-b-plan.json` in the run root; the review root is
+    typically `<run-root>-review`. If that plan is present, derive: baseline =
+    the condition with the null evidence id (`no-specialist-evidence-v1`),
+    evidence = the condition with a real specialist evidence id. Returns None
+    if the plan cannot be located or parsed usefully.
+    """
+    from pathlib import Path
+
+    review_root = Path(review_dir)
+    candidates = [
+        review_root / "stage-b-plan.json",
+        review_root.parent / (review_root.name + "-plan.json"),
+        review_root.parent / "stage-b-plan.json",
+    ]
+    # The run root is usually the parent sibling without the `-review` suffix.
+    if review_root.name.endswith("-review"):
+        run_root = review_root.parent / review_root.name[: -len("-review")]
+        candidates.insert(0, run_root / "stage-b-plan.json")
+
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            plan = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        conditions = plan.get("conditions") if isinstance(plan, dict) else None
+        if not isinstance(conditions, list):
+            continue
+        baseline = None
+        evidence = None
+        for cond in conditions:
+            if not isinstance(cond, dict):
+                continue
+            cid = cond.get("id")
+            ev = cond.get("evidence")
+            evid = ev.get("id") if isinstance(ev, dict) else None
+            if not isinstance(cid, str):
+                continue
+            if evid == "no-specialist-evidence-v1" and "context" in cid:
+                baseline = cid
+            elif isinstance(evid, str) and evid and evid != "no-specialist-evidence-v1":
+                evidence = cid
+        if baseline and evidence:
+            return baseline, evidence
+    return None
+
+
 def aggregate_claim_support(
     review_dir: str,
     *,
-    baseline_condition: str = "context-raw-no-evidence",
-    evidence_condition: str = "context-raw-geometry",
+    baseline_condition: str | None = None,
+    evidence_condition: str | None = None,
 ) -> dict[str, Any]:
     """Aggregate claim-support counts + paired sign-test from review files.
 
@@ -198,8 +249,28 @@ def aggregate_claim_support(
     arm-#4 protocol). The baseline/evidence conditions are matched **exactly**
     so a legacy `*-raw-no-evidence` row can never substitute for the matched
     context baseline.
+
+    When the conditions are not given explicitly, they are **derived from the
+    run plan** (`stage-b-plan.json`, found next to the review root): the
+    baseline is the condition with the null evidence id
+    (`no-specialist-evidence-v1`) and the evidence condition is the one with a
+    real specialist evidence id. This removes the per-arm hardcoding that once
+    silently flipped body-type/other arms to NOT_BETTER by aggregating the
+    wrong (geometry-only) condition columns.
     """
     from pathlib import Path
+
+    if baseline_condition is None or evidence_condition is None:
+        derived = _derive_conditions_from_plan(review_dir)
+        if derived is not None:
+            baseline_condition, evidence_condition = derived
+
+    if baseline_condition is None or evidence_condition is None:
+        raise AutonomousError(
+            "aggregate_claim_support: could not determine baseline/evidence "
+            "conditions; pass them explicitly or provide stage-b-plan.json "
+            "beside the review root"
+        )
 
     path = Path(review_dir) / "reviews.jsonl"
     if not path.is_file():
