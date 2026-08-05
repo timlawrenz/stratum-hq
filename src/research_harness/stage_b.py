@@ -37,6 +37,7 @@ from .contracts import ContractError, validate_comparison_parity_plan, validate_
 from .clothing import ClothingError, compute_clothing
 from .proportions import ProportionError, compute_proportions
 from .hair import HairError, compute_hair
+from .skin_color import SkinColorError, compute_skin_tone
 
 
 class StageBRunError(RuntimeError):
@@ -407,6 +408,71 @@ def _serialize_hair(hair: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _skin_color_evidence() -> dict[str, Any]:
+    """Declared deterministic skin-tone specialist (arm #31)."""
+    module_path = Path(compute_skin_tone.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-skin-tone-v1",
+        "specialists": [
+            {
+                "id": "in-memory-skin-tone-v1",
+                "scope": "seg2 DOME-29 exposed-skin regions only (Face_Neck, Torso, and limb/hand/foot skin classes) plus dominant skin tone from source pixels; never identity, posture, or facial-expression semantics.",
+                "inputs": "Frozen selected-item seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous exposure coverage fractions and a deterministic quantized dominant skin-tone name/hex, or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.skin_color.compute_skin_tone "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; skin tone is measured only when the aggregate exposed-skin region clears a raw-pixel floor and a foreground-coverage gate, otherwise it abstains (never fabricated); detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Skin tone depends on lighting and white balance and is a quantized palette name, not a spectral measurement; tight crops, makeup, or tan lines can shift the mean; regions covered by clothing/garments abstain from contributing; darker tones compress under low key light.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_skin_color(skin: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a skin-tone measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: whether exposed
+    skin is measurable, its subject-foreground coverage, and the quantized
+    dominant tone name (overall, plus face vs body where both measured).
+    Absolute pixel counts and raw RGB are deliberately NOT verbalized
+    (camera/size/white-balance dependent); they exist in the machine-readable
+    `evidence_payload` JSON (dossier / compressor input).
+    """
+    lines = [
+        "SKIN TONE (deterministic, seg2 DOME-29 exposed-skin regions + source pixel dominant tone):"
+    ]
+    if not skin.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from skin-tone claims")
+        return "\n".join(lines)
+    if not skin.get("exposed_skin_present"):
+        lines.append(
+            "- no exposed-skin region cleared the measurement gate -> abstain from skin-tone claims "
+            "(covered skin is not inferred as an absence of skin tone)"
+        )
+        return "\n".join(lines)
+
+    coverage = skin.get("skin_coverage")
+    tone = skin.get("skin_tone_name")
+    face_tone = skin.get("face_tone_name")
+    body_tone = skin.get("body_tone_name")
+    if coverage is not None:
+        lines.append(f"- exposed skin covers {coverage:.2f} of subject foreground")
+    if tone:
+        lines.append(f"- dominant skin tone: {tone}")
+    if face_tone and face_tone != tone:
+        lines.append(f"- face/neck tone: {face_tone}")
+    if body_tone and body_tone != tone:
+        lines.append(f"- body tone: {body_tone}")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -531,7 +597,7 @@ def build_stage_b_plan(
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
-    if evidence_kind not in ("geometry", "body-type", "clothing", "hair"):
+    if evidence_kind not in ("geometry", "body-type", "clothing", "hair", "skin-color"):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
@@ -630,6 +696,28 @@ def build_stage_b_plan(
             "ratio are computed in memory from the frozen selected seg2 and the already-decoded source pixels only "
             "(presence requires a raw-pixel floor and a foreground-coverage gate; otherwise the region abstains). Only "
             "scale-invariant facts are verbalized."
+        )
+    elif evidence_kind == "skin-color":
+        evidence = _skin_color_evidence()
+        evidence_condition_id = "context-raw-skin-color"
+        comparison_plan_id = "stage-b-first500-skin-color-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic DOME-29 exposed-skin "
+            "measurements (aggregate exposed-skin coverage from seg2 and a quantized dominant skin tone from source "
+            "pixels, with face/neck vs body agreement) may improve supported skin-tone/color description claims without "
+            "increasing unsupported, contradictory, or invented skin-color claims when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The skin-color evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on skin-color claims, or an apparent improvement is attributable to an "
+            "uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Exposed-skin coverage and dominant skin tone are computed in memory from "
+            "the frozen selected seg2 and the already-decoded source pixels only (presence requires a raw-pixel floor "
+            "and a foreground-coverage gate; otherwise the region abstains). Only scale-invariant facts are verbalized."
         )
     else:
         evidence = _geometry_evidence()
@@ -794,6 +882,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "hair"
     elif "context-raw-body-type" in condition_ids:
         rebuild_kind = "body-type"
+    elif "context-raw-skin-color" in condition_ids:
+        rebuild_kind = "skin-color"
     else:
         rebuild_kind = "geometry"
     rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
@@ -905,6 +995,10 @@ def _load_selected_item(
         hair = compute_hair(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except HairError as exc:
         raise StageBRunError(f"hair abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        skin_tone = compute_skin_tone(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
+    except SkinColorError as exc:
+        raise StageBRunError(f"skin-color abort for frozen selected item {image_id}: {exc}") from exc
     return {
         "item": dict(item),
         "image": image,
@@ -913,6 +1007,7 @@ def _load_selected_item(
         "proportions": proportions,
         "clothing": clothing,
         "hair": hair,
+        "skin_tone": skin_tone,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": ["pose2.npy", "seg2.npy"],
@@ -969,6 +1064,10 @@ def _render_condition(
         hair = prepared["hair"]
         evidence_text = _serialize_hair(hair)
         return raw.copy(), _context_prompt(evidence_text), hair
+    if condition_id == "context-raw-skin-color":
+        skin = prepared["skin_tone"]
+        evidence_text = _serialize_skin_color(skin)
+        return raw.copy(), _context_prompt(evidence_text), skin
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 

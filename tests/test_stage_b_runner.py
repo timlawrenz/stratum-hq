@@ -402,6 +402,49 @@ def test_stage_b_hair_rejects_unknown_evidence_kind(tmp_path: Path) -> None:
         build_stage_b_plan(program, candidate, settings, evidence_kind="not-a-kind")
 
 
+def test_stage_b_skin_color_evidence_kind_builds_and_executes(tmp_path: Path) -> None:
+    program, candidate, settings, research_root = _fixture(tmp_path)
+    captured: list[dict] = []
+
+    def generate(image: Image.Image, prompt: str, generation: StageBGenerationSettings) -> str:
+        captured.append({"prompt": prompt})
+        return f"caption-{len(captured)}"
+
+    frozen = freeze_stage_b_plan(program, candidate, settings, evidence_kind="skin-color")
+    assert frozen["comparison_plan_id"] == "stage-b-first500-skin-color-v1"
+    assert [c["id"] for c in frozen["conditions"]] == [
+        "legacy-bucketed-no-evidence",
+        "legacy-raw-no-evidence",
+        "context-raw-no-evidence",
+        "context-raw-skin-color",
+    ]
+    evidence_only = next(c for c in frozen["contrasts"] if c["id"] == "evidence-only")
+    assert evidence_only["variant_condition"] == "context-raw-skin-color"
+    validate_comparison_parity_plan(frozen, program)
+    result = execute_stage_b(
+        program,
+        candidate,
+        settings,
+        output_root=research_root / "run-skin-color",
+        expected_plan=frozen,
+        generate=generate,
+    )
+    assert result["record_count"] == 4
+    assert len(captured) == 4
+    skin_prompt = captured[3]["prompt"]
+    assert "DECLARED SPECIALIST EVIDENCE:" in skin_prompt
+    assert "SKIN TONE" in skin_prompt
+
+    records = [json.loads(line) for line in (research_root / "run-skin-color" / "records.jsonl").read_text().splitlines()]
+    skin_record = next(r for r in records if r["condition_id"] == "context-raw-skin-color")
+    payload = skin_record["evidence_payload"]
+    assert payload["subject_present"] is True
+    assert "exposed_skin_present" in payload
+    assert "skin_tone_name" in payload
+    assert skin_record["selected_derived_reads"] == ["pose2.npy", "seg2.npy"]
+    assert not (Path(program["canonical_source"]["derived_tree"]) / "fixture" / "determinations.json").exists()
+
+
 def test_stage_b_rejects_derived_artifact_hash_drift_before_generator(tmp_path: Path) -> None:
     program, candidate, settings, research_root = _fixture(tmp_path)
     frozen_plan = freeze_stage_b_plan(program, candidate, settings)
