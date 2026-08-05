@@ -38,6 +38,7 @@ from .clothing import ClothingError, compute_clothing
 from .proportions import ProportionError, compute_proportions
 from .hair import HairError, compute_hair
 from .skin_color import SkinColorError, compute_skin_tone
+from .lighting import LightingError, compute_lighting
 
 
 class StageBRunError(RuntimeError):
@@ -473,6 +474,75 @@ def _serialize_skin_color(skin: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _lighting_evidence() -> dict[str, Any]:
+    """Declared deterministic lighting specialist (arm #33)."""
+    module_path = Path(compute_lighting.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-lighting-v1",
+        "specialists": [
+            {
+                "id": "in-memory-lighting-v1",
+                "scope": "Camera-space normal2 direction statistics over the subject plus scale-invariant source luminance/histogram/dynamic-range stats only; never identity, posture, or facial-expression semantics.",
+                "inputs": "Frozen selected-item normal2.npy + seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous lighting statistics with a deterministic quantized luma band, dynamic-range band, shadow fraction, surround ratio, and a coarse key-light direction name, or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.lighting.compute_lighting "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; lighting statistics are measured only when the foreground clears a raw-pixel floor and a coverage floor and the direction fit has sufficient valid camera-facing normals, otherwise the respective fact abstains (never fabricated); detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Luma/dynamic-range are camera-response dependent so only relative bands and ratios are verbalized; the Lambertian least-squares direction fit is a heuristic that can alias albedo to lighting on textured/clothed subjects; backlit silhouettes and very flat fill lighting can leave the direction undetermined; extreme over/under-exposure compresses the luma histogram.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_lighting(lighting: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a lighting measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: whether lighting
+    is measurable, the quantized luma band, dynamic-range band, shadow band,
+    surround band, and the coarse key-light direction. Continuous values, the
+    fitted light vector, and the fit residual are deliberately NOT verbalized
+    (camera/response/scale dependent); they exist in the machine-readable
+    `evidence_payload` JSON (dossier / compressor input).
+    """
+    lines = [
+        "LIGHTING (deterministic, normal2 direction statistics + source luminance/histogram/dynamic-range):"
+    ]
+    if not lighting.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from lighting claims")
+        return "\n".join(lines)
+    if not lighting.get("lighting_measurable"):
+        lines.append("- lighting statistics did not clear the measurement gate -> abstain from lighting claims")
+        reason = lighting.get("abstention_reason")
+        if reason:
+            lines.append(f"  (reason: {reason})")
+        return "\n".join(lines)
+
+    band = lighting.get("luma_band")
+    if band:
+        lines.append(f"- overall exposure: {band}")
+    dr = lighting.get("dynamic_range_band")
+    if dr:
+        lines.append(f"- tonal dynamic range: {dr}")
+    shadow = lighting.get("shadow_band")
+    if shadow and shadow != "little shadow":
+        lines.append(f"- shadows: {shadow}")
+    surround = lighting.get("surround_band")
+    lines.append(f"- subject relative to surround: {surround or 'undetermined'}")
+    direction = lighting.get("light_direction")
+    if direction and direction != "undetermined":
+        lines.append(f"- key light direction: {direction}")
+    elif lighting.get("light_direction") == "undetermined":
+        lines.append("- key light direction: undetermined (insufficient directional shading)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -538,12 +608,37 @@ def _candidate_items(candidate: Mapping[str, Any], program: Mapping[str, Any]) -
     return list(raw_items)
 
 
+_EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
+    "geometry": ("pose2.npy", "seg2.npy"),
+    "body-type": ("pose2.npy", "seg2.npy"),
+    "clothing": ("pose2.npy", "seg2.npy"),
+    "hair": ("pose2.npy", "seg2.npy"),
+    "skin-color": ("pose2.npy", "seg2.npy"),
+    "lighting": ("seg2.npy", "normal2.npy"),
+}
+
+
+def _evidence_input_names(evidence_kind: str) -> tuple[str, ...]:
+    try:
+        return _EVIDENCE_INPUT_NAMES[evidence_kind]
+    except KeyError as exc:
+        raise StageBRunError(f"unsupported evidence_kind for artifact hashing: {evidence_kind}") from exc
+
+
 def _freeze_evidence_input_artifact_hashes(
-    candidate_manifest: Mapping[str, Any], program: Mapping[str, Any], items: list[Mapping[str, Any]]
+    candidate_manifest: Mapping[str, Any], program: Mapping[str, Any], items: list[Mapping[str, Any]],
+    *,
+    evidence_kind: str = "geometry",
 ) -> dict[str, dict[str, str]]:
-    """Hash only the two selected evidence inputs for a frozen Stage-B plan."""
+    """Hash the selected evidence inputs for a frozen Stage-B plan.
+
+    The hashed set is the exact artifact set the declared evidence specialist
+    consumes (default pose2+seg2; lighting binds seg2+normal2); source-image
+    bytes are already bound by each candidate item's source_sha256.
+    """
     canonical = _require_mapping(program["canonical_source"], "program canonical_source")
     derived_root = _resolved_existing_directory(Path(canonical["derived_tree"]), "derived artifact root")
+    names = _evidence_input_names(evidence_kind)
     hashes: dict[str, dict[str, str]] = {}
     for item in items:
         image_id = _safe_output_segment(item.get("image_id"), "candidate item image_id")
@@ -551,7 +646,7 @@ def _freeze_evidence_input_artifact_hashes(
             derived_root / image_id, derived_root, "selected derived artifact directory"
         )
         hashes[image_id] = {}
-        for name in ("pose2.npy", "seg2.npy"):
+        for name in names:
             artifact_path = _require_contained(artifact_dir / name, artifact_dir, f"selected {name}")
             try:
                 payload = artifact_path.read_bytes()
@@ -573,7 +668,7 @@ def freeze_stage_b_plan(
     plan = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=evidence_kind)
     items = _candidate_items(candidate_manifest, program)
     plan["evidence_input_artifact_sha256"] = _freeze_evidence_input_artifact_hashes(
-        candidate_manifest, program, items
+        candidate_manifest, program, items, evidence_kind=evidence_kind
     )
     plan["comparison_plan_fingerprint"] = _canonical_fingerprint(plan, "comparison_plan_fingerprint")
     try:
@@ -597,7 +692,7 @@ def build_stage_b_plan(
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
-    if evidence_kind not in ("geometry", "body-type", "clothing", "hair", "skin-color"):
+    if evidence_kind not in ("geometry", "body-type", "clothing", "hair", "skin-color", "lighting"):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
@@ -718,6 +813,30 @@ def build_stage_b_plan(
             "are not used as evidence inputs. Exposed-skin coverage and dominant skin tone are computed in memory from "
             "the frozen selected seg2 and the already-decoded source pixels only (presence requires a raw-pixel floor "
             "and a foreground-coverage gate; otherwise the region abstains). Only scale-invariant facts are verbalized."
+        )
+    elif evidence_kind == "lighting":
+        evidence = _lighting_evidence()
+        evidence_condition_id = "context-raw-lighting"
+        comparison_plan_id = "stage-b-first500-lighting-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic lighting measurements "
+            "(overall exposure band, tonal dynamic-range band, shadow fraction, subject-vs-surround ratio, and a coarse "
+            "key-light direction fit from normal2) may improve supported lighting/shadow/atmosphere description claims "
+            "without increasing unsupported, contradictory, or invented lighting claims when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The lighting-evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on lighting/shadow claims, or an apparent improvement is attributable to an "
+            "uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Exposure band, dynamic-range band, shadow fraction, surround ratio, and the "
+            "key-light direction fit are computed in memory from the frozen selected normal2 + seg2 and the already-decoded "
+            "source pixels only (presence requires a raw-pixel floor and a foreground-coverage gate; the direction fit "
+            "additionally requires sufficient valid camera-facing normals, otherwise it abstains). Only scale-invariant "
+            "facts are verbalized; absolute luma/normal values stay in evidence_payload."
         )
     else:
         evidence = _geometry_evidence()
@@ -884,6 +1003,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "body-type"
     elif "context-raw-skin-color" in condition_ids:
         rebuild_kind = "skin-color"
+    elif "context-raw-lighting" in condition_ids:
+        rebuild_kind = "lighting"
     else:
         rebuild_kind = "geometry"
     rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
@@ -908,13 +1029,17 @@ def _validate_frozen_execution_plan(
     if set(raw_hashes) != item_ids:
         raise StageBRunError("expected comparison plan evidence artifact hashes must cover exactly the frozen items")
     hashes: dict[str, dict[str, str]] = {}
+    expected_names = set(_evidence_input_names(rebuild_kind))
     for image_id in sorted(item_ids):
         row = _require_mapping(raw_hashes[image_id], f"frozen evidence hashes for {image_id}")
-        if set(row) != {"pose2.npy", "seg2.npy"}:
-            raise StageBRunError("frozen evidence hashes must contain exactly pose2.npy and seg2.npy")
+        if set(row) != expected_names:
+            raise StageBRunError(
+                f"frozen evidence hashes for {rebuild_kind} must contain exactly "
+                f"{sorted(expected_names)}, got {sorted(row)}"
+            )
         hashes[image_id] = {
             name: _require_sha256(row[name], f"frozen evidence hash {image_id}/{name}")
-            for name in ("pose2.npy", "seg2.npy")
+            for name in sorted(expected_names)
         }
     return plan, hashes
 
@@ -999,6 +1124,20 @@ def _load_selected_item(
         skin_tone = compute_skin_tone(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except SkinColorError as exc:
         raise StageBRunError(f"skin-color abort for frozen selected item {image_id}: {exc}") from exc
+    derived_reads = ["pose2.npy", "seg2.npy"]
+    lighting = None
+    if "normal2.npy" in expected_evidence_hashes:
+        normal2 = artifact("normal2.npy", required=True)
+        assert normal2 is not None
+        if normal2.ndim != 3 or normal2.shape[2] != 3:
+            raise StageBRunError(f"selected normal2.npy must be (H, W, 3) for {image_id}")
+        try:
+            lighting = compute_lighting(
+                normal2, seg2, np.asarray(image.convert("RGB"), dtype=np.uint8)
+            )
+        except LightingError as exc:
+            raise StageBRunError(f"lighting abort for frozen selected item {image_id}: {exc}") from exc
+        derived_reads.append("normal2.npy")
     return {
         "item": dict(item),
         "image": image,
@@ -1008,9 +1147,10 @@ def _load_selected_item(
         "clothing": clothing,
         "hair": hair,
         "skin_tone": skin_tone,
+        "lighting": lighting,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
-        "derived_reads": ["pose2.npy", "seg2.npy"],
+        "derived_reads": derived_reads,
     }
 
 
@@ -1068,6 +1208,10 @@ def _render_condition(
         skin = prepared["skin_tone"]
         evidence_text = _serialize_skin_color(skin)
         return raw.copy(), _context_prompt(evidence_text), skin
+    if condition_id == "context-raw-lighting":
+        lighting = prepared["lighting"]
+        evidence_text = _serialize_lighting(lighting)
+        return raw.copy(), _context_prompt(evidence_text), lighting
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 
