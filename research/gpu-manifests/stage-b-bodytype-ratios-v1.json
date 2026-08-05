@@ -10,7 +10,7 @@
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
     "comparison_plan_fingerprint": "37b47cea885b5fc71e801fbd33bc902454f8a21ae52b4896aac925408a44fe1b",
     "comparison_plan_relative_path": "research/stage-b-plans/stage-b-bodytype-v1.json",
-    "comparison_plan_sha256": "9ff555a5e9e562bafbc350feb38f0d3168a41042eb79bb21294b0f51b9c9e79f",
+    "comparison_plan_sha256": "d1be3dacb3daa46b3c442635d3b87cdee2315dbf9cd91dfbb6e2a084d9571668",
     "expected_record_count": 96,
     "generation": {
       "context_window": 4096,
@@ -23,7 +23,7 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "947711871fdd47327f52cf595bf38dbaf6c043d6",
+    "git_commit": "8086ca6a343b6c5e0290d7a88ae86d84b73bb8c7",
     "launcher_source_sha256": "3d1fc471bc72a6429e2b4aa0a87e11ad2f341a89c96636d532467efc3c12487e",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
