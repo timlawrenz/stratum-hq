@@ -1,0 +1,42 @@
+name: Research arm
+description: Pre-register one falsifiable research direction; this is not a FIFO task.
+title: "research: "
+labels: ["research", "research:proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before submitting
+        Read `RESEARCH_CONTRACT.md`. A research arm may be selected only after its hypothesis, falsification condition, gate, baseline, data snapshot, parent issue, and full-tree selection rationale are recorded.
+  - type: textarea
+    id: metadata
+    attributes:
+      label: Machine-readable research metadata
+      description: Replace every placeholder. `parent_issue` is the program/arm issue number. `surveyed_issue_numbers` must include every open research issue considered before activation.
+      value: |
+        <!-- research-harness:
+        {"kind":"arm","parent_issue":0,"hypothesis":"REPLACE","falsified_if":"REPLACE","pre_registered_gate":"REPLACE","metric_version":"REPLACE","data_snapshot":"REPLACE","selection_rationale":"REPLACE","surveyed_issue_numbers":[0],"valid_non_improving_experiments":0}
+        -->
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale and expected information gain
+      description: Explain why this branch is worth selecting over existing branches.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Existing evidence and related branches
+      description: Link issues, artifacts, prior runs, or negative results.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Requested authority and resources
+      description: State whether work is documentation/tests only, CPU-only, or needs a separately reviewed GPU manifest. Do not embed shell commands.
+    validations:
+      required: true
