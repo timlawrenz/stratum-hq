@@ -96,6 +96,21 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `COMPLETED RUN / UNREVIEWED / NEEDS-HUMAN`. This is **not** a PASS, FAIL, or validated result. The asserted approval remains unverifiable and is not accepted as authorization; the 96-record output set is real but unreviewed. The owner must (a) confirm or deny the asserted WebUI approval for frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, record that decision durably, and (b) decide whether to accept the completed output root for the sequential claim-support self-audit plus adversarial review, or treat it as invalid and require a re-run under a durable approved manifest. This round performed no scheduler, model, corpus, merge, or main-push action.
 
+## Stage-B self-audit fixture readiness — `[METRIC-READINESS FINDING / NON-EXECUTING]`
+
+**Date:** 2026-08-04
+**Arm:** #4 — baseline and comparison parity (held by #18)
+**Artifact:** [`STAGE_B_SELF_AUDIT_FIXTURE_READINESS.md`](STAGE_B_SELF_AUDIT_FIXTURE_READINESS.md) and additive observer-only check `research_harness.stage_b_verify.check_stage_b_self_audit_readiness` (+ CLI `check-stage-b-self-audit-readiness`).
+
+**Read-only evidence:**
+
+- The completed output root remains structurally valid (`verify-stage-b-output` → `valid`; 96 records = 24 frozen images × 4 conditions; all bindings ok) and entirely unreviewed.
+- The pre-registered `metric_self_audit` declares `known_case_item_id: 0yo0gxbfflugqp205k128kktigl5` (materialized: **yes**, 4 records) and `null_output_id: empty-caption-null-v1` (materialized: **no** — not a record_id; 0 empty-caption records).
+- Therefore the pre-registered **null/abstention self-audit step cannot execute as specified** on this run's records; the known-case step can. This is a metric-precondition observation, not a PASS/FAIL or authorization.
+- Full suite: **281 passed** (5 new synthetic readiness tests); `validate-program` and fresh-open-snapshot `validate-tree` remain `valid`.
+
+**Verdict:** `PENDING / HELD`. Adds a precise, decision-relevant readiness gap to #18: the owner must decide how the declared-but-unmaterialized `empty-caption-null-v1` null/abstention self-audit step should be satisfied (e.g., accept a remedy for that step or require a re-run that materializes the fixture). No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
+
 ## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
 
 **Date:** 2026-08-03 to 2026-08-04

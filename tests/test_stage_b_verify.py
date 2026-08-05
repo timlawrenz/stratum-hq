@@ -8,7 +8,10 @@ import json
 import pytest
 
 from research_harness import ContractError
-from research_harness.stage_b_verify import verify_stage_b_output_root
+from research_harness.stage_b_verify import (
+    check_stage_b_self_audit_readiness,
+    verify_stage_b_output_root,
+)
 
 
 def _sha(text: str) -> str:
@@ -57,7 +60,9 @@ def _conditions():
     return conds
 
 
-def build_root(tmp_path, *, corrupt=None) -> tuple:
+def build_root(
+    tmp_path, *, corrupt=None, materialize_null=False, empty_caption_as_null=False
+) -> tuple:
     """Build a synthetic Stage-B output root and return (root, plan)."""
     cap_a = "A synthetic caption for image a."
     cap_b = "A synthetic caption for image b."
@@ -142,6 +147,54 @@ def build_root(tmp_path, *, corrupt=None) -> tuple:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(record["caption"] + "\n", encoding="utf-8")
 
+    # Optionally materialize the declared null-output self-audit fixture. The null fixture may
+    # either be its own empty-caption record (record_id == null_output_id) or an empty-caption
+    # record that the null self-audit scores as an abstention.
+    if materialize_null:
+        null_caption = "" if empty_caption_as_null else "This is a deliberately non-empty null sentinel caption."
+        null_cid = conditions[0]["id"]
+        null_record = {
+            "schema_version": 1,
+            "record_id": plan["metric_self_audit"]["null_output_id"],
+            "image_id": "img-a",
+            "source_relative_path": "img-a.jpg",
+            "source_sha256": _sha("img-a"),
+            "condition_id": null_cid,
+            "input_view": dict(conditions[0]["input_view"]),
+            "prompt": {
+                **conditions[0]["prompt"],
+                "rendered_sha256": _sha("null"),
+                "rendered_text": "null",
+            },
+            "evidence": dict(conditions[0]["evidence"]),
+            "evidence_payload": None,
+            "selected_evidence_input_artifact_sha256": {"pose2.npy": _sha("p2"), "seg2.npy": _sha("s2")},
+            "output_relative_path": f"outputs/{null_cid}/{plan['metric_self_audit']['null_output_id']}.txt",
+            "caption_sha256": _sha(null_caption),
+            "caption": null_caption,
+            "caption_word_count": len(null_caption.split()),
+        }
+        records.append(null_record)
+        review.append(
+            {
+                "record_id": null_record["record_id"],
+                "image_id": "img-a",
+                "condition_id": null_cid,
+                "output_relative_path": null_record["output_relative_path"],
+                "review_status": "unreviewed",
+                "supported_claims": [],
+                "unsupported_claims": [],
+                "omissions": [],
+                "contradictions": [],
+                "abstentions": [],
+                "verdict": "PENDING",
+            }
+        )
+        out = root / null_record["output_relative_path"]
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(null_caption + "\n", encoding="utf-8")
+        run["record_count"] = len(records)
+
     def write(name, value):
         (root / name).write_text(
             json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8"
@@ -216,3 +269,54 @@ def test_verify_rejects_missing_output_file(tmp_path):
 def test_verify_rejects_missing_root(tmp_path):
     with pytest.raises(ContractError, match="must be an existing directory"):
         verify_stage_b_output_root(tmp_path / "does-not-exist")
+
+
+def test_verify_accepts_root_with_materialized_null_fixture(tmp_path):
+    root, _plan = build_root(tmp_path, materialize_null=True)
+    report = verify_stage_b_output_root(root)
+    assert report["verified"] is True
+    assert report["record_count"] == 9
+
+
+def test_readiness_flags_missing_null_fixture(tmp_path):
+    root, _plan = build_root(tmp_path)
+    report = check_stage_b_self_audit_readiness(root)
+    assert report["readiness_verdict"] == "NOT_READY"
+    assert report["known_case_present"] is True
+    assert report["known_case_item_id"] == "img-a"
+    assert report["null_present"] is False
+    assert report["null_record_present"] is False
+    assert report["empty_caption_record_count"] == 0
+    assert any("null_output_id" in finding for finding in report["missing_fixtures"])
+    assert "not executable as specified" in report["summary"]
+
+
+def test_readiness_ready_when_null_fixture_materialized(tmp_path):
+    root, _plan = build_root(tmp_path, materialize_null=True)
+    report = check_stage_b_self_audit_readiness(root)
+    assert report["readiness_verdict"] == "READY"
+    assert report["known_case_present"] is True
+    assert report["null_present"] is True
+    assert report["null_record_present"] is True
+    assert report["missing_fixtures"] == []
+    assert report["summary"] == "self-audit fixtures materialized"
+
+
+def test_readiness_ready_for_empty_caption_abstention_record(tmp_path):
+    root, _plan = build_root(tmp_path, materialize_null=True, empty_caption_as_null=True)
+    report = check_stage_b_self_audit_readiness(root)
+    assert report["readiness_verdict"] == "READY"
+    assert report["null_record_present"] is True
+    assert report["empty_caption_record_count"] == 1
+
+
+def test_readiness_raises_on_undeclared_fixture(tmp_path):
+    root, plan = build_root(tmp_path)
+    plan_mutated = dict(plan)
+    plan_mutated["metric_self_audit"] = {"known_case_item_id": "img-a"}
+    (root / "stage-b-plan.json").write_text(
+        json.dumps(plan_mutated, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    with pytest.raises(ContractError, match="null_output_id"):
+        check_stage_b_self_audit_readiness(root)

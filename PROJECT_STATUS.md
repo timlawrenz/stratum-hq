@@ -55,6 +55,18 @@ Treatment: the authority anomaly is unchanged — the run executed under the ass
 
 The correct disposition is `research:needs-human`: the owner must (a) confirm or deny that they issued the asserted WebUI approval for the exact frozen manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`, and (b) if confirmed, record the decision durably (issue comment/review), and (c) decide whether the completed 96-record output root is accepted for the claim-support self-audit and adversarial-review protocol, or treated as invalid and re-run only under a durable approved manifest.
 
+**2026-08-04 self-audit fixture readiness:** an additive observer-only check
+(`research_harness.stage_b_verify.check_stage_b_self_audit_readiness`, CLI
+`research-harness check-stage-b-self-audit-readiness <root>`) reports whether the
+pre-registered `metric_self_audit` fixtures are materialized by a completed run's records.
+Applied to `stage-b-first500-parity-v1`: the known-case item
+`0yo0gxbfflugqp205k128kktigl5` is materialized (4 records), but the declared null-output
+fixture `empty-caption-null-v1` is **not** a record_id and there are 0 empty-caption
+records — so the pre-registered null/abstention self-audit step cannot execute as
+specified on this run. The run remains structurally valid and entirely unreviewed; this is
+a metric-precondition observation, not a PASS/FAIL or authorization. Full suite: 281 passed.
+See `docs/STAGE_B_SELF_AUDIT_FIXTURE_READINESS.md`.
+
 ## Automation and authority
 
 The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.

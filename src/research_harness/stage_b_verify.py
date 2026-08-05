@@ -241,3 +241,89 @@ def verify_stage_b_output_root(root: Path) -> dict[str, Any]:
             "Stage-B output root structural verification failed: " + "; ".join(report["findings"])
         )
     return report
+
+
+def check_stage_b_self_audit_readiness(root: Path) -> dict[str, Any]:
+    """Observer-only readiness report for a completed Stage-B run's pre-registered metric self-audit.
+
+    The frozen plan declares a `metric_self_audit` with a `known_case_item_id` and a
+    `null_output_id`. This check reports, read-only, whether those fixtures are actually
+    materialized by the run's records so the pre-registered known-case and null/abstention
+    self-audit steps can execute as specified. It never fabricates a verdict: a missing fixture
+    means the corresponding self-audit step is not executable as pre-registered, which is a
+    metric-readiness finding, not a model/quality PASS or FAIL.
+
+    The check is deliberately independent of `verify_stage_b_output_root` structural binding:
+    a run can be structurally sound (all fingerprints bind, all files present) while still
+    lacking the declared known-case or null-output fixture needed by the self-audit.
+    """
+    if not root.exists():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"Stage-B output root is unavailable: {root}: {exc}") from exc
+    if not root.is_dir():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+
+    plan = _read_json(_require_file(root / "stage-b-plan.json"))
+    records = _read_jsonl(_require_file(root / "records.jsonl"))
+
+    audit = plan.get("metric_self_audit") or {}
+    known_case = audit.get("known_case_item_id")
+    null_output = audit.get("null_output_id")
+
+    if not isinstance(known_case, str) or not known_case:
+        raise ContractError("comparison parity plan metric_self_audit.known_case_item_id must be declared")
+    if not isinstance(null_output, str) or not null_output:
+        raise ContractError("comparison parity plan metric_self_audit.null_output_id must be declared")
+
+    record_ids = {record.get("record_id") for record in records}
+    image_ids = {record.get("image_id") for record in records}
+    empty_records = [
+        record.get("record_id")
+        for record in records
+        if not isinstance(record.get("caption"), str) or not record["caption"].strip()
+    ]
+
+    # The known-case self-audit scores one generated output against its original selected
+    # source, so it is materialized when the declared item id is a record's image_id.
+    known_case_present = known_case in image_ids
+    known_case_record_keys = sorted(
+        [r["record_id"] for r in records if r.get("image_id") == known_case and isinstance(r.get("record_id"), str)]
+    )
+
+    # The null self-audit scores the declared empty-caption null output and confirms it is
+    # recorded as an abstention. It is materialized when the declared id is itself a record_id
+    # or when at least one record carries an empty caption. Absence means the step cannot run
+    # as pre-registered on this run's records.
+    null_record_present = null_output in record_ids
+    null_empty_present = len(empty_records) > 0
+    null_present = null_record_present or null_empty_present
+
+    missing = []
+    if not known_case_present:
+        missing.append(f"known_case_item_id {known_case!r} is not any record image_id")
+    if not null_present:
+        missing.append(
+            f"null_output_id {null_output!r} is neither a record_id nor materialized as an empty-caption record"
+        )
+
+    return {
+        "root": str(root),
+        "record_count": len(records),
+        "known_case_item_id": known_case,
+        "known_case_present": known_case_present,
+        "known_case_record_keys": known_case_record_keys,
+        "null_output_id": null_output,
+        "null_record_present": null_record_present,
+        "empty_caption_record_count": len(empty_records),
+        "null_present": null_present,
+        "missing_fixtures": missing,
+        "summary": (
+            "self-audit fixtures materialized"
+            if not missing
+            else "self-audit fixtures missing; pre-registered step not executable as specified: " + "; ".join(missing)
+        ),
+        "readiness_verdict": "READY" if not missing else "NOT_READY",
+    }

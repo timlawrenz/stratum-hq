@@ -17,7 +17,10 @@ from .contracts import (
     validate_research_tree,
 )
 from .labels import load_label_specs, plan_label_sync
-from .stage_b_verify import verify_stage_b_output_root
+from .stage_b_verify import (
+    check_stage_b_self_audit_readiness,
+    verify_stage_b_output_root,
+)
 
 
 def _read_json_value(path: Path, label: str) -> Any:
@@ -84,6 +87,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     stage_b.add_argument("root", type=Path)
 
+    stage_b_readiness = sub.add_parser(
+        "check-stage-b-self-audit-readiness",
+        help="report whether a completed Stage-B run materialized its pre-registered metric self-audit fixtures (observer-only)",
+    )
+    stage_b_readiness.add_argument("root", type=Path)
+
     labels = sub.add_parser("plan-labels", help="plan additive GitHub label changes from JSON snapshots")
     labels.add_argument("desired", type=Path, help="tracked desired label-specification JSON")
     labels.add_argument("current", type=Path, help="read-only GitHub label-list JSON")
@@ -125,6 +134,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "verify-stage-b-output":
             verify_stage_b_output_root(args.root)
             print("valid")
+            return 0
+
+        if args.command == "check-stage-b-self-audit-readiness":
+            report = check_stage_b_self_audit_readiness(args.root)
+            print(json.dumps(report, indent=2, sort_keys=True))
             return 0
 
         program = _read_json(args.program)
