@@ -1,7 +1,7 @@
 # Project Status — Stratum Contextual Specialist Research
 
 **Last updated:** 2026-08-05
-**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously.** Hold #18 is RELEASED (recorded via draft PR #28). Arm #4 (baseline/comparison parity) is the sole `research:active` / `research:metric-risk` arm and is empirically complete: 96 captions + independent gemma4 review + reviewer calibration. Its deterministic verdict is **BETTER** (support ratio 0.322→0.796, sign-test p=0.003); `PENDING_HUMAN_SPOT_CHECK` is advisory, not a gate. The dimension registry selects **arm #32 (body-type/proportions)** as the next active arm.
+**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously.** Hold #18 is RELEASED (recorded via draft PR #28). **#4 is the sole `research:active`** / `research:metric-risk` arm (baseline/comparison parity) and is empirically complete: 96 captions + independent gemma4 review + reviewer calibration. Its deterministic verdict is **BETTER** (support ratio 0.322→0.796, sign-test p=0.003); `PENDING_HUMAN_SPOT_CHECK` is advisory, not a gate. The dimension registry selects **arm #32 (body-type/proportions)** as the next active arm. The Stage-A proposal is preserved at `research/proposals/stage-a-caption-context-parity-preparation.md` (bounded, non-executing).
 
 ## Current state
 
@@ -27,7 +27,7 @@ Run arm #32 body-type through the scheduler lifecycle (stage_b_launcher + stage_
 
 ## Automation and authority
 
-The `stratum-ffhq` strategist is executing the autonomous decide→research→conclude→advance loop. Under the frozen-cohort protocol it may: run the deterministic selector, compute deterministic evidence from existing artifacts, generate captions and run the independent review through the scheduler-managed 4090, write noncanonical outputs under `/mnt/nas-ai-models/research`, record verdicts, and advance the registry. It may not mutate either corpus tree, backfill, install/download new image models, use external image services, merge, or push `main` directly (draft-PR-only).
+The `stratum-ffhq` strategist is re-engaged for autonomous research and is executing the autonomous decide→research→conclude→advance loop. Under the frozen-cohort protocol it may: run the deterministic selector, compute deterministic evidence from existing artifacts, generate captions and run the independent review through the scheduler-managed 4090, write noncanonical outputs under `/mnt/nas-ai-models/research`, record verdicts, and advance the registry. It may not mutate either corpus tree, backfill, install/download new image models, use external image services, merge, or push `main` directly (draft-PR-only). The Stage-A proposal remains at `research/proposals/stage-a-caption-context-parity-preparation.md`.
 
 ## Headline result so far
 
