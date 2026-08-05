@@ -10,7 +10,7 @@
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
     "comparison_plan_fingerprint": "6bfdb635459a93532cfbf7d3073991a0975c22d9c95e09d0f5ee5975dbe9b96c",
     "comparison_plan_relative_path": "research/stage-b-plans/stage-b-clothing-v1.json",
-    "comparison_plan_sha256": "be51a927743b8cda255e69c501fde60b0f472ddb3aef582308b2fb14743d3b4b",
+    "comparison_plan_sha256": "f5e2a0f9dc1b740cf576ced15b43ff8a825291c5da4864fc29839ebaae5690a5",
     "expected_record_count": 96,
     "generation": {
       "context_window": 4096,
@@ -23,7 +23,7 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "a4915cebdb2a894b12ed896da9b3cfbe068a3a69",
+    "git_commit": "db9a50023be4f7afad5c963d28824a560cd50046",
     "launcher_source_sha256": "3d1fc471bc72a6429e2b4aa0a87e11ad2f341a89c96636d532467efc3c12487e",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",

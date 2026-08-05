@@ -81,6 +81,12 @@ def main() -> int:
 
     PLAN_OUT.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+    # The launcher compares comparison_plan_sha256 against the plan's CANONICAL
+    # re-serialization (stage_b_launcher line ~147), not the raw file bytes.
+    from research_harness.stage_b import _canonical_json as stage_canonical
+
+    plan_sha = hashlib.sha256(stage_canonical(plan).encode("utf-8")).hexdigest()
+
     # Mirror the arm-#4/#32 manifest shape. Same candidate + generation,
     # different plan fingerprint; distinct job_id + output root; identical
     # launcher/runner hashes only AFTER the committed code matches.
@@ -97,7 +103,7 @@ def main() -> int:
             "candidate_manifest_path": str(CANDIDATE),
             "comparison_plan_fingerprint": plan["comparison_plan_fingerprint"],
             "comparison_plan_relative_path": "research/stage-b-plans/stage-b-clothing-v1.json",
-            "comparison_plan_sha256": _sha256(PLAN_OUT),
+            "comparison_plan_sha256": plan_sha,
             "expected_record_count": 96,
             "generation": {
                 "context_window": SETTINGS.context_window,
