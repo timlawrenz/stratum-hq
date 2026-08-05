@@ -645,3 +645,205 @@ def check_stage_b_contrast_divergence(root: Path) -> dict[str, Any]:
         ),
         "contrast_divergence_ok": bad == 0,
     }
+
+
+# Instruction-bearing fragments that must never appear inside a data-only evidence
+# slot of a rendered prompt. They are the role/task/semantic-expansion directives
+# that legitimate data-only evidence serialization must not carry (see the
+# executor-level controlled-comparison audit). Kept deliberately short and specific;
+# a match means the evidence slot is not data-only, so the evidence axis is not
+# cleanly isolated at the rendered-input boundary.
+_EVIDENCE_SLOT_INSTRUCTION_MARKERS = (
+    "Your job is to VERBALIZE the geometry and ADD what the determinations omit",
+    "Name the posture or activity if obvious",
+    "Translate the measured relations",
+    "Describe mood, lighting quality, color palette",
+    "Describe the setting and environment",
+    "Subject & Pose",
+    "Semantics:",
+    "Visuals:",
+    "Background:",
+    "Below is a block of DETERMINATIONS",
+    "These are ground truth",
+    "You must NEVER contradict",
+)
+_EVIDENCE_SLOT_MARKER = "DECLARED SPECIALIST EVIDENCE:"
+# The context-grounded template's own role/task tail follows the evidence slot. It
+# legitimately repeats phrases like "Write strictly objective prose" / "Start the
+# description immediately", so the check clips the slot at this boundary and scans only
+# the evidence block itself, never the surrounding template prose.
+_EVIDENCE_SLOT_TAIL = "Use declared specialist evidence only as bounded support;"
+
+
+def _evidence_slot(rendered_text: str) -> str | None:
+    """Return the evidence slot from a rendered prompt (clipped at the template tail).
+
+    Returns ``None`` when the declared-specialist-evidence marker is not present (the
+    prompt does not follow the context-grounded template shape).
+    """
+    marker_index = rendered_text.find(_EVIDENCE_SLOT_MARKER)
+    if marker_index == -1:
+        return None
+    slot = rendered_text[marker_index + len(_EVIDENCE_SLOT_MARKER):].strip()
+    tail_index = slot.find(_EVIDENCE_SLOT_TAIL)
+    if tail_index != -1:
+        slot = slot[:tail_index].strip()
+    return slot
+
+
+def check_stage_b_evidence_prompt_clean(root: Path) -> dict[str, Any]:
+    """Observer-only report on whether a completed Stage-B run's evidence slot is data-only.
+
+    The other evidence checks verify the run's *recorded* `evidence_payload` field and the
+    output-level divergence of its declared contrasts. They do not inspect the exact rendered
+    prompt that was sent to the aggregator. This check reads `prompt.rendered_text` from the
+    records and inspects the declared specialist-evidence slot: a data-only evidence block must
+    contain only the evidence content itself and must not smuggle role text, task instructions,
+    semantic-expansion guidance, or detector/evaluator metadata into the prompt.
+
+    Specifically, for every evidence-bearing condition (kind ``specialist_bundle``) the check:
+
+    - locates the ``DECLARED SPECIALIST EVIDENCE:`` slot in each record's rendered prompt;
+    - verifies the slot is present and non-empty;
+    - verifies the slot contains per-image distinct content (not one shared block);
+    - flags any instruction-bearing marker inside the slot.
+
+    A flagged marker means the evidence-only contrast changes embedded instructions together
+    with the evidence itself, so the evidence axis is not cleanly isolated at the model-input
+    boundary. This is a metric-readiness finding, never a semantic/quality PASS or FAIL, and
+    never an authorization. No model, GPU, scheduler, corpus, or derived-tree action occurs.
+    """
+    if not root.exists():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"Stage-B output root is unavailable: {root}: {exc}") from exc
+    if not root.is_dir():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+
+    plan = _read_json(_require_file(root / "stage-b-plan.json"))
+    records = _read_jsonl(_require_file(root / "records.jsonl"))
+
+    conditions = plan.get("conditions") or []
+    evidence_ids: list[str] = []
+    none_ids: list[str] = []
+    for condition in conditions:
+        if not isinstance(condition, dict):
+            raise ContractError("each comparison condition must be an object")
+        cid = condition.get("id")
+        evidence = condition.get("evidence") or {}
+        kind = evidence.get("kind") if isinstance(evidence, dict) else None
+        if not isinstance(cid, str) or not cid:
+            raise ContractError("each comparison condition must declare a string id")
+        if kind == "specialist_bundle":
+            evidence_ids.append(cid)
+        elif kind == "none":
+            none_ids.append(cid)
+        else:
+            raise ContractError(
+                f"condition {cid!r} must declare evidence.kind 'specialist_bundle' or 'none'"
+            )
+    if not evidence_ids:
+        raise ContractError("stage-b-plan.json must declare at least one evidence-bearing condition")
+    if not none_ids:
+        raise ContractError("stage-b-plan.json must declare at least one no-evidence condition")
+
+    by_condition: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        cid = record.get("condition_id")
+        if isinstance(cid, str):
+            by_condition.setdefault(cid, []).append(record)
+
+    checks: dict[str, int] = {"ok": 0, "bad": 0}
+    findings: list[str] = []
+    condition_reports: list[dict[str, Any]] = []
+
+    def check(condition: bool, label: str) -> None:
+        checks["ok" if condition else "bad"] += 1
+        if not condition:
+            findings.append(label)
+
+    for condition_id in sorted(evidence_ids):
+        group = by_condition.get(condition_id, [])
+        check(len(group) > 0, f"evidence condition {condition_id!r} has no records")
+        slots: list[str] = []
+        leaky_records: list[dict[str, Any]] = []
+        for record in group:
+            rendered = record.get("prompt") or {}
+            text = rendered.get("rendered_text")
+            check(
+                bool(isinstance(text, str) and text),
+                f"{record.get('record_id')}: evidence-bearing record must carry rendered prompt text",
+            )
+            if not isinstance(text, str):
+                continue
+            slot = _evidence_slot(text)
+            check(
+                slot is not None,
+                f"{record.get('record_id')}: evidence-bearing rendered prompt must declare an evidence slot",
+            )
+            if slot is None:
+                continue
+            check(slot != "", f"{record.get('record_id')}: evidence slot must be non-empty")
+            if not slot:
+                continue
+            slots.append(slot)
+            found = [marker for marker in _EVIDENCE_SLOT_INSTRUCTION_MARKERS if marker in slot]
+            if found:
+                leaky_records.append(
+                    {"record_id": record.get("record_id"), "image_id": record.get("image_id"), "markers": found}
+                )
+        check(len(slots) > 0, f"evidence condition {condition_id!r} has no readable evidence slots")
+        distinct_slots = len({slot for slot in slots})
+        check(
+            distinct_slots >= 2,
+            f"evidence condition {condition_id!r} evidence slot collapsed to one shared block across records",
+        )
+        for row in leaky_records:
+            check(
+                False,
+                f"{row['record_id']}: evidence slot contains instruction-bearing text: {', '.join(row['markers'])}",
+            )
+        condition_reports.append(
+            {
+                "condition": condition_id,
+                "record_count": len(group),
+                "distinct_slot_count": distinct_slots,
+                "instruction_leak_count": len(leaky_records),
+                "leaky_records": leaky_records,
+            }
+        )
+
+    for condition_id in sorted(none_ids):
+        group = by_condition.get(condition_id, [])
+        for record in group:
+            rendered = record.get("prompt") or {}
+            text = rendered.get("rendered_text")
+            slot = _evidence_slot(text) if isinstance(text, str) else None
+            if slot is None:
+                # A no-evidence condition may legitimately be rendered without the
+                # context-grounded marker (e.g. the legacy prompt template). Nothing to
+                # inspect; the evidence-prompt check only binds evidence conditions.
+                continue
+            found = [marker for marker in _EVIDENCE_SLOT_INSTRUCTION_MARKERS if marker in slot]
+            check(
+                not found,
+                f"{record.get('record_id')}: no-evidence evidence slot contains instruction-bearing text: {', '.join(found)}",
+            )
+
+    bad = checks["bad"]
+    return {
+        "root": str(root),
+        "evidence_condition_count": len(evidence_ids),
+        "conditions": condition_reports,
+        "checks_passed": checks["ok"],
+        "checks_failed": checks["bad"],
+        "findings": findings,
+        "summary": (
+            "all evidence slots are data-only in their rendered prompts"
+            if bad == 0
+            else "evidence prompts NOT data-only: " + "; ".join(findings)
+        ),
+        "evidence_prompt_clean": bad == 0,
+    }

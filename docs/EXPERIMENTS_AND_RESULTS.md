@@ -128,6 +128,25 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD`. The evidence axis of the completed run is structurally real and isolated, so it is decision-relevant that the owner need not treat "0/24 materialized later chains" as a blocker for *interpreting* the evidence contrast — the geometry was derived in memory from existing core artifacts. The #18 decisions are unchanged: confirm/deny the asserted approval, decide the missing `empty-caption-null-v1` null fixture, freeze the claim-support/adversarial review protocol, and confirm geometry-derivation provenance for any re-run. No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
 
+## Stage-B evidence-prompt cleanliness — `[METRIC-READINESS FINDING / NON-EXECUTING]`
+
+**Date:** 2026-08-05
+**Arm:** #4 — baseline and comparison parity (held by #18)
+**Artifact:** [`STAGE_B_EVIDENCE_PROMPT_CLEANLINESS.md`](STAGE_B_EVIDENCE_PROMPT_CLEANLINESS.md) and additive observer-only check `research_harness.stage_b_verify.check_stage_b_evidence_prompt_clean` (+ CLI `check-stage-b-evidence-prompt-clean`).
+
+**Read-only evidence:**
+
+- Question answered: the recorded `evidence_payload` field was proven clean and the output captions were proven to diverge, but nobody had inspected the **exact rendered prompt** sent to the aggregator — the executor-level boundary where an evidence-only contrast can be silently turned into an evidence-plus-instructions contrast.
+- `check-stage-b-evidence-prompt-clean stage-b-first500-parity-v1` → `evidence_prompt_clean: **false**` (99 checks passed, **24 failed**).
+- All 24/24 `context-raw-geometry` records carry a readable, **per-image distinct** evidence slot (24 distinct slots → data is not boilerplate), but **every** record's evidence slot embeds the full CAPTION2 role/task instruction block: "Your job is to VERBALIZE the geometry and ADD what the determinations omit", "Name the posture or activity if obvious", "Translate the measured relations", "Describe mood, lighting quality, color palette", "Describe the setting and environment", "Subject & Pose", "Semantics:", "Visuals:", "Background:".
+- Root cause (executor-level): the runner built the evidence text with `build_prompt(determinations).split("DETERMINATIONS:\n", 1)[-1].strip()`, and `build_prompt` returns the full `CAPTION2_PROMPT_TEMPLATE`, so the split retains the template's trailing role/task block alongside the determinations.
+- The 72 no-evidence records carry no such instruction text in their evidence slots.
+- Therefore the declared **evidence-only** contrast differs on two axes at the rendered-input boundary: the evidence payload **and** the embedded instructions. The evidence axis is not cleanly isolated in this run's rendered prompts, independent of the `evidence_payload` field being clean.
+- Structural only, not semantic: `run-provenance.json` still declares `PENDING_INDEPENDENT_REVIEW`, `semantic_verdict: PENDING`, metric self-audit `PENDING_HUMAN_SELF_AUDIT`; 96/96 review rows stay `unreviewed`/`PENDING`. No claim-support scoring, known-case/null self-audit, or adversarial review has run.
+- Full suite: **294 passed** (3 new synthetic tests); `validate-program` and fresh-open-snapshot `validate-tree` remain `valid`.
+
+**Verdict:** `PENDING / HELD`. Shapes the #18 owner decision: if the completed root is considered for the claim-support self-audit + adversarial review, the evidence-only contrast must be interpreted with the documented evidence+instructions confound, or a re-run must use a data-only evidence renderer (only the determinations block, no surrounding instructions). The smallest exact decisions are unchanged (confirm/deny the asserted approval; decide the missing `empty-caption-null-v1` null fixture; freeze the self-audit/adversarial protocol; decide the evidence-rendering confound). No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
+
 ## Stage-B contrast divergence — `[METRIC-READINESS FINDING / NON-EXECUTING]`
 
 **Date:** 2026-08-05

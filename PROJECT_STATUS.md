@@ -23,7 +23,7 @@ The new immutable noncanonical candidate record is `/mnt/nas-ai-models/research/
 
 ## Immediate next action
 
-The source-hashed coverage-balanced subset is frozen. Respect #18: await an owner decision that names an already-installed local aggregator and immutable generation settings, freezes the claim-support known-case/null self-audit and adversarial-review plan, and separately authorizes or denies model invocation and GPU/scheduler action for the exact manifest.
+The source-hashed coverage-balanced subset is frozen. Respect #18: await an owner decision that names an already-installed local aggregator and immutable generation settings, freezes the claim-support known-case/null self-audit and adversarial-review plan, and separately authorizes or denies model invocation and GPU/scheduler action for the exact manifest. The completed output root remains `PENDING_INDEPENDENT_REVIEW`; the newest observer-only finding (evidence-prompt cleanliness) adds that the evidence-only contrast is not cleanly isolated in the rendered prompts, so the owner must also decide whether to interpret that contrast with the documented evidence+instructions confound or require a data-only evidence renderer in any re-run.
 
 **2026-08-04 correction:** a completed 96-record empirical Stage-B output root now exists (`/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1`, created 22:20:21Z; scheduler release logged `completed` 22:20:22Z), contradicting the earlier "no output root" record. It is structurally self-consistent (96/96 source/evidence/plan bindings verified) but **entirely unreviewed** (`PENDING_INDEPENDENT_REVIEW`, all 96 review rows `PENDING`) and was produced under the asserted-but-undemonstrated approval. There is still no durable owner authorization, so it remains `PENDING / HELD` until the owner decides whether to accept it for claim-support self-audit + adversarial review, or treat it as invalid. Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files still cannot substitute for the missing evidence condition on the wider first-500 cohort or for `context4k`.
 
@@ -97,6 +97,24 @@ semantic: no claim-support scoring, self-audit, or adversarial review has run (9
 PENDING), and it does not authorize anything or alter the #18 hold. Full suite: **291 passed**
 (4 new tests). See `docs/STAGE_B_CONTRAST_DIVERGENCE.md`.
 
+**2026-08-05 evidence-prompt cleanliness finding (additive, observer-only, executor-level):**
+a new check (`research_harness.stage_b_verify.check_stage_b_evidence_prompt_clean`, CLI
+`research-harness check-stage-b-evidence-prompt-clean <root>`) inspects the **rendered prompt**
+the completed run actually sent to the aggregator — the executor-level boundary the earlier
+checks did not cover. Applied to `stage-b-first500-parity-v1`: `evidence_prompt_clean: **false**`
+(99 checks passed, **24 failed**). All 24/24 `context-raw-geometry` records carry a readable,
+per-image distinct evidence slot, but **every** one embeds the full CAPTION2 role/task
+instruction block ("Your job is to VERBALIZE the geometry and ADD what the determinations omit",
+"Name the posture or activity if obvious", "Translate the measured relations", "Subject & Pose",
+"Semantics:", "Visuals:", "Background:", …) inside the evidence slot, because the runner
+extracted the evidence text with `build_prompt(determinations).split("DETERMINATIONS:\n", 1)[-1]`
+retaining the template's trailing instruction block. So the declared **evidence-only** contrast
+changes evidence **and** embedded instructions at the model-input boundary — the evidence axis is
+not cleanly isolated in this run's rendered prompts (the 72 no-evidence records are clean). This is
+structural, not semantic: no claim-support scoring, self-audit, or adversarial review has run
+(96/96 rows PENDING), and it does not authorize anything or alter the #18 hold. Full suite:
+**294 passed** (3 new synthetic tests). See `docs/STAGE_B_EVIDENCE_PROMPT_CLEANLINESS.md`.
+
 ## Automation and authority
 
 The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.
@@ -105,4 +123,4 @@ It may not merge, push `main`, mutate either corpus tree, backfill, install/down
 
 ## Headline result so far
 
-**PENDING / HELD, WITH A COMPLETED UNREVIEWED STAGE-B OUTPUT SET.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. A 96-record empirical Stage-B output root exists (created 22:20:21Z, scheduler `completed` 22:20:22Z) with cleanly isolatable one-axis contrasts and fully verified structural bindings; observer-only checks additionally confirm the evidence axis was materialized/in-memory-derived and that all three declared one-axis contrasts produced distinguishable output captions (0/24 byte-identical pairs on every axis). But 0/96 review rows are scored and no self-audit or adversarial review has run, so it is `PENDING_INDEPENDENT_REVIEW`, not a result. The frozen subset still has **0 / 24** complete *existing* later chains, and #18 still blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and durable Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.
+**PENDING / HELD, WITH A COMPLETED UNREVIEWED STAGE-B OUTPUT SET.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. A 96-record empirical Stage-B output root exists (created 22:20:21Z, scheduler `completed` 22:20:22Z) with cleanly isolatable one-axis contrasts and fully verified structural bindings; observer-only checks additionally confirm the evidence axis was materialized/in-memory-derived, that all three declared one-axis contrasts produced distinguishable output captions (0/24 byte-identical pairs on every axis), **and that the evidence-bearing rendered prompts embed the CAPTION2 role/task instruction block inside the evidence slot — so the evidence-only contrast is not cleanly isolated at the model-input boundary** (`evidence_prompt_clean: false`, 24/24 `context-raw-geometry` records). But 0/96 review rows are scored and no self-audit or adversarial review has run, so it is `PENDING_INDEPENDENT_REVIEW`, not a result. The frozen subset still has **0 / 24** complete *existing* later chains, and #18 still blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and durable Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.

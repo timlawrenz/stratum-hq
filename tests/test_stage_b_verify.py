@@ -11,6 +11,7 @@ from research_harness import ContractError
 from research_harness.stage_b_verify import (
     check_stage_b_contrast_divergence,
     check_stage_b_evidence_axis,
+    check_stage_b_evidence_prompt_clean,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
 )
@@ -122,6 +123,15 @@ def build_root(
                     "relations": [{"part": "face", "kp_conf": 0.9}],
                     "image_id": image_id,
                 }
+                rendered_prompt = (
+                    "You are an expert descriptive captioner for a text-to-image dataset.\n"
+                    "Your task is to write a single, rich, dense paragraph describing the provided image.\n\n"
+                    "DECLARED SPECIALIST EVIDENCE:\n"
+                    f"- exactly one primary subject detected\n"
+                    f"- subject horizontal position: {image_id}\n"
+                    f"- visible body regions: face, {image_id}\n\n"
+                    "Use declared specialist evidence only as bounded support; do not turn absent evidence into a claim.\n"
+                )
             else:
                 evidence_payload = None
             record = {
@@ -332,6 +342,30 @@ def build_root(
         with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
             for record in records_mutated:
                 handle.write(_canonical_json(record) + "\n")
+    if corrupt == "evidence-prompt-instruction-leak":
+        records_mutated = list(records)
+        leaked_tail = (
+            "\n\nYour job is to VERBALIZE the geometry and ADD what the determinations omit:\n"
+            "1. Subject & Pose: Translate the measured relations (e.g., facing, limb positions) into natural prose.\n"
+            "2. Semantics: Name the posture or activity if obvious (e.g., cartwheel, kneeling, ballet) consistent with the geometry.\n"
+            "3. Visuals: Describe mood, lighting quality, color palette, fabric, texture, skin details, and expression.\n"
+            "4. Background: Describe the setting and environment.\n"
+            "These are ground truth.\n"
+        )
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-geometry":
+                slot = record["prompt"]["rendered_text"]
+                tail = "Use declared specialist evidence only as bounded support;"
+                tail_index = slot.find(tail)
+                if tail_index != -1:
+                    slot = slot[:tail_index] + leaked_tail + "\n\n" + slot[tail_index:]
+                else:
+                    slot = slot + leaked_tail
+                record["prompt"]["rendered_sha256"] = _sha(slot)
+                record["prompt"]["rendered_text"] = slot
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
 
     return root, plan
 
@@ -506,3 +540,29 @@ def test_contrast_divergence_rejects_condition_boilerplate(tmp_path):
 def test_contrast_divergence_rejects_missing_root(tmp_path):
     with pytest.raises(ContractError, match="must be an existing directory"):
         check_stage_b_contrast_divergence(tmp_path / "does-not-exist")
+
+
+def test_evidence_prompt_clean_on_wellformed_root(tmp_path):
+    root, _plan = build_root(tmp_path)
+    report = check_stage_b_evidence_prompt_clean(root)
+    assert report["evidence_prompt_clean"] is True
+    assert report["checks_failed"] == 0
+    assert report["evidence_condition_count"] == 1
+    assert report["conditions"][0]["instruction_leak_count"] == 0
+    assert report["conditions"][0]["distinct_slot_count"] == 2
+
+
+def test_evidence_prompt_clean_rejects_instruction_leak(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="evidence-prompt-instruction-leak")
+    report = check_stage_b_evidence_prompt_clean(root)
+    assert report["evidence_prompt_clean"] is False
+    assert report["checks_failed"] > 0
+    assert report["conditions"][0]["instruction_leak_count"] > 0
+    assert any("instruction-bearing" in finding for finding in report["findings"])
+    # The leaked CAPTION2 role/task fragment must be named in the finding.
+    assert any("Your job is to VERBALIZE" in finding for finding in report["findings"])
+
+
+def test_evidence_prompt_clean_rejects_missing_root(tmp_path):
+    with pytest.raises(ContractError, match="must be an existing directory"):
+        check_stage_b_evidence_prompt_clean(tmp_path / "does-not-exist")
