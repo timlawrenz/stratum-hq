@@ -116,6 +116,22 @@ def test_sweep_status_exhausted_triggers_brainstorm() -> None:
     assert status["next_action"] == "brainstorm-new-data"
 
 
+def test_sweep_status_exhausted_offers_brainstorm_widening_options() -> None:
+    """Exhaustion must not mean 'stop': it routes to brainstorm options that
+    include new data sources, new evidence parts, AND new model candidates
+    (literature/arXiv scan) — the owner's widening directive."""
+    reg = _registry()
+    reg["dimensions"][0]["state"] = "falsified"
+    status = sweep_status(reg)
+    assert status["exhausted"] is True
+    opts = status["brainstorm_options"]
+    assert "new-model-candidate research (literature/arXiv scan)" in " ".join(opts)
+    assert any("new-data-source" in o for o in opts)
+    assert any("new-evidence-part" in o for o in opts)
+    # not exhausted -> no brainstorm options offered
+    assert sweep_status(_registry())["brainstorm_options"] == []
+
+
 def test_render_arm_issue_is_deterministic_and_contains_meta() -> None:
     reg = _registry()
     body = render_arm_issue(reg, "clothing")

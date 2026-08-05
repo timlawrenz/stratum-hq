@@ -151,6 +151,20 @@ def sweep_status(registry: Mapping[str, Any]) -> dict[str, Any]:
         "terminal": sum(by_state.get(s, 0) for s in terminal),
         "exhausted": exhausted,
         "next_action": "brainstorm-new-data" if exhausted else "none",
+        # (owner directive 2026-08-05) exhaustion must not mean "stop": the
+        # brainstorm step is the widening move — new data sources, new evidence
+        # parts, AND new model candidates (literature/arXiv scan) for existing
+        # tasks or entirely new parts.
+        "brainstorm_options": (
+            [
+                "new-data-source candidacy",
+                "new-evidence-part candidacy",
+                "new-model-candidate research (literature/arXiv scan): better model "
+                "for an existing task, or a model covering an entirely new part",
+            ]
+            if exhausted
+            else []
+        ),
     }
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from research_harness.issue_labels import (
-    IssueLabelError,
     compute_desired_labels,
     plan_issue_label_sync,
 )

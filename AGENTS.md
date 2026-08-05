@@ -23,7 +23,7 @@
 - A PASS requires a metric self-audit, a controlled comparison, and adversarial review. Otherwise write `PENDING`.
 - GPU work must use `/mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py`. Its `poll` operation performs the atomic claim; never call a separate claim after a successful poll, bypass the scheduler, kill another job, or infer availability from a transient GPU snapshot.
 - The 4090 is local; Strix jobs must use `ssh:max395`. The Strix has a 10GB evergreen Crawlr labeling reservation.
-- Keep sensitive-image inference local-first. Any external image-model proposal requires a hold and explicit review.
+- Keep sensitive-image inference on owned hardware by default (local-first execution). Model sourcing is open-world: new candidate models (open weights, fine-tunes, deterministic or learned specialists) may be discovered, downloaded, installed, and qualified when local options are exhausted or a better/new-part model exists, including literature/arXiv research. Hosted third-party inference of the sensitive canonical corpus still requires a hold and explicit review.
 - Work is PR-only: create draft PRs, never merge or directly push `main`.
 
 ## Required hold behavior

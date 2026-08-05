@@ -204,6 +204,33 @@ def test_stratum_program_keeps_its_specific_corpus_and_accelerator_contract() ->
     }
 
 
+def test_program_model_sourcing_is_open_world_while_sensitive_hosting_stays_gated() -> None:
+    """(Owner directive 2026-08-05) Model SOURCING is open-world: the loop may
+    discover/download/install/qualify new candidate models when local options
+    are exhausted, and may scan literature/arXiv for better or new-part models.
+    This must NOT reopen hosted third-party inference of the sensitive canonical
+    corpus, which stays gated. The validator must accept installation=True while
+    still rejecting external image-hosting authorization."""
+    program = json.loads((ROOT / "research" / "program.json").read_text())
+    assert program["content_policy"]["model_sourcing"] == "open_world"
+    assert program["content_policy"]["model_execution"] == "local_first"
+    assert program["content_policy"]["autonomous_external_image_model_allowed"] is False
+    assert program["autonomy"]["autonomous_model_installation_allowed"] is True
+    assert program["autonomy"]["requires_hold"] == [
+        "GPU request, claim, launch, heartbeat, or release",
+        "dataset mutation or corpus-wide backfill",
+        "hosted third-party inference of the sensitive canonical corpus",
+        "sending canonical source images to an external hosted image service",
+        "metric or policy uncertainty",
+        "scope-changing specialist or architecture opportunity",
+        "merge or direct push to main",
+    ]
+    assert any("arXiv" in s or "literature" in s for s in program["autonomy"]["authorized_without_new_human_approval"])
+    assert program["content_policy"]["external_model_requirement"] != (
+        "A non-local image model requires an explicit reviewed policy and qualification issue before use."
+    )
+
+
 def test_label_spec_is_unique_and_contains_hold_controls() -> None:
     labels = json.loads((ROOT / "research" / "labels.json").read_text())
     names = [label["name"] for label in labels]

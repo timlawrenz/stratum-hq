@@ -17,7 +17,7 @@ A positive result is desirable, but scientific success is an auditable **GO, PIV
 - **Derived artifact tree:** `/mnt/nas-ai-models/training-data/crawlr/stratum`; currently partial and heterogeneous.
 - **Subject invariant:** every source image contains exactly one curated woman.
 - A detector producing zero or multiple people is a model/data-quality anomaly. It is not a semantic statement for captions or the representation.
-- The corpus can include swimwear or nudity. Local-first image inference is mandatory. A silent refusal, vague avoidance, or unexplained omission is a data-quality failure.
+- The corpus can include swimwear or nudity. Sensitive-image inference runs on owned hardware by default (local-first execution). Model SOURCING is open-world: the loop may discover, download, install, and qualify new candidate models (open weights, fine-tunes, deterministic or learned specialists) from papers/literature and hubs when local options are exhausted or a materially better / new-part model exists. Hosted third-party inference of the sensitive canonical corpus requires a hold and reviewed qualification. A silent refusal, vague avoidance, or unexplained omission is a data-quality failure.
 
 ## Evidence architecture
 
@@ -93,7 +93,7 @@ request → poll-and-claim → launch → verify → activate → heartbeat → 
 
 ## Autonomy and hold boundary
 
-The autonomous agent may update documentation, tests, issues, labels, branches, commits, and draft PRs. It may not merge, push `main`, mutate the canonical corpus, launch a backfill, install/download a new model, or use GPU resources without a reviewed future arm and explicit authority.
+The autonomous agent may update documentation, tests, issues, labels, branches, commits, and draft PRs. It may not merge, push `main`, mutate the canonical corpus, launch a backfill, or use GPU resources without a reviewed future arm and explicit authority. It MAY autonomously discover, download, install, and qualify new candidate models (arXiv/literature/hub research included) under the open-world model-sourcing policy, as long as sensitive-corpus inference stays on owned hardware; hosted third-party inference of the sensitive canonical corpus still requires a hold.
 
 Apply `research:hold` and stop if any of these occur:
 
