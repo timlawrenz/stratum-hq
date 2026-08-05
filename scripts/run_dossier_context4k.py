@@ -152,7 +152,7 @@ def run(manifest_path: Path, program_path: Path, output_root: Path, *, report: P
             "expanded_dossier_tokens": dossier["token_count"],
             "compact_context_tokens": context["token_count"],
             "compact_under_budget": context["under_budget"],
-            "claims": context["token_count"],
+            "claim_count": len(context["claims"]),
             "evidence_ids": dossier["evidence_ids"],
             "contract_ok": contract_ok,
             "contract_reason": contract_reason,
