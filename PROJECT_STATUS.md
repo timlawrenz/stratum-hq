@@ -1,6 +1,6 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-05
 **Phase / status:** **ACTIVE METHODOLOGY / PRE-COMPUTE HOLD** — #4 is the sole `research:active` / `research:metric-risk` arm, while #18 holds Stage B pending a direct owner decision. Stage A is completed and independently audited, but remains `PENDING` / non-executing; no Stage-B action is authorized.
 
 ## Current state
@@ -77,11 +77,25 @@ materialized `determinations.json → caption2.txt → t52_*` later chains. Appl
 `in-memory-geometry-determinations-v1` payloads whose `selected_evidence_input_artifact_sha256`
 (`pose2.npy`, `seg2.npy`) bind byte-for-byte to the on-disk derived files for the same
 source, and all 72 no-evidence records carry `evidence_payload: null`. The evidence axis is
-structurally real and isolated; the geometry was derived in memory from existing core
-artifacts, not from the missing later-chain files. This is structural, not semantic: no
-claim-support scoring, self-audit, or adversarial review has run (96/96 rows PENDING), and
-it does not authorize anything or alter the #18 hold. Full suite: **287 passed** (6 new
+structurally real and isolated; the geometry was derived in memory from existing
+core artifacts, not from the missing later-chain files. This is structural, not semantic: no
+claim-support scoring, self-audit, or adversarial review has run (96/96 rows PENDING), and it
+does not authorize anything or alter the #18 hold. Full suite: **287 passed** (6 new
 tests). See `docs/STAGE_B_EVIDENCE_AXIS_INTEGRITY.md`.
+
+**2026-08-05 contrast-divergence finding (additive, observer-only):** a new check
+(`research_harness.stage_b_verify.check_stage_b_contrast_divergence`, CLI
+`research-harness check-stage-b-contrast-divergence <root>`) answers the output-level twin of
+the evidence-axis question for the completed run: did the aggregator actually produce
+**distinguishable captions** for each declared one-axis contrast, or collapse them? Applied to
+`stage-b-first500-parity-v1`: `contrast_divergence_ok: true` (20 checks, 0 failed) —
+**0 of 24** baseline/variant caption pairs are byte-identical on every declared contrast
+(`input-view-only` token-Jaccard median 0.491, `prompt-only` 0.308, `evidence-only` 0.380) and
+no condition collapsed to a single boilerplate caption across its 24 records. The run therefore
+expresses all three declared axes at the output level; none is vacuous. This is structural, not
+semantic: no claim-support scoring, self-audit, or adversarial review has run (96/96 rows
+PENDING), and it does not authorize anything or alter the #18 hold. Full suite: **291 passed**
+(4 new tests). See `docs/STAGE_B_CONTRAST_DIVERGENCE.md`.
 
 ## Automation and authority
 
@@ -91,4 +105,4 @@ It may not merge, push `main`, mutate either corpus tree, backfill, install/down
 
 ## Headline result so far
 
-**PENDING / HELD, WITH A COMPLETED UNREVIEWED STAGE-B OUTPUT SET.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. A 96-record empirical Stage-B output root exists (created 22:20:21Z, scheduler `completed` 22:20:22Z) with cleanly isolatable one-axis contrasts and fully verified structural bindings, but 0/96 review rows are scored and no self-audit or adversarial review has run, so it is `PENDING_INDEPENDENT_REVIEW`, not a result. The frozen subset still has **0 / 24** complete *existing* later chains, and #18 still blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and durable Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.
+**PENDING / HELD, WITH A COMPLETED UNREVIEWED STAGE-B OUTPUT SET.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. A 96-record empirical Stage-B output root exists (created 22:20:21Z, scheduler `completed` 22:20:22Z) with cleanly isolatable one-axis contrasts and fully verified structural bindings; observer-only checks additionally confirm the evidence axis was materialized/in-memory-derived and that all three declared one-axis contrasts produced distinguishable output captions (0/24 byte-identical pairs on every axis). But 0/96 review rows are scored and no self-audit or adversarial review has run, so it is `PENDING_INDEPENDENT_REVIEW`, not a result. The frozen subset still has **0 / 24** complete *existing* later chains, and #18 still blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and durable Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.

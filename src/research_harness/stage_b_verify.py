@@ -463,3 +463,185 @@ def check_stage_b_evidence_axis(root: Path) -> dict[str, Any]:
         ),
         "evidence_axis_ok": bad == 0,
     }
+
+
+def _token_set(text: str) -> set[str]:
+    """Lowercased alphanumeric token set used only for divergence stats."""
+    return set(__import__("re").findall(r"[a-zA-Z0-9]+", text.lower()))
+
+
+def _token_jaccard(left: str, right: str) -> float:
+    tokens_left = _token_set(left)
+    tokens_right = _token_set(right)
+    union = tokens_left | tokens_right
+    if not union:
+        return 0.0
+    return len(tokens_left & tokens_right) / len(union)
+
+
+def check_stage_b_contrast_divergence(root: Path) -> dict[str, Any]:
+    """Observer-only report on whether a completed Stage-B run's declared one-axis contrasts
+    produced distinguishable output captions.
+
+    The frozen plan declares one-axis contrasts (a baseline and a variant condition differing
+    on exactly one declared axis, e.g. ``input_view``, ``prompt``, or ``evidence``). A run can
+    only *support* a declared contrast if its output captions actually differ across that pair:
+    a wholesale byte-collapse (every baseline/variant pair identical) would mean the aggregator
+    ignored the axis, making the contrast vacuous regardless of how the plan and inputs were
+    bound. This check also verifies each condition emitted more than one distinct caption across
+    images (no per-condition boilerplate), the output-level twin of the per-image evidence-payload
+    distinctness check.
+
+    The check is deliberately structural and observer-only: it measures presence and statistical
+    divergence of the *recorded* caption text only. It does not judge caption quality, claim
+    support, semantic accuracy, or which output is better; claimed supported/unsupported scoring,
+    known-case/null self-audit, and adversarial review remain the reserved human steps. A report
+    produced here is not an authorization and not a PASS/FAIL.
+    """
+    if not root.exists():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"Stage-B output root is unavailable: {root}: {exc}") from exc
+    if not root.is_dir():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+
+    plan = _read_json(_require_file(root / "stage-b-plan.json"))
+    records = _read_jsonl(_require_file(root / "records.jsonl"))
+
+    plan_condition_ids = {
+        condition.get("id")
+        for condition in (plan.get("conditions") or [])
+        if isinstance(condition, dict) and isinstance(condition.get("id"), str)
+    }
+    contrasts = plan.get("contrasts")
+    if not isinstance(contrasts, list) or not contrasts:
+        raise ContractError("stage-b-plan.json must declare at least one one-axis contrast in 'contrasts'")
+
+    by_image_and_condition: dict[tuple[str, str], str] = {}
+    for record in records:
+        image_id = record.get("image_id")
+        condition_id = record.get("condition_id")
+        caption = record.get("caption")
+        if (
+            isinstance(image_id, str)
+            and isinstance(condition_id, str)
+            and isinstance(caption, str)
+        ):
+            by_image_and_condition[(image_id, condition_id)] = caption
+
+    checks: dict[str, int] = {"ok": 0, "bad": 0}
+    findings: list[str] = []
+    contrast_reports: list[dict[str, Any]] = []
+
+    def check(condition: bool, label: str) -> None:
+        checks["ok" if condition else "bad"] += 1
+        if not condition:
+            findings.append(label)
+
+    for contrast in contrasts:
+        if not isinstance(contrast, dict):
+            check(False, "each contrast must be an object")
+            continue
+        contrast_id = contrast.get("id")
+        baseline = contrast.get("baseline_condition")
+        variant = contrast.get("variant_condition")
+        changed_axes = contrast.get("changed_axes") or []
+        if not isinstance(contrast_id, str) or not contrast_id:
+            check(False, "each contrast must declare a string id")
+            continue
+        if not isinstance(baseline, str) or not isinstance(variant, str):
+            check(False, f"contrast {contrast_id!r} must declare baseline_condition and variant_condition")
+            continue
+        check(
+            baseline in plan_condition_ids and variant in plan_condition_ids,
+            f"contrast {contrast_id!r} must reference declared plan conditions",
+        )
+        if not isinstance(changed_axes, list):
+            check(False, f"contrast {contrast_id!r} changed_axes must be a list")
+            continue
+        # Single-axis guard: the contrast must declare exactly one changed axis.
+        check(
+            len(changed_axes) == 1,
+            f"contrast {contrast_id!r} must declare exactly one changed axis",
+        )
+
+        pair_captions: list[tuple[str, str]] = []
+        pair_image_ids: set[str] = set()
+        for image_id, condition_id in by_image_and_condition:
+            if condition_id == baseline or condition_id == variant:
+                pair_image_ids.add(image_id)
+        for image_id in sorted(pair_image_ids):
+            baseline_caption = by_image_and_condition.get((image_id, baseline))
+            variant_caption = by_image_and_condition.get((image_id, variant))
+            if isinstance(baseline_caption, str) and isinstance(variant_caption, str):
+                pair_captions.append((baseline_caption, variant_caption))
+
+        check(
+            len(pair_captions) > 0,
+            f"contrast {contrast_id!r} has no images with both baseline and variant records",
+        )
+        if not pair_captions:
+            continue
+
+        identical_count = sum(1 for left, right in pair_captions if left == right)
+        distinct_count = len(pair_captions) - identical_count
+        # A contrast that produces byte-identical output for EVERY image is vacuous.
+        check(
+            distinct_count >= 1,
+            f"contrast {contrast_id!r} is vacuous: all {len(pair_captions)} baseline/variant caption pairs are byte-identical",
+        )
+
+        jaccards = sorted(_token_jaccard(left, right) for left, right in pair_captions)
+        contrast_reports.append(
+            {
+                "id": contrast_id,
+                "baseline_condition": baseline,
+                "variant_condition": variant,
+                "changed_axes": changed_axes,
+                "image_count": len(pair_captions),
+                "identical_pair_count": identical_count,
+                "token_jaccard_min": round(jaccards[0], 4) if jaccards else None,
+                "token_jaccard_median": round(jaccards[len(jaccards) // 2], 4) if jaccards else None,
+                "token_jaccard_max": round(jaccards[-1], 4) if jaccards else None,
+            }
+        )
+
+    # Per-condition distinctness: a condition that emitted the same caption for every image
+    # carries no per-image signal and cannot support the declared per-image comparison.
+    condition_boilerplate: list[str] = []
+    for condition_id in sorted(plan_condition_ids):
+        condition_captions = [
+            caption
+            for (image_id, cid), caption in by_image_and_condition.items()
+            if cid == condition_id
+        ]
+        check(
+            len(condition_captions) > 0,
+            f"condition {condition_id!r} has no records",
+        )
+        distinct_captions = len({caption for caption in condition_captions})
+        check(
+            distinct_captions >= 2,
+            f"condition {condition_id!r} collapsed to a single boilerplate caption across {len(condition_captions)} records",
+        )
+        if distinct_captions < 2:
+            condition_boilerplate.append(condition_id)
+
+    bad = checks["bad"]
+    return {
+        "root": str(root),
+        "contrast_count": len(contrast_reports),
+        "contrasts": contrast_reports,
+        "condition_boilerplate_ids": condition_boilerplate,
+        "checks_passed": checks["ok"],
+        "checks_failed": checks["bad"],
+        "findings": findings,
+        "summary": (
+            "all declared one-axis contrasts produced distinguishable captions"
+            if bad == 0
+            else "contrast divergence NOT confirmed: " + "; ".join(findings)
+        ),
+        "contrast_divergence_ok": bad == 0,
+    }

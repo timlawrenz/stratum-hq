@@ -128,6 +128,22 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD`. The evidence axis of the completed run is structurally real and isolated, so it is decision-relevant that the owner need not treat "0/24 materialized later chains" as a blocker for *interpreting* the evidence contrast — the geometry was derived in memory from existing core artifacts. The #18 decisions are unchanged: confirm/deny the asserted approval, decide the missing `empty-caption-null-v1` null fixture, freeze the claim-support/adversarial review protocol, and confirm geometry-derivation provenance for any re-run. No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
 
+## Stage-B contrast divergence — `[METRIC-READINESS FINDING / NON-EXECUTING]`
+
+**Date:** 2026-08-05
+**Arm:** #4 — baseline and comparison parity (held by #18)
+**Artifact:** [`STAGE_B_CONTRAST_DIVERGENCE.md`](STAGE_B_CONTRAST_DIVERGENCE.md) and additive observer-only check `research_harness.stage_b_verify.check_stage_b_contrast_divergence` (+ CLI `check-stage-b-contrast-divergence`).
+
+**Read-only evidence:**
+
+- Question answered: structural binding proved the inputs were bound and the evidence axis proved the evidence payload was real, but nobody had verified the output side — did the aggregator actually produce different captions for each declared one-axis contrast, or collapse them?
+- `check-stage-b-contrast-divergence stage-b-first500-parity-v1` → `contrast_divergence_ok: true` (20 checks, 0 failed): **0 of 24** baseline/variant caption pairs are byte-identical on every contrast — `input-view-only` (token-Jaccard median 0.491), `prompt-only` (median 0.308), `evidence-only` (median 0.380) — and each of the 4 conditions keeps 24 distinct per-image captions (`condition_boilerplate_ids: []`).
+- The completed run therefore **expresses all three declared one-axis contrasts at the output level**; none is vacuous.
+- Structural only, not semantic: `run-provenance.json` still declares `PENDING_INDEPENDENT_REVIEW`, `semantic_verdict: PENDING`, metric self-audit `PENDING_HUMAN_SELF_AUDIT`; 96/96 review rows stay `unreviewed`/`PENDING`. No claim-support scoring, known-case/null self-audit, or adversarial review has run.
+- Full suite: **291 passed** (4 new synthetic tests); `validate-program` and fresh-open-snapshot `validate-tree` remain `valid`.
+
+**Verdict:** `PENDING / HELD`. The #18 decisions are unchanged (confirm/deny the asserted approval; decide the missing `empty-caption-null-v1` null fixture; freeze the claim-support/adversarial review protocol). The run's outputs are now known to express the declared axes, sharpening whether the owner accepts the root for self-audit. No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
+
 ## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
 
 **Date:** 2026-08-03 to 2026-08-04

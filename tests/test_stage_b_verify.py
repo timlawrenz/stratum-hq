@@ -9,6 +9,7 @@ import pytest
 
 from research_harness import ContractError
 from research_harness.stage_b_verify import (
+    check_stage_b_contrast_divergence,
     check_stage_b_evidence_axis,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
@@ -65,10 +66,15 @@ def build_root(
     tmp_path, *, corrupt=None, materialize_null=False, empty_caption_as_null=False
 ) -> tuple:
     """Build a synthetic Stage-B output root and return (root, plan)."""
-    cap_a = "A synthetic caption for image a."
-    cap_b = "A synthetic caption for image b."
     image_ids = ["img-a", "img-b"]
     conditions = _conditions()
+    condition_index = {condition["id"]: i for i, condition in enumerate(conditions)}
+
+    def _caption(image_id: str, condition_id: str) -> str:
+        return (
+            f"Synthetic {image_id} {condition_id} caption number {condition_index[condition_id]} "
+            f"with body text describing {image_id} for the {condition_id} view."
+        )
 
     plan = {
         "schema_version": 1,
@@ -76,6 +82,26 @@ def build_root(
         "comparison_plan_id": "synthetic-stage-b-plan-v1",
         "candidate_manifest_fingerprint": "0" * 64,
         "conditions": conditions,
+        "contrasts": [
+            {
+                "id": "input-view-only",
+                "baseline_condition": "legacy-bucketed-no-evidence",
+                "variant_condition": "legacy-raw-no-evidence",
+                "changed_axes": ["input_view"],
+            },
+            {
+                "id": "prompt-only",
+                "baseline_condition": "legacy-raw-no-evidence",
+                "variant_condition": "context-raw-no-evidence",
+                "changed_axes": ["prompt"],
+            },
+            {
+                "id": "evidence-only",
+                "baseline_condition": "context-raw-no-evidence",
+                "variant_condition": "context-raw-geometry",
+                "changed_axes": ["evidence"],
+            },
+        ],
         "metric_self_audit": {
             "known_case_item_id": "img-a",
             "null_output_id": "empty-caption-null-v1",
@@ -85,9 +111,10 @@ def build_root(
 
     records = []
     review = []
-    for image_id, caption in zip(image_ids, [cap_a, cap_b]):
+    for image_id in image_ids:
         for condition in conditions:
             cid = condition["id"]
+            caption = _caption(image_id, cid)
             rendered_prompt = f"Render for {cid}"
             if condition["evidence"]["kind"] == "specialist_bundle":
                 evidence_payload = {
@@ -278,6 +305,33 @@ def build_root(
         with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
             for record in records_mutated:
                 handle.write(_canonical_json(record) + "\n")
+    if corrupt == "contrast-collapse":
+        records_mutated = list(records)
+        buckets = {
+            record["image_id"]: record["caption"]
+            for record in records
+            if record["condition_id"] == "legacy-bucketed-no-evidence"
+        }
+        for record in records_mutated:
+            if record["condition_id"] == "legacy-raw-no-evidence":
+                collapsed = buckets[record["image_id"]]
+                record["caption"] = collapsed
+                record["caption_sha256"] = _sha(collapsed)
+                record["caption_word_count"] = len(collapsed.split())
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "condition-boilerplate":
+        records_mutated = list(records)
+        boilerplate = _caption("img-a", "context-raw-geometry")
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-geometry":
+                record["caption"] = boilerplate
+                record["caption_sha256"] = _sha(boilerplate)
+                record["caption_word_count"] = len(boilerplate.split())
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
 
     return root, plan
 
@@ -417,3 +471,38 @@ def test_evidence_axis_rejects_empty_payload(tmp_path):
 def test_evidence_axis_rejects_missing_root(tmp_path):
     with pytest.raises(ContractError, match="must be an existing directory"):
         check_stage_b_evidence_axis(tmp_path / "does-not-exist")
+
+
+def test_contrast_divergence_ok_on_wellformed_root(tmp_path):
+    root, _plan = build_root(tmp_path)
+    report = check_stage_b_contrast_divergence(root)
+    assert report["contrast_divergence_ok"] is True
+    assert report["checks_failed"] == 0
+    assert report["contrast_count"] == 3
+    axes = {tuple(contrast["changed_axes"]) for contrast in report["contrasts"]}
+    assert axes == {("input_view",), ("prompt",), ("evidence",)}
+    for contrast in report["contrasts"]:
+        assert contrast["identical_pair_count"] == 0
+        assert contrast["image_count"] == 2
+        assert contrast["token_jaccard_max"] < 1.0
+
+
+def test_contrast_divergence_rejects_vacuous_contrast(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="contrast-collapse")
+    report = check_stage_b_contrast_divergence(root)
+    assert report["contrast_divergence_ok"] is False
+    assert report["contrast_count"] == 3
+    assert any("input-view-only" in finding and "vacuous" in finding for finding in report["findings"])
+
+
+def test_contrast_divergence_rejects_condition_boilerplate(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="condition-boilerplate")
+    report = check_stage_b_contrast_divergence(root)
+    assert report["contrast_divergence_ok"] is False
+    assert report["condition_boilerplate_ids"] == ["context-raw-geometry"]
+    assert any("boilerplate" in finding for finding in report["findings"])
+
+
+def test_contrast_divergence_rejects_missing_root(tmp_path):
+    with pytest.raises(ContractError, match="must be an existing directory"):
+        check_stage_b_contrast_divergence(tmp_path / "does-not-exist")
