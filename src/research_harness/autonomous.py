@@ -26,7 +26,11 @@ import json
 from collections import defaultdict
 from typing import Any, Mapping
 
-from .dimension_registry import validate_registry
+from .dimension_registry import (
+    BRAINSTORM_OPTIONS,
+    validate_registry,
+    validated_evidence_parts,
+)
 
 ACTIONABLE = ("proposal", "active")
 
@@ -80,27 +84,185 @@ def _arm_value(dim: Mapping[str, Any]) -> tuple[float, str]:
     return value, dim["id"]
 
 
-def select_next_arm(registry: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the highest-impact actionable proposal as the next active arm."""
+def _prior_number(dim: Mapping[str, Any]) -> float:
+    """Numeric prior for exploration tie-breaking (higher = more established)."""
+    prior = dim.get("prior_evidence_strength")
+    if prior is None:
+        prior = _PRIOR_WEIGHTS[dim.get("prior_evidence_strength_str", "low")]
+    return float(prior)
+
+
+def _established_models(registry: Mapping[str, Any]) -> set[str]:
+    """Model/specialist identities already established by terminal-state arms."""
+    terminal = set(registry.get("sweep_terms", {}).get("terminal_states", ("validated", "falsified", "exhausted")))
+    models: set[str] = set()
+    for dim in registry.get("dimensions", []):
+        if dim.get("state") not in terminal:
+            continue
+        models.update(dim.get("model_candidates") or [])
+        for spec in dim.get("specialists") or []:
+            models.add(spec.get("name", ""))
+    return {m for m in models if m}
+
+
+def _novelty_for(
+    dim: Mapping[str, Any],
+    established_parts: set[str],
+    established_models: set[str],
+) -> bool:
+    """A proposal is novel if it names an evidence part or model class NOT
+    already established by a terminal (validated/falsified/exhausted) arm.
+    Arms that declare neither evidence_parts nor model_candidates are treated
+    as non-novel (conservative — no bonus).
+    """
+    parts = set(dim.get("evidence_parts") or [])
+    models = set(dim.get("model_candidates") or [])
+    return bool((parts - established_parts) or (models - established_models))
+
+
+def _eig_with_novelty(
+    dim: Mapping[str, Any],
+    established_parts: set[str],
+    established_models: set[str],
+    novelty_bonus: float,
+) -> tuple[float, bool, float]:
+    """EIG with an optional novelty bonus; returns (value, is_novel, applied_bonus)."""
+    base = _arm_value(dim)[0]
+    novel = _novelty_for(dim, established_parts, established_models)
+    applied = novelty_bonus if novel else 0.0
+    return base + applied, novel, applied
+
+
+def _exploration_config(registry: Mapping[str, Any]) -> tuple[int, float]:
+    sweep = registry.get("sweep_terms", {})
+    expl = sweep.get("exploration") if isinstance(sweep, Mapping) else None
+    if not isinstance(expl, Mapping):
+        return 0, 0.0
+    every_n = expl.get("every_n", 0)
+    bonus = expl.get("novelty_bonus", 0.0)
+    return (int(every_n) if isinstance(every_n, int) and not isinstance(every_n, bool) else 0,
+            float(bonus) if isinstance(bonus, (int, float)) and not isinstance(bonus, bool) else 0.0)
+
+
+def select_next_arm(
+    registry: Mapping[str, Any],
+    *,
+    at_selection_index: int | None = None,
+) -> dict[str, Any]:
+    """Return the highest-impact actionable proposal as the next active arm.
+
+    Two exploration affordances (owner directive 2026-08-05):
+    - **ε-greedy slot**: when `sweep_terms.exploration.every_n` > 0, every N-th
+      selection forces the *lowest-prior / highest-uncertainty* actionable
+      proposal instead of the max-EIG one (`selected_via: 'explore'`); all other
+      selections exploit (`selected_via: 'exploit'`). The index defaults to the
+      registry's `selection_progress` (bumped by run_tick after each selection).
+    - **novelty bonus**: when `sweep_terms.exploration.novelty_bonus` > 0, a
+      proposal whose deterministic signal names an evidence part *or* model class
+      not already established by a terminal arm gets the bonus added to its EIG.
+      This rewards genuinely-new axes (relational, temporal, reconstruction)
+      instead of double-dipping validated artifacts.
+
+    Still deterministic (ties broken by id) and fail-closed.
+    """
     validate_registry(registry)
     actionable = [d for d in registry["dimensions"] if d["state"] in ACTIONABLE]
     if not actionable:
         raise AutonomousError("no actionable proposal — registry is terminal; run brainstorm-new-data")
-    scored = sorted((_arm_value(d), d) for d in actionable)
-    (value, _chosen_id), chosen = scored[-1]
+
+    every_n, novelty_bonus = _exploration_config(registry)
+    index = (
+        int(registry.get("selection_progress", 0))
+        if at_selection_index is None
+        else at_selection_index
+    )
+    exploration_slot = every_n > 0 and (index + 1) % every_n == 0
+    established_parts = validated_evidence_parts(registry)
+    established_models = _established_models(registry)
+
+    def _score(dim: Mapping[str, Any]) -> tuple[float, bool, float]:
+        return _eig_with_novelty(dim, established_parts, established_models, novelty_bonus)
+
+    if exploration_slot:
+        # Force the highest-uncertainty (lowest-prior) actionable proposal.
+        chosen = min(actionable, key=lambda d: (_prior_number(d), d["id"]))
+        value, novel, applied = _score(chosen)
+        return {
+            "id": chosen["id"],
+            "name": chosen["name"],
+            "arm_issue": chosen["arm_issue"],
+            "expected_information_gain": round(value, 4),
+            "state": chosen["state"],
+            "selection_rationale_recorded": True,
+            "ties_broken_by": "id",
+            "selected_via": "explore",
+            "exploration_slot": True,
+            "novelty_bonus_applied": round(applied, 4),
+            "all_scores": [
+                {"id": d["id"],
+                 "expected_information_gain": round(_score(d)[0], 4),
+                 "novelty_bonus_applied": round(_score(d)[2], 4)}
+                for d in sorted(actionable, key=lambda d: (_score(d)[0], d["id"]), reverse=True)
+            ],
+        }
+
+    scored = sorted((_score(d), d) for d in actionable)
+    (value, novel, applied), chosen = scored[-1]
+    chosen_id = chosen["id"]
     return {
-        "id": chosen["id"],
+        "id": chosen_id,
         "name": chosen["name"],
         "arm_issue": chosen["arm_issue"],
         "expected_information_gain": round(value, 4),
         "state": chosen["state"],
         "selection_rationale_recorded": True,
         "ties_broken_by": "id",
+        "selected_via": "exploit",
+        "exploration_slot": False,
+        "novelty_bonus_applied": round(applied, 4),
         "all_scores": [
-            {"id": d["id"], "expected_information_gain": round(_arm_value(d)[0], 4)}
-            for _, d in sorted(scored, key=lambda t: t[0], reverse=True)
+            {"id": d["id"],
+             "expected_information_gain": round(_score(d)[0], 4),
+             "novelty_bonus_applied": round(_score(d)[2], 4)}
+            for (s, d) in sorted(scored, key=lambda t: (t[0][0], t[1]["id"]), reverse=True)
         ],
     }
+
+
+def _top_actionable_eig(registry: Mapping[str, Any]) -> float:
+    """Best (novelty-adjusted) EIG among actionable proposals — used by the
+    selector-top-score-below stall trigger."""
+    every_n, novelty_bonus = _exploration_config(registry)
+    established_parts = validated_evidence_parts(registry)
+    established_models = _established_models(registry)
+    best = 0.0
+    for d in registry.get("dimensions", []):
+        if d.get("state") not in ACTIONABLE:
+            continue
+        value = _eig_with_novelty(d, established_parts, established_models, novelty_bonus)[0]
+        best = max(best, value)
+    return best
+
+
+def _tick_stall_reason(registry: Mapping[str, Any]) -> str | None:
+    """Combine history-based stall (sweep_status) and selector top-score-below.
+
+    Returns a human reason when the loop should pause to brainstorm even though
+    the safe menu is not yet terminal.
+    """
+    from .dimension_registry import _stall_reason_from_history
+
+    reason = _stall_reason_from_history(registry)
+    if reason is not None:
+        return reason
+    stall = registry.get("sweep_terms", {}).get("stall")
+    if isinstance(stall, Mapping) and isinstance(stall.get("selector_top_score_below"), (int, float)) \
+            and not isinstance(stall.get("selector_top_score_below"), bool):
+        threshold = float(stall["selector_top_score_below"])
+        top = _top_actionable_eig(registry)
+        if top < threshold:
+            return f"selector top score {top:.3f} below threshold {threshold:.3f}"
+    return None
 
 
 def _support_ratio(supported: int, unsupported: int) -> float:
@@ -335,18 +497,37 @@ def advance_dimension(registry: dict[str, Any], dim_id: str, *, state: str, stri
     return registry
 
 
-def run_tick(registry: dict[str, Any], *, review_dir: str | None = None) -> dict[str, Any]:
+def run_tick(
+    registry: dict[str, Any],
+    *,
+    review_dir: str | None = None,
+    method: str = "claim-support",
+    reconstruction_delta: float | None = None,
+    items: int | None = None,
+) -> dict[str, Any]:
     """One loop iteration. Returns a next_action + (optionally) verdict.
 
     Flow:
     - If a dimension is already active: look for measured results in
-      `review_dir`. If present, aggregate -> better_or_not -> advance the
-      registry (BETTER => validated; NOT_BETTER => +1 strike, falsified at the
-      limit) and then select the next arm. If absent, next_action is
-      research-pending (the launchers are the executor) and we do not advance.
+      `review_dir` (`claim-support` method) or use a reconstruction CLIP delta
+      (`reconstruction` method). When present, aggregate -> better_or_not ->
+      advance the registry (BETTER => validated; NOT_BETTER => +1 strike,
+      falsified at the limit) and then select the next arm. If absent,
+      next_action is research-pending (the launchers are the executor) and we
+      do not advance.
+    - Every conclude records a `conclusion_history` entry and every selection
+      bumps `selection_progress`, so the ε-greedy slot and stall detection are
+      deterministic and atomic with the persisted registry.
+    - If the sweep is stalled (see `_tick_stall_reason`) but not terminal, the
+      next_action is `brainstorm-on-stall` — new ideas surface while the safe
+      menu is still being worked, instead of only on full exhaustion.
     - If nothing is active: if the registry is terminal, next_action is
       brainstorm-new-data; otherwise activate the highest-impact proposal.
     """
+    if method not in ("claim-support", "reconstruction"):
+        raise AutonomousError(f"unsupported tick method {method!r}")
+    if method == "reconstruction" and reconstruction_delta is None:
+        raise AutonomousError("reconstruction method requires reconstruction_delta")
     validate_registry(registry)
     strike_limit: int = registry["sweep_terms"]["per_dimension_strike_limit"]
     terminal = set(registry["sweep_terms"]["terminal_states"])
@@ -354,39 +535,76 @@ def run_tick(registry: dict[str, Any], *, review_dir: str | None = None) -> dict
     if len(active) > 1:
         raise AutonomousError("more than one research:active arm — routing invariant violated")
 
+    def _record_conclusion(arm_id: str, verdict: str, state: str, agg: Any) -> None:
+        history = registry.setdefault("conclusion_history", [])
+        history.append({
+            "arm_id": arm_id,
+            "verdict": verdict,
+            "state": state,
+            "cycle": len(history) + 1,
+        })
+
+    def _bump_progress() -> int:
+        registry["selection_progress"] = int(registry.get("selection_progress", 0)) + 1
+        return registry["selection_progress"]
+
     if active:
         arm = active[0]
-        if review_dir is None:
+        if review_dir is None and method == "claim-support":
             return {"next_action": "research-pending", "active_arm": arm["id"]}
         try:
-            agg = aggregate_claim_support(review_dir)
+            if method == "claim-support":
+                agg = aggregate_claim_support(review_dir or "")
+                verdict = better_or_not(
+                    supported_base=agg["baseline_supported"],
+                    supported_variant=agg["evidence_supported"],
+                    unsupported_base=agg["baseline_unsupported"],
+                    unsupported_variant=agg["evidence_unsupported"],
+                    items=items or agg["paired_items"] or 24,
+                    sign_test_p_supported=agg["sign_test_p_supported"],
+                    method="claim-support",
+                )
+            else:
+                agg = None
+                verdict = better_or_not(
+                    supported_base=0,
+                    supported_variant=0,
+                    unsupported_base=0,
+                    unsupported_variant=0,
+                    items=items or 24,
+                    sign_test_p_supported=1.0,
+                    method="reconstruction",
+                    reconstruction_delta=reconstruction_delta,
+                )
         except AutonomousError:
             return {"next_action": "research-pending", "active_arm": arm["id"]}
-        verdict = better_or_not(
-            supported_base=agg["baseline_supported"],
-            supported_variant=agg["evidence_supported"],
-            unsupported_base=agg["baseline_unsupported"],
-            unsupported_variant=agg["evidence_unsupported"],
-            items=agg["paired_items"] or 24,
-            sign_test_p_supported=agg["sign_test_p_supported"],
-            method="claim-support",
-        )
         strikes = arm["valid_non_improving_experiments"]
         if verdict["verdict"] == "BETTER":
             advance_dimension(registry, arm["id"], state="validated", strikes=strikes)
+            _record_conclusion(arm["id"], verdict["verdict"], "validated", agg)
         else:
             strikes += 1
             new_state = "falsified" if strikes >= strike_limit else "active"
             advance_dimension(registry, arm["id"], state=new_state, strikes=strikes)
+            _record_conclusion(arm["id"], verdict["verdict"], new_state, agg)
         # Select the next arm from the updated registry.
         proposals = [d for d in registry["dimensions"]
                      if d["state"] in ("proposal",) and d["id"] != arm["id"]]
         if proposals:
+            stall_reason = _tick_stall_reason(registry)
+            if stall_reason is not None:
+                return {"next_action": "brainstorm-on-stall", "verdict": verdict,
+                        "advanced_arm": arm["id"], "aggregate": agg,
+                        "stall_reason": stall_reason,
+                        "brainstorm_options": BRAINSTORM_OPTIONS}
             selection = select_next_arm(registry)
             advance_dimension(registry, selection["id"], state="active", strikes=0)
+            _bump_progress()
             return {"next_action": "activate-next", "verdict": verdict,
                     "advanced_arm": arm["id"], "next_arm": selection["id"],
-                    "aggregate": agg}
+                    "aggregate": agg,
+                    "selected_via": selection.get("selected_via", "exploit"),
+                    "selection_progress": registry["selection_progress"]}
         if all(d["state"] in terminal for d in registry["dimensions"]):
             return {"next_action": "brainstorm-new-data", "verdict": verdict,
                     "advanced_arm": arm["id"], "aggregate": agg}
@@ -395,7 +613,14 @@ def run_tick(registry: dict[str, Any], *, review_dir: str | None = None) -> dict
 
     if all(d["state"] in terminal for d in registry["dimensions"]):
         return {"next_action": "brainstorm-new-data"}
+    stall_reason = _tick_stall_reason(registry)
+    if stall_reason is not None:
+        return {"next_action": "brainstorm-on-stall", "stall_reason": stall_reason,
+                "brainstorm_options": BRAINSTORM_OPTIONS}
     selection = select_next_arm(registry)
     advance_dimension(registry, selection["id"], state="active", strikes=0)
+    _bump_progress()
     return {"next_action": "activate", "next_arm": selection["id"],
-            "expected_information_gain": selection["expected_information_gain"]}
+            "expected_information_gain": selection["expected_information_gain"],
+            "selected_via": selection.get("selected_via", "exploit"),
+            "selection_progress": registry["selection_progress"]}
