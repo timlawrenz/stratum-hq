@@ -103,6 +103,58 @@ def test_compute_proportions_requires_confident_joints() -> None:
     assert m["low_confidence_joints"] >= 1
 
 
+def test_compute_proportions_abstains_on_foreshortened_hip_plane() -> None:
+    """Width ratios are only body measurements when both segments share an
+    imaging plane. A reclining/diagonal subject with the hip pair near-vertical
+    (edge-on, foreshortened) must ABSTAIN, not emit a huge garbage ratio."""
+    # Replicating the poolside artifact: shoulders ~horizontal, hips near-vertical
+    p = _pose(
+        {
+            "left_shoulder": (619.0, 437.0, 0.9),
+            "right_shoulder": (548.0, 554.0, 0.9),
+            "left_hip": (1057.0, 670.0, 0.9),
+            "right_hip": (1050.0, 645.0, 0.9),
+            "left_knee": (1200.0, 700.0, 0.8),
+            "right_knee": (1195.0, 680.0, 0.8),
+            "left_ankle": (1568.0, 777.0, 0.8),
+            "right_ankle": (1555.0, 772.0, 0.8),
+            "nose": (560.0, 497.0, 0.8),
+        }
+    )
+    m = compute_proportions(p)
+    # Shoulders and hips both present, so raw widths compute — but the hip pair
+    # is near-vertical (edge-on, ~74°) vs shoulders ~-59°: different planes.
+    assert m["between_shoulders"] is not None
+    assert m["between_hips"] is not None
+    assert m["shoulder_hip_ratio"] is None  # must abstain, not emit 5.x
+    # abstention reason surfaceable for the serializer
+    assert m.get("shoulder_hip_ratio_abstention_reason")
+
+
+def test_compute_proportions_abstains_on_implausible_ratio() -> None:
+    """Even when both segments are near-horizontal, a ratio outside the human
+    plausible band (e.g. >2.4, a giraffe-level shoulder) is a projection
+    artifact and must abstain rather than be verbalized."""
+    p = _pose(
+        {
+            "left_shoulder": (100.0, 100.0, 0.9),
+            "right_shoulder": (260.0, 100.0, 0.9),  # 160px shoulders
+            "left_hip": (145.0, 240.0, 0.9),
+            "right_hip": (155.0, 240.0, 0.9),       # 10px hips -> ratio ~14
+            "left_knee": (140.0, 380.0, 0.8),
+            "right_knee": (160.0, 380.0, 0.8),
+            "left_ankle": (138.0, 500.0, 0.8),
+            "right_ankle": (162.0, 500.0, 0.8),
+            "nose": (180.0, 40.0, 0.8),
+        }
+    )
+    m = compute_proportions(p)
+    assert m["between_shoulders"] is not None
+    assert m["between_hips"] is not None
+    assert m["shoulder_hip_ratio"] is None
+    assert m.get("shoulder_hip_ratio_abstention_reason")
+
+
 def test_compute_proportions_no_subject_symbolizes_absent() -> None:
     m = compute_proportions(np.zeros((308, 3), dtype=np.float32))
     assert m["subject_present"] is False

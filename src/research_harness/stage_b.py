@@ -258,7 +258,13 @@ def _serialize_proportions(proportions: Mapping[str, Any]) -> str:
     for key, label in ratio_items:
         value = proportions.get(key)
         if value is None:
-            lines.append(f"- {label}: not measurable (joint absent or low confidence)")
+            reason = None
+            if key == "shoulder_hip_ratio":
+                reason = proportions.get("shoulder_hip_ratio_abstention_reason")
+            if reason:
+                lines.append(f"- {label}: not measurable — {reason}")
+            else:
+                lines.append(f"- {label}: not measurable (joint absent or low confidence)")
         else:
             # Emit as a human-interpretable ratio description, not a bare number
             lines.append(f"- {label}: {value:.2f}")

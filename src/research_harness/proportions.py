@@ -8,6 +8,7 @@ fabricate a value when the supporting joints are absent or low-confidence.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -57,6 +58,60 @@ def _pts(pose: np.ndarray, name: str, min_conf: float = MIN_CONF) -> tuple[float
     if x < 0 or y < 0 or conf < min_conf:
         return None
     return (x, y)
+
+
+def _segment_angle_deg(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Angle of a segment from the horizontal (image x-axis), in degrees [0,90].
+
+    A segment close to 0° is roughly horizontal (breadth as seen by camera);
+    closer to 90° means it is near-vertical (torso appears edge-on, widths are
+    foreshortened). Two width segments are only comparable when BOTH are near
+    horizontal — otherwise their ratio mixes different imaging planes.
+    """
+    return math.degrees(math.atan2(abs(a[1] - b[1]), abs(a[0] - b[0])))
+
+
+# A width ratio in px is only a *body* measurement when both segments are in
+# roughly the same plane (both near horizontal). Angle tolerance is generous
+# (±45° from horizontal) so normal slight tilts pass.
+_PLANE_MAX_ANGLE = 45.0
+# Biologically plausible shoulder:hip breadth ratio for an adult woman/human.
+# Real values cluster ~1.2-1.9; anything outside [0.7, 2.4] is overwhelmingly
+# a projection artifact (foreshortened hips, occluded landmark), not anatomy.
+_RATIO_PLAUSIBLE_MIN = 0.7
+_RATIO_PLAUSIBLE_MAX = 2.4
+
+
+def _gated_width_ratio(
+    ls, rs, lh, rh, out: dict[str, Any]
+) -> float | None:
+    """Shoulder:hip breadth ratio, abstaining on non-comparable imaging planes
+    or implausible values. Records `_abstention_reason` on `out` when rejecting.
+    """
+    if not (ls and rs and lh and rh):
+        out["_abstention_reason"] = "shoulder or hip joint absent or low confidence"
+        return None
+    a_s = _segment_angle_deg(ls, rs)
+    a_h = _segment_angle_deg(lh, rh)
+    if a_s > _PLANE_MAX_ANGLE or a_h > _PLANE_MAX_ANGLE:
+        out["_abstention_reason"] = (
+            f"plane-mixing: shoulder seg {a_s:.0f}° / hip seg {a_h:.0f}° from "
+            "horizontal (foreshortened or non-frontal) — width ratio not a body measure"
+        )
+        return None
+    bw_s = _dist(ls, rs)
+    bw_h = _dist(lh, rh)
+    if bw_h <= 0:
+        out["_abstention_reason"] = "zero hip width"
+        return None
+    ratio = (bw_s + 1.0) / (bw_h + 1.0)
+    if not (_RATIO_PLAUSIBLE_MIN <= ratio <= _RATIO_PLAUSIBLE_MAX):
+        out["_abstention_reason"] = (
+            f"implausible ratio {ratio:.2f} outside human band "
+            f"[{_RATIO_PLAUSIBLE_MIN}, {_RATIO_PLAUSIBLE_MAX}] — projection artifact"
+        )
+        return None
+    return round(ratio, 4)
 
 
 def _dist(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -116,10 +171,8 @@ def compute_proportions(pose: np.ndarray, *, min_conf: float = MIN_CONF) -> dict
     bw_h = _dist(lh, rh) if (lh and rh) else None
     out["between_shoulders"] = round(bw_s, 3) if bw_s is not None else None
     out["between_hips"] = round(bw_h, 3) if bw_h is not None else None
-    if bw_s is not None and bw_h is not None and bw_h > 0:
-        out["shoulder_hip_ratio"] = round((bw_s + 1.0) / (bw_h + 1.0), 4)
-    else:
-        out["shoulder_hip_ratio"] = None
+    out["shoulder_hip_ratio"] = _gated_width_ratio(ls, rs, lh, rh, out)
+    out["shoulder_hip_ratio_abstention_reason"] = out.pop("_abstention_reason", None)
 
     if ls and rs and lh and rh:
         torso = _dist(_mid(ls, rs), _mid(lh, rh))
