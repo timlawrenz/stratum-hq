@@ -62,6 +62,24 @@ Each verified evidence dimension is a **building block of the ~100K-token dossie
 
 This mirrors the user's framing: *"~100K tokens that describe an asset → compressed to ~4K tokens. Clothing, hair, makeup, texture, skin color, mood, lighting, setting, body types — the list is endless."*
 
+## Measurement semantics — px vs ratios (owner directive 2026-08-05)
+
+- Absolute pixel measurements (e.g. `between_shoulders: 137.386`) are **not**
+  verbalized into captions: they are camera-frame-dependent, do not survive
+  cross-picture comparison, and a text-to-image model cannot interpret them.
+  They remain in the machine-readable `evidence_payload` JSON as part of the
+  per-asset dossier / compressor input, but are never caption claims.
+- **Scale-invariant ratios are the verbalized signal**: shoulder:hip, leg:torso,
+  limb-length asymmetry. These survive cross-picture comparison and are
+  meaningful guidance for describing a subject (owner agreement).
+- The reviewer consumes the same rendered evidence, so it can no longer reward
+  or penalize px restatement — removing that confound by construction.
+- Future evidence dimensions must follow the same rule: ratios/relative intent
+  verbalized; raw absolute measurements stay in JSON only.
+- A dedicated `waist` keypoint is not in GOLIATH-308; hip:waist / waist:shoulder
+  would require a seg2-based waist estimator (narrowest torso cross-section) —
+  a candidate future measurement for arm #31/#32 extension.
+
 ## Guardrails
 
 - Every arm keeps: local models only; outputs only under the approved noncanonical research root; no `crawlr/approved`/`crawlr/stratum` mutation; no backfill; no legacy overwrite; scheduler lifecycle for any GPU action; additive artifacts only.
