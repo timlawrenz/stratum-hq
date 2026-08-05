@@ -49,11 +49,25 @@ def _settings() -> ReviewSettings:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = list(argv) if argv else sys.argv[1:]
-    request_if_missing = "--request" in args
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="stage-b-review-launcher")
+    parser.add_argument("--run-root", default=str(RUN_ROOT))
+    parser.add_argument("--review-root", default=str(REVIEW_ROOT))
+    parser.add_argument("--source-root", default=str(SOURCE_ROOT))
+    parser.add_argument("--job-id", default=JOB_ID)
+    parser.add_argument("--request", action="store_true")
+    args = parser.parse_args(argv)
+
+    run_root = Path(args.run_root)
+    review_root = Path(args.review_root)
+    source_root = Path(args.source_root)
+    job_id = args.job_id
+    request_if_missing = args.request
+
     candidate = json.loads(CANDIDATE_MANIFEST.read_text(encoding="utf-8"))
     settings = _settings()
-    build_review_plan(settings, RUN_ROOT, candidate["manifest_fingerprint"])
+    build_review_plan(settings, run_root, candidate["manifest_fingerprint"])
 
     claimed = False
     gpu_activity_seen = False
@@ -61,28 +75,28 @@ def main(argv: list[str] | None = None) -> int:
         if request_if_missing:
             result = _scheduler("request", [
                 "--gpu", "4090", "--project", "stratum-contextual-specialist-research",
-                "--vram", "22", "--duration", "1h", "--job-id", JOB_ID,
+                "--vram", "22", "--duration", "1h", "--job-id", job_id,
             ])
-            if result != JOB_ID:
+            if result != job_id:
                 raise StageBReviewError(f"scheduler request returned unexpected job identity: {result}")
-            print(json.dumps({"status": "queued", "job_id": JOB_ID}, sort_keys=True))
+            print(json.dumps({"status": "queued", "job_id": job_id}, sort_keys=True))
             return 0
 
-        poll = _scheduler("poll", ["--gpu", "4090", "--job-id", JOB_ID])
+        poll = _scheduler("poll", ["--gpu", "4090", "--job-id", job_id])
         if poll != "claimed":
             return 0  # queued / not_my_turn / busy — stay quiet
         claimed = True
 
-        activation = _scheduler("activate", ["--gpu", "4090", "--job-id", JOB_ID, "--progress-unit", "item"])
+        activation = _scheduler("activate", ["--gpu", "4090", "--job-id", job_id, "--progress-unit", "item"])
         if activation != "activated":
             raise StageBReviewError(f"activate returned {activation}")
-        _scheduler("heartbeat", ["--gpu", "4090", "--job-id", JOB_ID, "--progress", "0", "--vram-used", "20.0"])
+        _scheduler("heartbeat", ["--gpu", "4090", "--job-id", job_id, "--progress", "0", "--vram-used", "20.0"])
         gpu_activity_seen = True
 
         result = execute_review(
-            settings, RUN_ROOT, SOURCE_ROOT, candidate["manifest_fingerprint"], REVIEW_ROOT,
+            settings, run_root, source_root, candidate["manifest_fingerprint"], review_root,
         )
-        _scheduler("release", ["--gpu", "4090", "--job-id", JOB_ID, "--status", "completed"])
+        _scheduler("release", ["--gpu", "4090", "--job-id", job_id, "--status", "completed"])
         claimed = False
         print(json.dumps({"status": "completed", "review_root": result["review_root"],
                           "record_count": result["record_count"], "gpu_activity_seen": gpu_activity_seen}, sort_keys=True))
@@ -90,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     except StageBReviewError as exc:
         if claimed:
             try:
-                _scheduler("release", ["--gpu", "4090", "--job-id", JOB_ID, "--status", "failed"])
+                _scheduler("release", ["--gpu", "4090", "--job-id", job_id, "--status", "failed"])
             except Exception:
                 pass
         print(f"stage-b-review: {exc}", file=sys.stderr)
