@@ -31,8 +31,8 @@ PROGRAM = ROOT / "research/program.json"
 CANDIDATE = Path("/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json")
 PLAN_OUT = ROOT / "research/stage-b-plans/stage-b-lighting-v1.json"
 MANIFEST_OUT = ROOT / "research/gpu-manifests/stage-b-lighting-v1.json"
-OUTPUT_ROOT = Path("/mnt/nas-ai-models/research/stratum/stage-b-lighting-v1")
-JOB_ID = "stratum-stage-b-lighting-v1"
+OUTPUT_ROOT = Path("/mnt/nas-ai-models/research/stratum/stage-b-lighting-v2")
+JOB_ID = "stratum-stage-b-lighting-v2"
 
 # Arm-#4 approved settings (identical), only evidence axis changes.
 SETTINGS = StageBGenerationSettings(
