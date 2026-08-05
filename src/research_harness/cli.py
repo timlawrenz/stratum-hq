@@ -80,6 +80,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     labels = sub.add_parser("plan-labels", help="plan additive GitHub label changes from JSON snapshots")
     labels.add_argument("desired", type=Path, help="tracked desired label-specification JSON")
     labels.add_argument("current", type=Path, help="read-only GitHub label-list JSON")
+
+    dims = sub.add_parser(
+        "validate-dimension-registry", help="validate the evidence-dimension sweep registry"
+    )
+    dims.add_argument("registry", type=Path)
+
+    sweep = sub.add_parser("dimension-sweep-status", help="print evidence-dimension sweep status")
+    sweep.add_argument("registry", type=Path)
     return parser.parse_args(argv)
 
 
@@ -113,6 +121,16 @@ def main(argv: list[str] | None = None) -> int:
             if len(current_by_name) != len(current):
                 raise ContractError("label snapshot contains invalid or duplicate label names")
             print(json.dumps(plan_label_sync(desired, current_by_name), indent=2))
+            return 0
+
+        if args.command in ("validate-dimension-registry", "dimension-sweep-status"):
+            from .dimension_registry import load_registry, sweep_status
+
+            registry = load_registry(args.registry)
+            if args.command == "validate-dimension-registry":
+                print("valid")
+            else:
+                print(json.dumps(sweep_status(registry), sort_keys=True))
             return 0
 
         program = _read_json(args.program)
