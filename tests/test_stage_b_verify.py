@@ -9,6 +9,7 @@ import pytest
 
 from research_harness import ContractError
 from research_harness.stage_b_verify import (
+    check_stage_b_evidence_axis,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
 )
@@ -88,6 +89,14 @@ def build_root(
         for condition in conditions:
             cid = condition["id"]
             rendered_prompt = f"Render for {cid}"
+            if condition["evidence"]["kind"] == "specialist_bundle":
+                evidence_payload = {
+                    "subject": {"id": image_id, "frame_frac": 0.5},
+                    "relations": [{"part": "face", "kp_conf": 0.9}],
+                    "image_id": image_id,
+                }
+            else:
+                evidence_payload = None
             record = {
                 "schema_version": 1,
                 "record_id": f"{cid}:{image_id}",
@@ -102,7 +111,7 @@ def build_root(
                     "rendered_text": rendered_prompt,
                 },
                 "evidence": dict(condition["evidence"]),
-                "evidence_payload": {"x": 1} if condition["evidence"]["kind"] == "specialist_bundle" else None,
+                "evidence_payload": evidence_payload,
                 "selected_evidence_input_artifact_sha256": {"pose2.npy": _sha("p2"), "seg2.npy": _sha("s2")},
                 "output_relative_path": f"outputs/{cid}/{image_id}.txt",
                 "caption_sha256": _sha(caption),
@@ -229,6 +238,46 @@ def build_root(
     if corrupt == "missing-output":
         target = root / "outputs" / conditions[0]["id"] / "img-a.txt"
         target.unlink()
+    if corrupt == "evidence-boilerplate":
+        records_mutated = list(records)
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-geometry":
+                record["evidence_payload"] = {
+                    "subject": {"id": "img-a", "frame_frac": 0.5},
+                    "relations": [{"part": "face", "kp_conf": 0.9}],
+                    "image_id": "img-a",
+                }
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "evidence-payload-on-noevidence":
+        records_mutated = list(records)
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-no-evidence":
+                record["evidence_payload"] = {
+                    "subject": {"id": record["image_id"], "frame_frac": 0.5},
+                    "relations": [{"part": "face", "kp_conf": 0.9}],
+                    "image_id": record["image_id"],
+                }
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "evidence-missing-inputs":
+        records_mutated = list(records)
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-geometry":
+                record["selected_evidence_input_artifact_sha256"] = {"pose2.npy": _sha("p2")}
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
+    if corrupt == "evidence-empty-payload":
+        records_mutated = list(records)
+        for record in records_mutated:
+            if record["condition_id"] == "context-raw-geometry":
+                record["evidence_payload"] = {}
+        with (root / "records.jsonl").open("w", encoding="utf-8") as handle:
+            for record in records_mutated:
+                handle.write(_canonical_json(record) + "\n")
 
     return root, plan
 
@@ -320,3 +369,51 @@ def test_readiness_raises_on_undeclared_fixture(tmp_path):
     )
     with pytest.raises(ContractError, match="null_output_id"):
         check_stage_b_self_audit_readiness(root)
+
+
+def test_evidence_axis_ok_on_wellformed_root(tmp_path):
+    root, _plan = build_root(tmp_path)
+    report = check_stage_b_evidence_axis(root)
+    assert report["evidence_axis_ok"] is True
+    assert report["checks_failed"] == 0
+    assert report["evidence_condition_ids"] == ["context-raw-geometry"]
+    assert report["no_evidence_condition_ids"] == [
+        "legacy-bucketed-no-evidence",
+        "legacy-raw-no-evidence",
+        "context-raw-no-evidence",
+    ]
+    assert report["evidence_record_count"] == 2
+    assert report["no_evidence_record_count"] == 6
+
+
+def test_evidence_axis_rejects_boilerplate_payloads(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="evidence-boilerplate")
+    report = check_stage_b_evidence_axis(root)
+    assert report["evidence_axis_ok"] is False
+    assert any("distinct per-image" in finding for finding in report["findings"])
+
+
+def test_evidence_axis_rejects_payload_on_noevidence(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="evidence-payload-on-noevidence")
+    report = check_stage_b_evidence_axis(root)
+    assert report["evidence_axis_ok"] is False
+    assert any("null evidence_payload" in finding for finding in report["findings"])
+
+
+def test_evidence_axis_rejects_missing_core_inputs(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="evidence-missing-inputs")
+    report = check_stage_b_evidence_axis(root)
+    assert report["evidence_axis_ok"] is False
+    assert any("pose2.npy and seg2.npy" in finding for finding in report["findings"])
+
+
+def test_evidence_axis_rejects_empty_payload(tmp_path):
+    root, _plan = build_root(tmp_path, corrupt="evidence-empty-payload")
+    report = check_stage_b_evidence_axis(root)
+    assert report["evidence_axis_ok"] is False
+    assert any("non-empty evidence_payload" in finding for finding in report["findings"])
+
+
+def test_evidence_axis_rejects_missing_root(tmp_path):
+    with pytest.raises(ContractError, match="must be an existing directory"):
+        check_stage_b_evidence_axis(tmp_path / "does-not-exist")

@@ -18,6 +18,7 @@ from .contracts import (
 )
 from .labels import load_label_specs, plan_label_sync
 from .stage_b_verify import (
+    check_stage_b_evidence_axis,
     check_stage_b_self_audit_readiness,
     verify_stage_b_output_root,
 )
@@ -93,6 +94,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     stage_b_readiness.add_argument("root", type=Path)
 
+    stage_b_evidence = sub.add_parser(
+        "check-stage-b-evidence-axis",
+        help="report whether a completed Stage-B run isolated and materialized its evidence axis (observer-only)",
+    )
+    stage_b_evidence.add_argument("root", type=Path)
+
     labels = sub.add_parser("plan-labels", help="plan additive GitHub label changes from JSON snapshots")
     labels.add_argument("desired", type=Path, help="tracked desired label-specification JSON")
     labels.add_argument("current", type=Path, help="read-only GitHub label-list JSON")
@@ -138,6 +145,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "check-stage-b-self-audit-readiness":
             report = check_stage_b_self_audit_readiness(args.root)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0
+
+        if args.command == "check-stage-b-evidence-axis":
+            report = check_stage_b_evidence_axis(args.root)
             print(json.dumps(report, indent=2, sort_keys=True))
             return 0
 

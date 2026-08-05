@@ -67,6 +67,22 @@ specified on this run. The run remains structurally valid and entirely unreviewe
 a metric-precondition observation, not a PASS/FAIL or authorization. Full suite: 281 passed.
 See `docs/STAGE_B_SELF_AUDIT_FIXTURE_READINESS.md`.
 
+**2026-08-04 evidence-axis integrity finding (additive, observer-only):** a new check
+(`research_harness.stage_b_verify.check_stage_b_evidence_axis`, CLI
+`research-harness check-stage-b-evidence-axis <root>`) answers whether the completed run's
+**evidence-only contrast was actually exercised** despite the frozen cohort having 0/24
+materialized `determinations.json → caption2.txt → t52_*` later chains. Applied to
+`stage-b-first500-parity-v1`: `evidence_axis_ok: true` (197 checks, 0 failed) — all 24
+`context-raw-geometry` records carry non-empty, **per-image distinct**
+`in-memory-geometry-determinations-v1` payloads whose `selected_evidence_input_artifact_sha256`
+(`pose2.npy`, `seg2.npy`) bind byte-for-byte to the on-disk derived files for the same
+source, and all 72 no-evidence records carry `evidence_payload: null`. The evidence axis is
+structurally real and isolated; the geometry was derived in memory from existing core
+artifacts, not from the missing later-chain files. This is structural, not semantic: no
+claim-support scoring, self-audit, or adversarial review has run (96/96 rows PENDING), and
+it does not authorize anything or alter the #18 hold. Full suite: **287 passed** (6 new
+tests). See `docs/STAGE_B_EVIDENCE_AXIS_INTEGRITY.md`.
+
 ## Automation and authority
 
 The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.

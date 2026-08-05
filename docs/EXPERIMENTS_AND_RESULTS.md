@@ -111,6 +111,23 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `PENDING / HELD`. Adds a precise, decision-relevant readiness gap to #18: the owner must decide how the declared-but-unmaterialized `empty-caption-null-v1` null/abstention self-audit step should be satisfied (e.g., accept a remedy for that step or require a re-run that materializes the fixture). No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
 
+## Stage-B evidence-axis integrity — `[METRIC-READINESS FINDING / NON-EXECUTING]`
+
+**Date:** 2026-08-04
+**Arm:** #4 — baseline and comparison parity (held by #18)
+**Artifact:** [`STAGE_B_EVIDENCE_AXIS_INTEGRITY.md`](STAGE_B_EVIDENCE_AXIS_INTEGRITY.md) and additive observer-only check `research_harness.stage_b_verify.check_stage_b_evidence_axis` (+ CLI `check-stage-b-evidence-axis`).
+
+**Read-only evidence:**
+
+- Question answered: the frozen cohort has 0/24 materialized later chains (`determinations.json → caption2.txt → t52_*`), so — was the completed run's **evidence-only contrast actually exercised**? The run declares `context-raw-geometry` (kind `specialist_bundle`) against three `none`-kind no-evidence conditions.
+- `check-stage-b-evidence-axis stage-b-first500-parity-v1` → `evidence_axis_ok: true` (197 checks, 0 failed; 24 evidence-bearing records, 72 no-evidence records).
+- All 24 evidence-bearing records carry **non-empty, per-image distinct** `in-memory-geometry-determinations-v1` payloads (subject/relations/body_parts_visible/orientation/subject_extent/schema_version), declared from `stratum2.pipeline.determinations.derive_determinations` computed in memory from `pose2.npy` + `seg2.npy` only.
+- 24/24 `selected_evidence_input_artifact_sha256` bind byte-for-byte to the on-disk derived files for the same source image; 72/72 no-evidence records carry `evidence_payload: null`.
+- Structural only, not semantic: `run-provenance.json` still declares `PENDING_INDEPENDENT_REVIEW`, `semantic_verdict: PENDING`, metric self-audit `PENDING_HUMAN_SELF_AUDIT`; 96/96 review rows stay `unreviewed`/`PENDING`. No claim-support scoring, known-case/null self-audit, or adversarial review has run.
+- Full suite: **287 passed** (6 new synthetic tests); `validate-program` and fresh-open-snapshot `validate-tree` remain `valid`.
+
+**Verdict:** `PENDING / HELD`. The evidence axis of the completed run is structurally real and isolated, so it is decision-relevant that the owner need not treat "0/24 materialized later chains" as a blocker for *interpreting* the evidence contrast — the geometry was derived in memory from existing core artifacts. The #18 decisions are unchanged: confirm/deny the asserted approval, decide the missing `empty-caption-null-v1` null fixture, freeze the claim-support/adversarial review protocol, and confirm geometry-derivation provenance for any re-run. No model, GPU/scheduler, corpus mutation, backfill, Stage-B execution, merge, or direct `main` push occurred.
+
 ## Harness initialization — `[PENDING / OWNER-REVIEWED DRAFT]`
 
 **Date:** 2026-08-03 to 2026-08-04

@@ -327,3 +327,139 @@ def check_stage_b_self_audit_readiness(root: Path) -> dict[str, Any]:
         ),
         "readiness_verdict": "READY" if not missing else "NOT_READY",
     }
+
+
+def check_stage_b_evidence_axis(root: Path) -> dict[str, Any]:
+    """Observer-only report on whether a completed Stage-B run's evidence axis is real.
+
+    The evidence-only contrast compares a no-evidence condition (kind ``none``, null payload)
+    against an evidence-bearing condition (kind ``specialist_bundle``). A run only *exercises*
+    that axis if its evidence-bearing records carry non-trivial, per-image payload content
+    (so the contrast is not two identical empties) and every no-evidence record carries a null
+    payload (so the axis is not silently confounded by stray evidence on the baseline side).
+
+    This check is deliberately structural and observer-only: it verifies payload presence,
+    per-condition isolation, and per-image distinctness from the records already in the root.
+    It does not inspect a source image, run a model, or judge whether the payload is *accurate*;
+    semantic claim-support remains the reserved human/adversarial-review step. A report stamped
+    here is not an authorization and not a PASS/FAIL.
+    """
+    if not root.exists():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"Stage-B output root is unavailable: {root}: {exc}") from exc
+    if not root.is_dir():
+        raise ContractError(f"Stage-B output root must be an existing directory: {root}")
+
+    plan = _read_json(_require_file(root / "stage-b-plan.json"))
+    records = _read_jsonl(_require_file(root / "records.jsonl"))
+
+    conditions = plan.get("conditions") or []
+    if not isinstance(conditions, list) or not all(isinstance(c, dict) for c in conditions):
+        raise ContractError("stage-b-plan.json conditions must be a list of objects")
+    if not conditions:
+        raise ContractError("stage-b-plan.json must declare at least one condition")
+
+    evidence_condition_ids: list[str] = []
+    no_evidence_condition_ids: list[str] = []
+    for condition in conditions:
+        cid = condition.get("id")
+        evidence = condition.get("evidence") or {}
+        kind = evidence.get("kind")
+        if not isinstance(cid, str) or not cid:
+            raise ContractError("each comparison condition must declare a string id")
+        if kind == "specialist_bundle":
+            evidence_condition_ids.append(cid)
+        elif kind == "none":
+            no_evidence_condition_ids.append(cid)
+        else:
+            raise ContractError(
+                f"condition {cid!r} must declare evidence.kind 'specialist_bundle' or 'none'"
+            )
+
+    if not evidence_condition_ids:
+        raise ContractError("stage-b-plan.json must declare at least one evidence-bearing condition")
+    if not no_evidence_condition_ids:
+        raise ContractError("stage-b-plan.json must declare at least one no-evidence condition")
+
+    by_condition: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        cid = record.get("condition_id")
+        if not isinstance(cid, str):
+            continue
+        by_condition.setdefault(cid, []).append(record)
+
+    # Every evidence-bearing record must carry a non-trivial payload; every no-evidence
+    # record must carry a null payload. This guarantees the axis isolates evidence placement.
+    bad = 0
+    findings: list[str] = []
+    checks: dict[str, int] = {"ok": 0, "bad": 0}
+
+    def check(condition: bool, label: str) -> None:
+        nonlocal bad
+        checks["ok" if condition else "bad"] += 1
+        if not condition:
+            bad += 1
+            findings.append(label)
+
+    for condition_id in sorted(evidence_condition_ids):
+        group = by_condition.get(condition_id, [])
+        check(len(group) > 0, f"evidence condition {condition_id!r} has no records")
+        distinct_payloads: set[str] = set()
+        for record in group:
+            cid = record.get("condition_id")
+            payload = record.get("evidence_payload")
+            # Payloads must be real JSON objects (never the 'none' sentinel, null, []).
+            check(
+                isinstance(payload, dict) and len(payload) > 0,
+                f"{record.get('record_id')}: evidence-bearing record must carry a non-empty evidence_payload object",
+            )
+            if isinstance(payload, dict) and len(payload) > 0:
+                distinct_payloads.add(_canonical_json(payload))
+            inputs = record.get("selected_evidence_input_artifact_sha256")
+            check(
+                isinstance(inputs, dict)
+                and "pose2.npy" in inputs
+                and "seg2.npy" in inputs,
+                f"{record.get('record_id')}: evidence-bearing record must record pose2.npy and seg2.npy inputs",
+            )
+        # Distinctness guards against a boilerplate/bloated copy of one shared payload.
+        check(
+            len(distinct_payloads) >= 2,
+            f"evidence condition {condition_id!r} must carry more than one distinct per-image payload",
+        )
+
+    for condition_id in sorted(no_evidence_condition_ids):
+        group = by_condition.get(condition_id, [])
+        check(len(group) > 0, f"no-evidence condition {condition_id!r} has no records")
+        for record in group:
+            payload = record.get("evidence_payload")
+            check(
+                payload is None,
+                f"{record.get('record_id')}: no-evidence record must carry a null evidence_payload",
+            )
+            inputs = record.get("selected_evidence_input_artifact_sha256")
+            check(
+                isinstance(inputs, dict)
+                and "pose2.npy" in inputs
+                and "seg2.npy" in inputs,
+                f"{record.get('record_id')}: no-evidence record should still list the core inputs it binds",
+            )
+
+    return {
+        "root": str(root),
+        "evidence_condition_ids": evidence_condition_ids,
+        "no_evidence_condition_ids": no_evidence_condition_ids,
+        "evidence_record_count": sum(len(by_condition.get(c, [])) for c in evidence_condition_ids),
+        "no_evidence_record_count": sum(len(by_condition.get(c, [])) for c in no_evidence_condition_ids),
+        "checks_passed": checks["ok"],
+        "checks_failed": checks["bad"],
+        "findings": findings,
+        "summary": (
+            "evidence axis isolated and materialized" if bad == 0
+            else "evidence axis NOT isolated: " + "; ".join(findings)
+        ),
+        "evidence_axis_ok": bad == 0,
+    }
