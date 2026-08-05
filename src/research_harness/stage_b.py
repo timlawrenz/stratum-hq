@@ -36,6 +36,7 @@ from stratum2.pipeline.determinations import derive_determinations
 from .contracts import ContractError, validate_comparison_parity_plan, validate_program
 from .clothing import ClothingError, compute_clothing
 from .proportions import ProportionError, compute_proportions
+from .hair import HairError, compute_hair
 
 
 class StageBRunError(RuntimeError):
@@ -342,6 +343,70 @@ def _serialize_clothing(clothing: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _hair_evidence() -> dict[str, Any]:
+    """Declared deterministic hair specialist (arm #30)."""
+    module_path = Path(compute_hair.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-hair-v1",
+        "specialists": [
+            {
+                "id": "in-memory-hair-v1",
+                "scope": "seg2 DOME-29 Hair(4) region only: coverage of subject foreground, dominant hair color from source pixels, vertical position band, and a hair-to-face vertical-extent length proxy; never facial, identity, or posture semantics.",
+                "inputs": "Frozen selected-item seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous coverage fractions, a deterministic dominant color, and scale-invariant relational ratios or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.hair.compute_hair "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; the Hair region is measured only when it clears a raw-pixel floor and a foreground-coverage gate, otherwise it abstains (never fabricated); detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Tight crops and segmentation errors can make the Hair region abstain or under-measure; dominant color depends on lighting and white balance and is a quantized name, not a spectral measurement; a hair-to-face ratio is undefined when the Face_Neck region is absent/degenerate.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_hair(hair: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a hair measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: hair presence,
+    subject-foreground coverage, quantized dominant color, vertical band, and
+    the hair-to-face extent ratio (length proxy). Absolute pixel counts and raw
+    RGB are deliberately NOT verbalized (camera/size-dependent); they exist in
+    the machine-readable `evidence_payload` JSON (dossier / compressor input).
+    """
+    lines = [
+        "HAIR (deterministic, seg2 DOME-29 Hair(4) region + source pixel dominant color):"
+    ]
+    if not hair.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from hair claims")
+        return "\n".join(lines)
+    if not hair.get("hair_present"):
+        lines.append(
+            "- no reliable hair region cleared the measurement gate -> abstain from hair presence/color/detail claims "
+            "(an absent hair mask is not evidence the subject is bald)"
+        )
+        return "\n".join(lines)
+
+    coverage = hair.get("hair_coverage")
+    color = hair.get("hair_dominant_color_name")
+    position = hair.get("hair_position")
+    ratio = hair.get("hair_face_extent_ratio")
+    if coverage is not None:
+        lines.append(f"- hair present, covering {coverage:.2f} of subject foreground")
+    if color:
+        lines.append(f"- hair dominant color: {color}")
+    if position:
+        lines.append(f"- hair occupies the {position} region of the frame")
+    if ratio is not None:
+        lines.append(f"- hair-to-face vertical extent ratio (length proxy): {ratio:.2f}")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -466,7 +531,7 @@ def build_stage_b_plan(
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
-    if evidence_kind not in ("geometry", "body-type", "clothing"):
+    if evidence_kind not in ("geometry", "body-type", "clothing", "hair"):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
@@ -542,6 +607,29 @@ def build_stage_b_plan(
             "are not used as evidence inputs. Clothing coverage and dominant colors are computed in memory from the frozen "
             "selected seg2 and the already-decoded source pixels only (presence requires a raw-pixel floor and a "
             "foreground-coverage gate; otherwise the class abstains)."
+        )
+    elif evidence_kind == "hair":
+        evidence = _hair_evidence()
+        evidence_condition_id = "context-raw-hair"
+        comparison_plan_id = "stage-b-first500-hair-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic DOME-29 hair measurements "
+            "(Hair-region coverage from seg2, dominant hair color from source pixels, vertical position band, and a "
+            "hair-to-face vertical-extent length proxy) may improve supported hair description claims without "
+            "increasing unsupported, contradictory, or invented hair-color/coverage claims when the source item, view, "
+            "prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The hair-evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on hair claims, or an apparent improvement is attributable to an "
+            "uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Hair coverage, dominant color, vertical band, and the hair-to-face extent "
+            "ratio are computed in memory from the frozen selected seg2 and the already-decoded source pixels only "
+            "(presence requires a raw-pixel floor and a foreground-coverage gate; otherwise the region abstains). Only "
+            "scale-invariant facts are verbalized."
         )
     else:
         evidence = _geometry_evidence()
@@ -702,6 +790,8 @@ def _validate_frozen_execution_plan(
     condition_ids = {condition.get("id") for condition in plan.get("conditions", [])}
     if "context-raw-clothing" in condition_ids:
         rebuild_kind = "clothing"
+    elif "context-raw-hair" in condition_ids:
+        rebuild_kind = "hair"
     elif "context-raw-body-type" in condition_ids:
         rebuild_kind = "body-type"
     else:
@@ -811,6 +901,10 @@ def _load_selected_item(
         clothing = compute_clothing(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except ClothingError as exc:
         raise StageBRunError(f"clothing abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        hair = compute_hair(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
+    except HairError as exc:
+        raise StageBRunError(f"hair abort for frozen selected item {image_id}: {exc}") from exc
     return {
         "item": dict(item),
         "image": image,
@@ -818,6 +912,7 @@ def _load_selected_item(
         "determinations": determinations,
         "proportions": proportions,
         "clothing": clothing,
+        "hair": hair,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": ["pose2.npy", "seg2.npy"],
@@ -870,6 +965,10 @@ def _render_condition(
         clothing = prepared["clothing"]
         evidence_text = _serialize_clothing(clothing)
         return raw.copy(), _context_prompt(evidence_text), clothing
+    if condition_id == "context-raw-hair":
+        hair = prepared["hair"]
+        evidence_text = _serialize_hair(hair)
+        return raw.copy(), _context_prompt(evidence_text), hair
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 

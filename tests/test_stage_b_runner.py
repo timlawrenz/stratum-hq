@@ -354,6 +354,54 @@ def test_stage_b_clothing_evidence_kind_builds_and_executes(tmp_path: Path) -> N
     assert not (Path(program["canonical_source"]["derived_tree"]) / "fixture" / "determinations.json").exists()
 
 
+def test_stage_b_hair_evidence_kind_builds_and_executes(tmp_path: Path) -> None:
+    program, candidate, settings, research_root = _fixture(tmp_path)
+    captured: list[dict] = []
+
+    def generate(image: Image.Image, prompt: str, generation: StageBGenerationSettings) -> str:
+        captured.append({"prompt": prompt})
+        return f"caption-{len(captured)}"
+
+    frozen = freeze_stage_b_plan(program, candidate, settings, evidence_kind="hair")
+    assert frozen["comparison_plan_id"] == "stage-b-first500-hair-v1"
+    assert [c["id"] for c in frozen["conditions"]] == [
+        "legacy-bucketed-no-evidence",
+        "legacy-raw-no-evidence",
+        "context-raw-no-evidence",
+        "context-raw-hair",
+    ]
+    evidence_only = next(c for c in frozen["contrasts"] if c["id"] == "evidence-only")
+    assert evidence_only["variant_condition"] == "context-raw-hair"
+    validate_comparison_parity_plan(frozen, program)
+    result = execute_stage_b(
+        program,
+        candidate,
+        settings,
+        output_root=research_root / "run-hair",
+        expected_plan=frozen,
+        generate=generate,
+    )
+    assert result["record_count"] == 4
+    assert len(captured) == 4
+    hair_prompt = captured[3]["prompt"]
+    assert "DECLARED SPECIALIST EVIDENCE:" in hair_prompt
+    assert "HAIR" in hair_prompt
+
+    records = [json.loads(line) for line in (research_root / "run-hair" / "records.jsonl").read_text().splitlines()]
+    hair_record = next(r for r in records if r["condition_id"] == "context-raw-hair")
+    payload = hair_record["evidence_payload"]
+    assert payload["subject_present"] is True
+    assert "hair_present" in payload
+    assert hair_record["selected_derived_reads"] == ["pose2.npy", "seg2.npy"]
+    assert not (Path(program["canonical_source"]["derived_tree"]) / "fixture" / "determinations.json").exists()
+
+
+def test_stage_b_hair_rejects_unknown_evidence_kind(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+    with pytest.raises(StageBRunError, match="unsupported Stage-B evidence_kind"):
+        build_stage_b_plan(program, candidate, settings, evidence_kind="not-a-kind")
+
+
 def test_stage_b_rejects_derived_artifact_hash_drift_before_generator(tmp_path: Path) -> None:
     program, candidate, settings, research_root = _fixture(tmp_path)
     frozen_plan = freeze_stage_b_plan(program, candidate, settings)
