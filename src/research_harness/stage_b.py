@@ -234,30 +234,43 @@ def _body_type_evidence() -> dict[str, Any]:
 def _serialize_proportions(proportions: Mapping[str, Any]) -> str:
     """Deterministic natural-language rendering of a proportions measurement dict.
 
-    Never frees text that the measurement abstained on: each unavailable ratio is
-    rendered as an explicit 'not measurable' line rather than a fabricated value.
+    Only **scale-invariant** ratios are verbalized (shoulder:hip, leg:torso,
+    limb asymmetry) plus explicit abstention lines. Absolute pixel measurements
+    are deliberately NOT verbalized: they are camera-frame-dependent, do not
+    survive cross-picture comparison, and a text-to-image model cannot
+    interpret them. Raw pixel values still exist in the machine-readable
+    `evidence_payload` JSON (dossier / compressor input) as
+    between_shoulders/between_hips/torso_length/lengths (px), but they are not
+    caption claims.
     """
     lines = [
-        "BODY-TYPE PROPORTIONS (deterministic, Goliath-308 pose2 keypoints, camera-frame pixel units):"
+        "BODY-TYPE PROPORTIONS (deterministic, scale-invariant ratios from Goliath-308 pose2 keypoints):"
     ]
     if not proportions.get("subject_present"):
         lines.append("- no reliable body-keypoint subject present -> abstain from body-type claims")
         return "\n".join(lines)
-    labelled: tuple[tuple[str, str], ...] = (
-        ("between_shoulders", "shoulder width (px)"),
-        ("between_hips", "hip width (px)"),
+
+    ratio_items: tuple[tuple[str, str], ...] = (
         ("shoulder_hip_ratio", "shoulder:hip width ratio"),
-        ("torso_length", "torso length (px)"),
-        ("left_leg_length", "left leg length (px)"),
-        ("right_leg_length", "right leg length (px)"),
         ("leg_torso_ratio", "mean leg:torso length ratio"),
     )
-    for key, label in labelled:
+    for key, label in ratio_items:
         value = proportions.get(key)
         if value is None:
             lines.append(f"- {label}: not measurable (joint absent or low confidence)")
         else:
-            lines.append(f"- {label}: {value}")
+            # Emit as a human-interpretable ratio description, not a bare number
+            lines.append(f"- {label}: {value:.2f}")
+
+    # Limb asymmetry is a scale-invariant relational fact: same-frame ratio.
+    llen = proportions.get("left_leg_length")
+    rlen = proportions.get("right_leg_length")
+    if llen is not None and rlen is not None and rlen > 0:
+        asym = llen / rlen
+        direction = "left leg longer" if asym > 1.02 else ("right leg longer" if asym < 0.98 else "legs of similar length")
+        lines.append(f"- leg length asymmetry (left:right): {direction} (ratio {asym:.2f})")
+    else:
+        lines.append("- leg length asymmetry: not measurable (one or both legs absent or low confidence)")
     return "\n".join(lines)
 
 

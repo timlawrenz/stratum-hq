@@ -541,8 +541,12 @@ def test_stage_b_bodytype_serialize_proportions_abstains_and_reports(tmp_path: P
             "leg_torso_ratio": None,
         }
     )
-    assert "shoulder:hip width ratio: 1.3226" in measured
-    assert "left leg length (px): not measurable" in measured
+    # ratio-only verbalization (scale-invariant); px are not caption claims
+    assert "shoulder:hip width ratio: 1.32" in measured
+    assert "shoulder:hip width ratio: not measurable" not in measured
+    # no absolute pixel units in the verbalized evidence
+    assert "px" not in measured.lower()
+    assert "leg length asymmetry: not measurable" in measured
 
 
 def test_stage_b_bodytype_execution_writes_evidence_condition(tmp_path: Path) -> None:

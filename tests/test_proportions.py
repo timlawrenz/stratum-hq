@@ -8,6 +8,8 @@ deliver exactly-one-subject semantics.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -105,3 +107,28 @@ def test_compute_proportions_no_subject_symbolizes_absent() -> None:
     m = compute_proportions(np.zeros((308, 3), dtype=np.float32))
     assert m["subject_present"] is False
     assert m["shoulder_hip_ratio"] is None
+
+
+def test_proportions_serialization_verbalizes_ratios_only_no_px(tmp_path: Path) -> None:
+    """The verbalized evidence must contain scale-invariant ratios and explicitly
+    not verbalize absolute pixel values (camera-frame-dependent, not useful to a
+    text-to-image model). Raw px stay in the JSON payload, never in the prompt."""
+    from research_harness.stage_b import _serialize_proportions
+
+    m = compute_proportions(_normal_pose())
+    assert m["shoulder_hip_ratio"] is not None
+    assert m["leg_torso_ratio"] is not None
+    text = _serialize_proportions(m)
+    # ratios present
+    assert "shoulder:hip width ratio" in text
+    assert "leg:torso length ratio" in text
+    # no absolute pixel units verbalized
+    assert "px" not in text.lower()
+    assert "pixel" not in text.lower()
+    # raw width keys are NOT verbalized
+    assert "between_sh" not in text
+    assert "torso_length" not in text
+    # abstention is explicit, never a fabricated number
+    m2 = compute_proportions(_pose({"left_shoulder": (1, 1, 0.9)}))
+    t2 = _serialize_proportions(m2)
+    assert "not measurable" in t2 or "no reliable body-keypoint" in t2
