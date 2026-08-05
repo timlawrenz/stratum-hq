@@ -41,7 +41,8 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
   * Test how `context4k` should be consumed without truncating it into the legacy 512-token T5 path, then test controlled downstream usefulness.
 
 * **[PROPOSAL] Evidence-dimension arms (draft PR #20, `docs/EVIDENCE_DIMENSION_ARMS.md`)**
-  * Each notes a deterministic measurement from existing artifacts and a claim-support delta target reusing the measured arm #4 protocol. See `[#29 clothing/apparel]`, `[#30 hair]`, `[#31 skin-color]`, `[#32 body-type/proportions]`, `[#33 lighting]`, `[#34 setting/environment]`, `[#35 texture/material]`, `[#36 full-dossier assembly + context4k compression]`.
+  * Each notes a deterministic measurement from existing artifacts and a claim-support delta target reusing the measured arm #4 protocol. See `[#29 clothing/apparel]`, `[#30 hair]`, `[#31 skin-color]`, `[#32 body-type/proportions]`, `[#33 lighting]`, `[#34 setting/environment]`, `[#35 texture/material]`, `[#36 full-dossier assembly + context4k compression]`, `[#37 generative reconstruction validation (ComfyUI round-trip)]`.
+  * The registry (`research/dimensions/evidence-dimension-registry-v1.json`) is the source of truth and now supports **non-stratum open-world specialists** (e.g. local Florence-2 for clothing/texture) and **reconstruction validation** (`claim-support` / `reconstruction` / `roundtrip-audit`) via local ComfyUI + CLIP scoring — the evidence space is not limited to stratum/Sapiens2 outputs.
   * None is active. #4 remains the sole `research:active` arm.
 
 ## Concluded
