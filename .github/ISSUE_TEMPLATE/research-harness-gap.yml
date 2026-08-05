@@ -1,0 +1,37 @@
+name: Research harness gap or hold
+description: Stop autonomous action when the contract, metric, policy, or authority boundary is insufficient.
+title: "research hold: "
+labels: ["research", "research:hold", "research:needs-human", "research:harness-gap"]
+body:
+  - type: textarea
+    id: metadata
+    attributes:
+      label: Machine-readable research metadata
+      description: Replace the placeholders with the evidence, risk, and smallest requested decision.
+      value: |
+        <!-- research-harness:
+        {"kind":"hold","trigger":"REPLACE","risk":"REPLACE","decision":"REPLACE"}
+        -->
+    validations:
+      required: true
+  - type: textarea
+    id: trigger
+    attributes:
+      label: Trigger and evidence
+      description: What was discovered, where, and why it prevents trustworthy autonomous progress.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk if the agent continued
+      description: Explain the false conclusion, data, GPU, policy, or scope risk.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Smallest human decision needed
+      description: Give the smallest reviewable choice that unblocks progress.
+    validations:
+      required: true
