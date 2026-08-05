@@ -2,6 +2,21 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Stage-B authority resolution and owner release — `[OWNER-CONFIRMED / REVIEW GATE OPEN / PENDING_INDEPENDENT_REVIEW]`
+
+**Date:** 2026-08-05
+**Arm:** #4 — baseline and comparison parity
+
+**Trigger escalation:** for several rounds the completed 96-record Stage-B run at `/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1` was held because the asserted approval in draft PR #20's GPU manifest was not present in the durable record; #18 was OPEN/held with only agent-authored comments.
+
+**Resolution (durable owner decision, 2026-08-05T07:23:06Z, authenticated Hermes WebUI):** the owner recorded on #18 that they approved the Stage-B request, delegated the aggregator/settings/review decision to the autonomous loop (not owner-gated), **released the hold** (`research:hold` / `research:needs-human` removed at 07:23:03Z/05Z), confirmed the finished 96-record run (gemma3:27b, temp 0, seed 20260804, num_ctx 4096, manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`), and retained `research:metric-risk` until the claim-support self-audit + independent adversarial review complete on the finished run.
+
+**Read-only verification (this round):** `run-provenance.json` / `scheduler-provenance.json` at the output root match the owner's description exactly; `verify-stage-b-output` → `valid`; 96/96 review rows remain PENDING.
+
+**Reconciliation:** per the repo's released-hold precedent (#9), issue #18 is closed/resolved; the retained `research:metric-risk` gate lives on #4. Live open-issue snapshot `validate-tree` is `valid` again.
+
+**Verdict:** `PENDING_INDEPENDENT_REVIEW` — owner-confirmed run, not PASS/FAIL. No claim-support scoring, self-audit, or adversarial review has run. The documented evidence-prompt confound and input-view not-input-documented caveats must be honored in the review. The missing `empty-caption-null-v1` null fixture remains a metric-precondition decision.
+
 ## Stage-A caption/context parity preparation — `[COMPLETED / PENDING / NON-EXECUTING]`
 
 **Date:** 2026-08-04
