@@ -313,6 +313,47 @@ def test_stage_b_writes_only_noncanonical_outputs_and_keeps_axes_separate(tmp_pa
     assert not (derived_root / "fixture" / "determinations.json").exists()
 
 
+def test_stage_b_clothing_evidence_kind_builds_and_executes(tmp_path: Path) -> None:
+    program, candidate, settings, research_root = _fixture(tmp_path)
+    captured: list[dict] = []
+
+    def generate(image: Image.Image, prompt: str, generation: StageBGenerationSettings) -> str:
+        captured.append({"prompt": prompt})
+        return f"caption-{len(captured)}"
+
+    frozen = freeze_stage_b_plan(program, candidate, settings, evidence_kind="clothing")
+    assert frozen["comparison_plan_id"] == "stage-b-first500-clothing-v1"
+    assert [c["id"] for c in frozen["conditions"]] == [
+        "legacy-bucketed-no-evidence",
+        "legacy-raw-no-evidence",
+        "context-raw-no-evidence",
+        "context-raw-clothing",
+    ]
+    validate_comparison_parity_plan(frozen, program)
+    result = execute_stage_b(
+        program,
+        candidate,
+        settings,
+        output_root=research_root / "run-clothing",
+        expected_plan=frozen,
+        generate=generate,
+    )
+    assert result["record_count"] == 4
+    # The fixture seg2 has arms/torso skin classes but no garment class -> abstain.
+    assert len(captured) == 4
+    clothing_prompt = captured[3]["prompt"]
+    assert "DECLARED SPECIALIST EVIDENCE:" in clothing_prompt
+    assert "CLOTHING/APPAREL" in clothing_prompt
+
+    records = [json.loads(line) for line in (research_root / "run-clothing" / "records.jsonl").read_text().splitlines()]
+    clothing_record = next(r for r in records if r["condition_id"] == "context-raw-clothing")
+    payload = clothing_record["evidence_payload"]
+    assert "classes" in payload
+    assert "garments" in payload
+    assert clothing_record["selected_derived_reads"] == ["pose2.npy", "seg2.npy"]
+    assert not (Path(program["canonical_source"]["derived_tree"]) / "fixture" / "determinations.json").exists()
+
+
 def test_stage_b_rejects_derived_artifact_hash_drift_before_generator(tmp_path: Path) -> None:
     program, candidate, settings, research_root = _fixture(tmp_path)
     frozen_plan = freeze_stage_b_plan(program, candidate, settings)

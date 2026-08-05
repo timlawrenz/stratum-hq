@@ -34,6 +34,7 @@ from stratum2.pipeline.caption2 import CAPTION2_PROMPT_TEMPLATE, build_prompt
 from stratum2.pipeline.determinations import derive_determinations
 
 from .contracts import ContractError, validate_comparison_parity_plan, validate_program
+from .clothing import ClothingError, compute_clothing
 from .proportions import ProportionError, compute_proportions
 
 
@@ -274,6 +275,67 @@ def _serialize_proportions(proportions: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _clothing_evidence() -> dict[str, Any]:
+    """Declared deterministic clothing/apparel specialist (arm #29)."""
+    module_path = Path(compute_clothing.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-clothing-apparel-v1",
+        "specialists": [
+            {
+                "id": "in-memory-clothing-apparel-v1",
+                "scope": "seg2 DOME-29 clothing/apparel classes only (Apparel, Upper_Clothing, Lower_Clothing, Socks, Shoes) plus per-class dominant color from source pixels; never body-type, posture, or identity semantics.",
+                "inputs": "Frozen selected-item seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous coverage fractions and deterministic dominant colors per garment class, or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.clothing.compute_clothing "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; a garment class is measured only when it clears a raw-pixel floor and a foreground-coverage gate, otherwise it abstains (never fabricated); detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Tight crops, segmentation errors, and heavily occluded garments can make classes abstain; dominant colors depend on lighting and white balance; generic Apparel class may not distinguish garment silhouettes.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_clothing(clothing: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a clothing measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: which garment
+    classes are present, their subject-foreground coverage, and the quantized
+    dominant color. Absolute pixel counts and raw RGB are deliberately NOT
+    verbalized (camera/size-dependent); they exist in the machine-readable
+    `evidence_payload` JSON (dossier / compressor input).
+    """
+    lines = [
+        "CLOTHING/APPAREL (deterministic, seg2 DOME-29 garment classes + source pixel dominant colors):"
+    ]
+    if not clothing.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from clothing claims")
+        return "\n".join(lines)
+
+    garments = clothing.get("garments") or []
+    if not garments:
+        lines.append(
+            "- no garment class cleared the measurement gate -> abstain from clothing/apparel claims "
+            "(exposed skin is not inferred as an absence of clothing)"
+        )
+    for garment in garments:
+        coverage = garment.get("coverage")
+        color = garment.get("dominant_color_name")
+        color_text = f", dominant color {color}" if color else ""
+        coverage_text = f"{coverage:.2f} of subject foreground" if coverage is not None else ""
+        lines.append(
+            f"- {garment['class'].replace('_', ' ')} present{color_text}"
+            + (f" ({coverage_text})" if coverage_text else "")
+        )
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -398,7 +460,7 @@ def build_stage_b_plan(
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
-    if evidence_kind not in ("geometry", "body-type"):
+    if evidence_kind not in ("geometry", "body-type", "clothing"):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
@@ -453,6 +515,27 @@ def build_stage_b_plan(
             "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
             "are not used as evidence inputs. Proportions are computed in memory from the frozen selected pose2 only "
             "(min keypoint confidence 0.5, transform-agnostic continuous ratios with explicit abstention)."
+        )
+    elif evidence_kind == "clothing":
+        evidence = _clothing_evidence()
+        evidence_condition_id = "context-raw-clothing"
+        comparison_plan_id = "stage-b-first500-clothing-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic DOME-29 clothing/apparel "
+            "measurements (garment class coverage from seg2 and per-class dominant colors from source pixels) may "
+            "improve supported clothing/apparel description claims without increasing unsupported or contradictory "
+            "claims when the source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The clothing-evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on clothing/apparel claims, or an apparent difference is attributable "
+            "to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Clothing coverage and dominant colors are computed in memory from the frozen "
+            "selected seg2 and the already-decoded source pixels only (presence requires a raw-pixel floor and a "
+            "foreground-coverage gate; otherwise the class abstains)."
         )
     else:
         evidence = _geometry_evidence()
@@ -611,7 +694,12 @@ def _validate_frozen_execution_plan(
         raise StageBRunError(f"expected comparison plan violates the comparison contract: {exc}") from exc
 
     condition_ids = {condition.get("id") for condition in plan.get("conditions", [])}
-    rebuild_kind = "body-type" if "context-raw-body-type" in condition_ids else "geometry"
+    if "context-raw-clothing" in condition_ids:
+        rebuild_kind = "clothing"
+    elif "context-raw-body-type" in condition_ids:
+        rebuild_kind = "body-type"
+    else:
+        rebuild_kind = "geometry"
     rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
     expected_core = {
         key: value
@@ -713,12 +801,17 @@ def _load_selected_item(
         proportions = compute_proportions(pose2)
     except ProportionError as exc:
         raise StageBRunError(f"proportions abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        clothing = compute_clothing(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
+    except ClothingError as exc:
+        raise StageBRunError(f"clothing abort for frozen selected item {image_id}: {exc}") from exc
     return {
         "item": dict(item),
         "image": image,
         "source_sha256": observed_sha,
         "determinations": determinations,
         "proportions": proportions,
+        "clothing": clothing,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": ["pose2.npy", "seg2.npy"],
@@ -767,6 +860,10 @@ def _render_condition(
         proportions = prepared["proportions"]
         evidence_text = _serialize_proportions(proportions)
         return raw.copy(), _context_prompt(evidence_text), proportions
+    if condition_id == "context-raw-clothing":
+        clothing = prepared["clothing"]
+        evidence_text = _serialize_clothing(clothing)
+        return raw.copy(), _context_prompt(evidence_text), clothing
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 
