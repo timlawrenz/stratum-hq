@@ -3,9 +3,15 @@
   "program_id": "stratum-contextual-specialist-research",
   "goal": "Enumeration and sweep of open-world evidence dimensions toward a ~100K-token per-asset dossier that compresses into a ~4K-token context4k.",
   "sweep_terms": {
-    "terminal_states": ["validated", "falsified", "exhausted"],
+    "terminal_states": [
+      "validated",
+      "falsified",
+      "exhausted"
+    ],
     "per_dimension_strike_limit": 3,
-    "brainstorm_states": ["brainstorm-new-data"]
+    "brainstorm_states": [
+      "brainstorm-new-data"
+    ]
   },
   "dimensions": [
     {
@@ -20,15 +26,24 @@
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
       "selection_rationale": "Clothing is a high-frequency hallucination risk and is deterministically measurable from existing seg2+pixels with no new model.",
-      "validation_methods": ["claim-support", "reconstruction"],
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
       "specialists": [
         {
           "name": "Florence-2-Flux-Large",
           "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
           "scope": "open-set clothing/apparel attribute tagging (garment type, color) from source pixels",
-          "known_failure_modes": ["hallucinated attributes on tight crops", "long-tail garment names may drift from source truth"]
+          "known_failure_modes": [
+            "hallucinated attributes on tight crops",
+            "long-tail garment names may drift from source truth"
+          ]
         }
-      ]
+      ],
+      "prior_evidence_strength": 0.7,
+      "measurability": "high",
+      "cost_bucket": "low"
     },
     {
       "id": "hair",
@@ -41,7 +56,10 @@
       "deterministic_signal": "seg2 Hair(4) region area/position + dominant color from source pixels",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
-      "selection_rationale": "Hair color/length is commonly hallucinated and is deterministically measurable from the existing Hair class."
+      "selection_rationale": "Hair color/length is commonly hallucinated and is deterministically measurable from the existing Hair class.",
+      "prior_evidence_strength": 0.6,
+      "measurability": "high",
+      "cost_bucket": "low"
     },
     {
       "id": "skin-color",
@@ -54,7 +72,10 @@
       "deterministic_signal": "seg2 Face_Neck(3)/limb skin regions + source pixel dominant color",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
-      "selection_rationale": "Skin tone is a frequent hallucination target and is measurable from existing seg2 masks."
+      "selection_rationale": "Skin tone is a frequent hallucination target and is measurable from existing seg2 masks.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low"
     },
     {
       "id": "body-type",
@@ -67,7 +88,10 @@
       "deterministic_signal": "pose2 Goliath-308 keypoints (shoulder/hip/limb ratios) + seg2 region fractions",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; pose2 + seg2",
-      "selection_rationale": "Pose evidence already improved claims in arm #4; body proportions are the direct extension using the same keypoints."
+      "selection_rationale": "Pose evidence already improved claims in arm #4; body proportions are the direct extension using the same keypoints.",
+      "prior_evidence_strength": 0.8,
+      "measurability": "high",
+      "cost_bucket": "low"
     },
     {
       "id": "lighting",
@@ -80,7 +104,10 @@
       "deterministic_signal": "normal2 direction statistics + source luminance/histogram/dynamic-range",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; normal2 + source pixels",
-      "selection_rationale": "Lighting is a common soft-detail hallucination and is measurable from existing pixel/normal artifacts."
+      "selection_rationale": "Lighting is a common soft-detail hallucination and is measurable from existing pixel/normal artifacts.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low"
     },
     {
       "id": "setting",
@@ -93,7 +120,10 @@
       "deterministic_signal": "seg2 Background/non-subject region + source color palette",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
-      "selection_rationale": "Background is frequently over-described and is measurable from the existing seg2 Background class."
+      "selection_rationale": "Background is frequently over-described and is measurable from the existing seg2 Background class.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium"
     },
     {
       "id": "texture",
@@ -107,15 +137,24 @@
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
       "selection_rationale": "Material/texture is a common hallucination and is measurable deterministically without new models.",
-      "validation_methods": ["claim-support", "reconstruction"],
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
       "specialists": [
         {
           "name": "Florence-2-large",
           "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
           "scope": "open-set material/texture/attribute description from source pixels",
-          "known_failure_modes": ["material attribution is confounded by lighting", "may over-specify texture"]
+          "known_failure_modes": [
+            "material attribution is confounded by lighting",
+            "may over-specify texture"
+          ]
         }
-      ]
+      ],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "medium"
     },
     {
       "id": "dossier-context4k",
@@ -128,16 +167,27 @@
       "deterministic_signal": "Verified dimension specialists + relational determinations assembled per item",
       "metric_version": "context4k-roundtrip-v1",
       "data_snapshot": "first-500 core-covered cohort expanded dossier",
-      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links — beyond any single dimension.",
-      "validation_methods": ["claim-support", "reconstruction", "roundtrip-audit"],
+      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links \u2014 beyond any single dimension.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction",
+        "roundtrip-audit"
+      ],
       "specialists": [
         {
           "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
           "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
           "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
-          "known_failure_modes": ["generative model does not reproduce identity/subject exactly", "CLIP score is a weak identity proxy", "GPU time per item is large"]
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
         }
-      ]
+      ],
+      "prior_evidence_strength": 0.9,
+      "measurability": "medium",
+      "cost_bucket": "high"
     }
   ]
 }

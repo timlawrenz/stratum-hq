@@ -88,6 +88,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     sweep = sub.add_parser("dimension-sweep-status", help="print evidence-dimension sweep status")
     sweep.add_argument("registry", type=Path)
+
+    sel = sub.add_parser(
+        "autonomous-select",
+        help="select the next highest-impact research arm from the registry",
+    )
+    sel.add_argument("registry", type=Path)
+
+    verd = sub.add_parser(
+        "autonomous-verdict",
+        help="compute a better-or-not verdict for a measured comparison",
+    )
+    verd.add_argument("registry", type=Path, nargs="?", help="optional; validates registry context")
+    verd.add_argument("--base-supported", type=int, required=True)
+    verd.add_argument("--variant-supported", type=int, required=True)
+    verd.add_argument("--base-unsupported", type=int, required=True)
+    verd.add_argument("--variant-unsupported", type=int, required=True)
+    verd.add_argument("--items", type=int, required=True)
+    verd.add_argument("--p-supported", type=float, required=True)
+    verd.add_argument("--method", choices=("claim-support", "reconstruction"), default="claim-support")
+    verd.add_argument("--reconstruction-delta", type=float, default=None)
+
+    tick = sub.add_parser(
+        "autonomous-tick",
+        help="run one autonomous-loop iteration (select/research/conclude/advance)",
+    )
+    tick.add_argument("registry", type=Path)
+    tick.add_argument("--review-dir", type=Path, default=None,
+                      help="review root for the active arm; omit to only select/activate")
+    tick.add_argument("--write", action="store_true",
+                      help="persist registry state changes back to the registry file")
     return parser.parse_args(argv)
 
 
@@ -131,6 +161,54 @@ def main(argv: list[str] | None = None) -> int:
                 print("valid")
             else:
                 print(json.dumps(sweep_status(registry), sort_keys=True))
+            return 0
+
+        if args.command == "autonomous-select":
+            from .autonomous import AutonomousError, select_next_arm
+            from .dimension_registry import load_registry
+
+            try:
+                selection = select_next_arm(load_registry(args.registry))
+            except AutonomousError as exc:
+                raise ContractError(str(exc)) from exc
+            print(json.dumps(selection, sort_keys=True))
+            return 0
+
+        if args.command == "autonomous-verdict":
+            from .autonomous import AutonomousError, better_or_not
+
+            try:
+                verdict = better_or_not(
+                    supported_base=args.base_supported,
+                    supported_variant=args.variant_supported,
+                    unsupported_base=args.base_unsupported,
+                    unsupported_variant=args.variant_unsupported,
+                    items=args.items,
+                    sign_test_p_supported=args.p_supported,
+                    method=args.method,
+                    reconstruction_delta=args.reconstruction_delta,
+                )
+            except AutonomousError as exc:
+                raise ContractError(str(exc)) from exc
+            print(json.dumps(verdict, sort_keys=True))
+            return 0
+
+        if args.command == "autonomous-tick":
+            from .autonomous import AutonomousError, run_tick
+            from .dimension_registry import load_registry
+
+            registry = load_registry(args.registry)
+            if args.review_dir is not None:
+                review_dir = str(args.review_dir)
+            else:
+                review_dir = None
+            try:
+                outcome = run_tick(registry, review_dir=review_dir)
+            except AutonomousError as exc:
+                raise ContractError(str(exc)) from exc
+            if args.write:
+                args.registry.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+            print(json.dumps({**outcome, "registry_written": bool(args.write)}, sort_keys=True))
             return 0
 
         program = _read_json(args.program)
