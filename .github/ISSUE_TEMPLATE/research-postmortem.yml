@@ -1,0 +1,44 @@
+name: Research post-mortem
+description: Preserve a negative, stalled, or discontinued result so it is not blindly retried.
+title: "research post-mortem: "
+labels: ["research", "research:postmortem", "wontfix"]
+body:
+  - type: textarea
+    id: metadata
+    attributes:
+      label: Machine-readable research metadata
+      description: Replace the placeholders. `parent_issue` must identify the concluded arm.
+      value: |
+        <!-- research-harness:
+        {"kind":"postmortem","parent_issue":0,"decision":"REPLACE","evidence_summary":"REPLACE"}
+        -->
+    validations:
+      required: true
+  - type: textarea
+    id: branch
+    attributes:
+      label: Arm and decision
+      description: Link the original issue, branch, PR, and state whether the verdict is PIVOT, PARK, or KILL.
+    validations:
+      required: true
+  - type: textarea
+    id: preregistered_gate
+    attributes:
+      label: Pre-registered gate and actual evidence
+      description: Include controlled comparison details, metrics, artifacts, and whether the evaluator passed its own audit.
+    validations:
+      required: true
+  - type: textarea
+    id: learning
+    attributes:
+      label: What was learned
+      description: Separate confirmed findings from unresolved confounds.
+    validations:
+      required: true
+  - type: textarea
+    id: salvage
+    attributes:
+      label: Salvage and follow-up
+      description: Name reusable artifacts/components and any genuinely new hypothesis worth pursuing.
+    validations:
+      required: true

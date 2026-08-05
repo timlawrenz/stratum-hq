@@ -18,6 +18,10 @@ from stratum2.config import (
     POINTMAP_FILE,
     POSE2_FILE,
     SEG2_FILE,
+    DETERMINATIONS_FILE,
+    CAPTION2_FILE,
+    T52_HIDDEN_FILE,
+    T52_MASK_FILE,
 )
 
 
@@ -70,6 +74,9 @@ def run_passes(
     run_pointmap = "pointmap" in passes
     run_pose2 = "pose2" in passes
     run_matting = "matting" in passes
+    run_determinations = "determinations" in passes
+    run_caption2 = "caption2" in passes
+    run_t52 = "t52" in passes
 
     # --- Non-Sapiens passes (from stratum) ---
     caption_backend = None
@@ -78,7 +85,7 @@ def run_passes(
     t5_encoder = None
     torch_device = None
 
-    needs_torch = run_dinov3 or run_t5 or run_seg2 or run_normal2 or run_pointmap or run_pose2 or run_matting
+    needs_torch = run_dinov3 or run_t5 or run_t52 or run_seg2 or run_normal2 or run_pointmap or run_pose2 or run_matting
     if needs_torch:
         torch_device = _pick_device(device)
         eprint(f"device: {torch_device}")
@@ -95,7 +102,7 @@ def run_passes(
         eprint("loading DINOv3 model...")
         dino = load_dinov3(torch_device)
 
-    if run_t5:
+    if run_t5 or run_t52:
         from stratum.pipeline.t5 import load_t5_encoder, load_t5_tokenizer
 
         eprint("loading T5 tokenizer + encoder...")
@@ -331,6 +338,41 @@ def run_passes(
                         counters["errors"] += 1
                 elif verbose:
                     eprint(f"  pointmap skipped {meta['image_id']} (no seg2)")
+
+            # Determinations (depends on pose2 and seg2, optionally pointmap)
+            if run_determinations and _needs(out_dir, DETERMINATIONS_FILE):
+                from stratum2.pipeline.determinations import process as determinations_process
+
+                if verbose:
+                    eprint(f"  determinations {meta['image_id']}...")
+                if determinations_process(image_path, out_dir):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # Caption2 (depends on determinations)
+            if run_caption2 and _needs(out_dir, CAPTION2_FILE):
+                from stratum2.pipeline.caption2 import process as caption2_process
+
+                if verbose:
+                    eprint(f"  caption2 {meta['image_id']}...")
+                if caption2_process(
+                    image_path, out_dir, ollama_url=ollama_url, ollama_model=ollama_model, max_tokens=caption_max_tokens
+                ):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
+
+            # T52 (depends on caption2)
+            if run_t52 and (_needs(out_dir, T52_HIDDEN_FILE) or _needs(out_dir, T52_MASK_FILE)):
+                from stratum2.pipeline.t52 import process as t52_process
+
+                if verbose:
+                    eprint(f"  t52 {meta['image_id']}...")
+                if t52_process(image_path, out_dir, tokenizer=t5_tokenizer, encoder=t5_encoder):
+                    did_work = True
+                else:
+                    counters["errors"] += 1
 
             if did_work:
                 counters["processed"] += 1
