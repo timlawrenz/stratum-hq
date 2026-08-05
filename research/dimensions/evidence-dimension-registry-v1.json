@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "program_id": "stratum-contextual-specialist-research",
+  "goal": "Enumeration and sweep of open-world evidence dimensions toward a ~100K-token per-asset dossier that compresses into a ~4K-token context4k.",
+  "sweep_terms": {
+    "terminal_states": [
+      "validated",
+      "falsified",
+      "exhausted"
+    ],
+    "per_dimension_strike_limit": 3,
+    "brainstorm_states": [
+      "brainstorm-new-data"
+    ]
+  },
+  "dimensions": [
+    {
+      "id": "clothing",
+      "name": "clothing/apparel",
+      "arm_issue": 29,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared DOME-29 clothing/apparel measurements (coverage, garment classes, per-garment dominant colors) reduce unsupported clothing claims in captions on the frozen first-500 cohort.",
+      "falsified_if": "The clothing-evidence condition does not reduce unsupported clothing claims or increase supported claims versus its matched no-evidence baseline under fixed view/prompt/model/settings.",
+      "deterministic_signal": "seg2 DOME-29 Apparel(1)/Upper_Clothing(23)/Lower_Clothing(13)/Torso(22)/Socks/Shoes classes + per-class dominant color from source pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Clothing is a high-frequency hallucination risk and is deterministically measurable from existing seg2+pixels with no new model.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
+      "specialists": [
+        {
+          "name": "Florence-2-Flux-Large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set clothing/apparel attribute tagging (garment type, color) from source pixels",
+          "known_failure_modes": [
+            "hallucinated attributes on tight crops",
+            "long-tail garment names may drift from source truth"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.7,
+      "measurability": "high",
+      "cost_bucket": "low"
+    },
+    {
+      "id": "hair",
+      "name": "hair",
+      "arm_issue": 30,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared hair measurements (color, area fraction, length proxy) reduce invented hair-color/coverage claims.",
+      "falsified_if": "The hair-evidence condition does not improve claim support versus its matched no-evidence baseline.",
+      "deterministic_signal": "seg2 Hair(4) region area/position + dominant color from source pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Hair color/length is commonly hallucinated and is deterministically measurable from the existing Hair class.",
+      "prior_evidence_strength": 0.6,
+      "measurability": "high",
+      "cost_bucket": "low"
+    },
+    {
+      "id": "skin-color",
+      "name": "skin-color/tone",
+      "arm_issue": 31,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared exposed-skin dominant color/tone reduces invented skin-tone claims.",
+      "falsified_if": "Skin-tone evidence does not improve supported claims or reduce unsupported color claims.",
+      "deterministic_signal": "seg2 Face_Neck(3)/limb skin regions + source pixel dominant color",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Skin tone is a frequent hallucination target and is measurable from existing seg2 masks.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low"
+    },
+    {
+      "id": "body-type",
+      "name": "body-type/proportions",
+      "arm_issue": 32,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared anthropometric ratios (shoulder:hip, torso:leg, limb lengths) improve body/limb description support.",
+      "falsified_if": "Proportion evidence does not improve supported body/pose claims over baseline.",
+      "deterministic_signal": "pose2 Goliath-308 keypoints (shoulder/hip/limb ratios) + seg2 region fractions",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 + seg2",
+      "selection_rationale": "Pose evidence already improved claims in arm #4; body proportions are the direct extension using the same keypoints.",
+      "prior_evidence_strength": 0.8,
+      "measurability": "high",
+      "cost_bucket": "low"
+    },
+    {
+      "id": "lighting",
+      "name": "lighting",
+      "arm_issue": 33,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared luminance/dynamic-range/lighting-direction statistics reduce invented shadow/lighting claims.",
+      "falsified_if": "Lighting evidence does not reduce unsupported lighting claims.",
+      "deterministic_signal": "normal2 direction statistics + source luminance/histogram/dynamic-range",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; normal2 + source pixels",
+      "selection_rationale": "Lighting is a common soft-detail hallucination and is measurable from existing pixel/normal artifacts.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low"
+    },
+    {
+      "id": "setting",
+      "name": "setting/environment",
+      "arm_issue": 34,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared background palette/non-subject statistics improve scene-environment claim support.",
+      "falsified_if": "Setting evidence does not improve supported scene claims or reduce invented background details.",
+      "deterministic_signal": "seg2 Background/non-subject region + source color palette",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Background is frequently over-described and is measurable from the existing seg2 Background class.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium"
+    },
+    {
+      "id": "texture",
+      "name": "texture/material",
+      "arm_issue": 35,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared per-region texture proxies (edge/gradient statistics) reduce invented material/texture claims.",
+      "falsified_if": "Texture evidence does not improve support or reduce unsupported material claims.",
+      "deterministic_signal": "per-mask gradient/edge statistics from source pixels (e.g. gradient magnitude inside seg2 regions)",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Material/texture is a common hallucination and is measurable deterministically without new models.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
+      "specialists": [
+        {
+          "name": "Florence-2-large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set material/texture/attribute description from source pixels",
+          "known_failure_modes": [
+            "material attribution is confounded by lighting",
+            "may over-specify texture"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "medium"
+    },
+    {
+      "id": "dossier-context4k",
+      "name": "full-dossier assembly and context4k compression",
+      "arm_issue": 36,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "An expanded per-item dossier assembled from verified evidence dimensions (target >=100K tokens, claim-by-claim evidence links) can be compressed to a ~4K-token context4k artifact that preserves supported claims better than a plain 4K summarization baseline.",
+      "falsified_if": "context4k does not preserve supported claims at materially higher density than a 4K baseline summarization (round-trip claim-support audit not passed).",
+      "deterministic_signal": "Verified dimension specialists + relational determinations assembled per item",
+      "metric_version": "context4k-roundtrip-v1",
+      "data_snapshot": "first-500 core-covered cohort expanded dossier",
+      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links \u2014 beyond any single dimension.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction",
+        "roundtrip-audit"
+      ],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.9,
+      "measurability": "medium",
+      "cost_bucket": "high"
+    }
+  ]
+}

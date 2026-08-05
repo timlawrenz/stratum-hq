@@ -1,0 +1,67 @@
+[
+  {
+    "name": "research",
+    "color": "5319E7",
+    "description": "Research-tree issue or program state"
+  },
+  {
+    "name": "research:active",
+    "color": "0E8A16",
+    "description": "The single currently selected research arm"
+  },
+  {
+    "name": "research:proposal",
+    "color": "BFD4F2",
+    "description": "Candidate direction; not a FIFO queue item"
+  },
+  {
+    "name": "research:go-deep",
+    "color": "1D76DB",
+    "description": "Positive valid signal merits deeper investigation"
+  },
+  {
+    "name": "research:high-priority",
+    "color": "D93F0B",
+    "description": "High expected information gain or urgent blocker"
+  },
+  {
+    "name": "research:low-priority",
+    "color": "EDEDED",
+    "description": "Preserve but do not select without new evidence"
+  },
+  {
+    "name": "research:blocked",
+    "color": "B60205",
+    "description": "Blocked by a named prerequisite or external dependency"
+  },
+  {
+    "name": "research:metric-risk",
+    "color": "FBCA04",
+    "description": "Metric, evaluator, or comparison is not yet trustworthy"
+  },
+  {
+    "name": "research:needs-human",
+    "color": "D876E3",
+    "description": "Requires an explicit human decision before continuing"
+  },
+  {
+    "name": "research:harness-gap",
+    "color": "7057FF",
+    "description": "Research contract or automation lacks a needed guard"
+  },
+  {
+    "name": "research:hold",
+    "color": "000000",
+    "description": "Global program hold; no autonomous selection or execution"
+  },
+  {
+    "name": "research:postmortem",
+    "color": "FFFFFF",
+    "description": "Negative result or discontinued branch has durable lessons"
+  },
+  {
+    "name": "research:gpu-authorized",
+    "color": "006B75",
+    "description": "Human-reviewed arm may request future GPU authority; not launch permission"
+  }
+]
