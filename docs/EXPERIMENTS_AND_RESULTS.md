@@ -2,6 +2,32 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #30 — hair evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-05
+**Arm:** #30 — hair evidence specialist
+**Code / PR:** `exp/stage-b-hair-arm30-20260805` (draft PR #40, stacked on the arm-#32/#29 execution harness)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arms #4/#29/#32)
+**Deterministic specialist:** `research_harness.hair.compute_hair` (seg2 DOME-29 Hair(4) region coverage + quantized dominant color from source pixels + vertical position band + hair-to-face vertical-extent length proxy, gate-floor abstention); computed in memory per item during the bounded run. Only scale-invariant facts are verbalized (coverage, color name, band, ratio); px stays in `evidence_payload`.
+**Deterministic probe (CPU, pre-run):** 24/24 subject present, 24/24 hair region cleared the gate, 23/24 length proxy measurable; palette black 2 / brown 6 / dark 5 / dark brown 8 / ginger 3; position top 14 / middle 9 / bottom 1. All 24 captions carry hair evidence; 3 ginger items are invented-color pressure tests.
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), temperature=0, seed=20260804, num_predict=384, num_ctx=4096, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family), temperature=0, seed=20260804, num_predict=2000, 512×512 input, same reviewer calibration as arms #4/#29/#32.
+**Plan:** frozen `research/stage-b-plans/stage-b-hair-v1.json` (fingerprint `2597eaf64025e440c604e13248d4c773420167195730501d8edee5b4925402ab`); conditions identical to arms #4/#29/#32 except the evidence condition is `context-raw-hair` (DOME-29 Hair region + color/length proxy) instead of `context-raw-geometry`/`context-raw-clothing`/`context-raw-body-type`. All 24/24 cohort items measured and generated.
+
+**Scheduler lifecycle (local 4090):** request → poll/claim → launch → verify GPU activity → activate → heartbeat → release, through `registered-research-launcher` (job `stratum-stage-b-hair-v1`, 15:18→15:29Z, `gpu_activity_seen: true`, 96/96, plan fingerprint verified) and the independent review pass (job `stratum-stage-b-adversarial-review-hair-v1`, 96/96 reviewed by gemma4:e4b, completed ~15:50Z, GPU released). Both slots released cleanly (4090 idle).
+
+**Evidence-only delta (cond 3 → 4):**
+- supported claims **47 → 172**; unsupported **99 → 23**; omissions 11 → 18; contradictions 1 → 1; abstentions 0 → 0.
+- Support ratio **32.2% → 88.2%** (Δ +0.560).
+- Paired per-item sign test on supported claims: 20 improve / 4 worsen (24 paired), one-sided binomial **p ≈ 0.000772**.
+- Deterministic cross-check independent of the LLM review: 19/24 hair-condition captions carry ≥1 hair vocabulary trace beyond their matched baseline (the remaining 5 already named hair color in baseline); both declared-ginger items now carry explicit "ginger hair", grounding the highest invented-color risk. Supported-claim gain is traceable to carried hair evidence.
+
+**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 172 --base-unsupported 99 --variant-unsupported 23 --items 24 --p-supported 0.000772` → **BETTER** (significant p=0.000772 ≤ 0.05; support-ratio improvement 0.322→0.882; unsupported reduced 99→23, not ballooning; `inconclusive: false`).
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root `/mnt/nas-ai-models/research/stratum/stage-b-hair-v1(-review)`; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `seg2.npy`/source pixels only; scale-invariant verbalization retained (owner px→ratios rule).
+
+**Registry advance:** hair dimension `active → validated` (0 strikes, confirmed by harness `autonomous-tick`). Next selector pick: **skin-color (arm #31, EIG 0.5)** now `research:active`. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+
 ## Arm #29 — clothing/apparel evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-05

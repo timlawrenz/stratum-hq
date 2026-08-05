@@ -43,7 +43,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[PROPOSAL] Evidence-dimension arms (draft PR #20, `docs/EVIDENCE_DIMENSION_ARMS.md`)**
   * Each notes a deterministic measurement from existing artifacts and a claim-support delta target reusing the measured arm #4 protocol. See `[#29 clothing/apparel]`, `[#30 hair]`, `[#31 skin-color]`, `[#32 body-type/proportions]`, `[#33 lighting]`, `[#34 setting/environment]`, `[#35 texture/material]`, `[#36 full-dossier assembly + context4k compression]`, `[#37 generative reconstruction validation (ComfyUI round-trip)]`.
   * The registry (`research/dimensions/evidence-dimension-registry-v1.json`) is the source of truth and now supports **non-stratum open-world specialists** (e.g. local Florence-2 for clothing/texture) and **reconstruction validation** (`claim-support` / `reconstruction` / `roundtrip-audit`) via local ComfyUI + CLIP scoring — the evidence space is not limited to stratum/Sapiens2 outputs.
-  * None is active. #4 remains the sole `research:active` arm.
+  * **Validated (2026-08-05):** clothing #29 (BETTER, p≈0.0173) and body-type #32 (ratio-corrected BETTER, p≈3e-6) and **hair #30 (BETTER, p≈0.000772, draft PR #40)**. **Active:** skin-color #31 (sole `research:active`, selector EIG 0.5). Proposals: lighting #33, setting #34, texture #35, dossier-context4k #36, reconstruction #37.
 
 ## Concluded
 
