@@ -53,6 +53,36 @@ def _read_issue_tree_snapshot(path: Path) -> dict[str, Any]:
     raise ContractError("issue-tree snapshot must be a JSON object or GitHub issue-list array")
 
 
+def _resolve_review_dir(args: argparse.Namespace) -> str | None:
+    """Resolve the review root from --review-dir or --review-dir-from marker.
+
+    Marker resolution is deterministic: the wrapper emits a JSON marker with a
+    `review_root` field after a completed review pass, so the tick never has to
+    guess which root to conclude against. Fail-closed on ambiguity or an
+    incomplete marker.
+    """
+    from .contracts import ContractError
+
+    if args.review_dir is not None and args.review_dir_from is not None:
+        raise ContractError(
+            "autonomous-tick: pass either --review-dir or --review-dir-from, not both"
+        )
+    if args.review_dir_from is None:
+        return str(args.review_dir) if args.review_dir is not None else None
+    try:
+        marker = json.loads(args.review_dir_from.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ContractError(f"unable to read tick-ready marker {args.review_dir_from}: {exc}") from exc
+    if not isinstance(marker, dict):
+        raise ContractError(f"tick-ready marker {args.review_dir_from} must be a JSON object")
+    if marker.get("status") != "completed":
+        raise ContractError(f"tick-ready marker {args.review_dir_from} is not completed: {marker.get('status')!r}")
+    root = marker.get("review_root")
+    if not isinstance(root, str) or not root.strip():
+        raise ContractError(f"tick-ready marker {args.review_dir_from} has no review_root")
+    return root
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="research-harness")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -117,8 +147,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     tick.add_argument("registry", type=Path)
     tick.add_argument("--review-dir", type=Path, default=None,
                       help="review root for the active arm; omit to only select/activate")
+    tick.add_argument("--review-dir-from", type=Path, default=None,
+                      help="JSON marker emitted by stratum_review_poll_wrapper.py; "
+                           "the tick uses its review_root (deterministic, no path guessing)")
+    tick.add_argument("--method", choices=("claim-support", "reconstruction"),
+                      default="claim-support",
+                      help="verdict method: claim-support (review root) or reconstruction (CLIP delta)")
+    tick.add_argument("--reconstruction-delta", type=float, default=None,
+                      help="CLIP similarity delta (variant minus base) for reconstruction method")
+    tick.add_argument("--items", type=int, default=None,
+                      help="override the item count used for the verdict")
     tick.add_argument("--write", action="store_true",
-                      help="persist registry state changes back to the registry file")
+                      help="persist registry state changes back to the registry file atomically")
+
+    propose = sub.add_parser(
+        "propose-dimensions",
+        help="gate-register N new candidate dimensions as proposals before selection",
+    )
+    propose.add_argument("registry", type=Path)
+    propose.add_argument("--candidates", type=Path, required=True,
+                         help="JSON array of candidate dimension objects with full declarations")
+    propose.add_argument("--count", type=int, default=1,
+                         help="number of NEW dimensions required to pass the gate (fail-closed below)")
+    propose.add_argument("--require-new-evidence-part", action="store_true",
+                         help="reject candidates that reuse only already-validated axes "
+                              "(seed-diversity gate: must name new evidence part or new model class)")
+    propose.add_argument("--write", action="store_true",
+                         help="persist the augmented registry back to the registry file atomically")
 
     sync = sub.add_parser(
         "sync-issue-labels",
@@ -204,20 +259,60 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "autonomous-tick":
             from .autonomous import AutonomousError, run_tick
-            from .dimension_registry import load_registry
+            from .dimension_registry import (
+                DimensionRegistryError,
+                load_registry,
+                registry_sha256,
+                write_registry,
+            )
 
+            expected_sha = registry_sha256(args.registry) if args.write else None
             registry = load_registry(args.registry)
-            if args.review_dir is not None:
-                review_dir = str(args.review_dir)
-            else:
-                review_dir = None
+            review_dir = _resolve_review_dir(args)
             try:
-                outcome = run_tick(registry, review_dir=review_dir)
+                outcome = run_tick(
+                    registry,
+                    review_dir=review_dir,
+                    method=args.method,
+                    reconstruction_delta=args.reconstruction_delta,
+                    items=args.items,
+                )
             except AutonomousError as exc:
                 raise ContractError(str(exc)) from exc
             if args.write:
-                args.registry.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+                try:
+                    write_registry(args.registry, registry, expected_sha256=expected_sha)
+                except DimensionRegistryError as exc:
+                    raise ContractError(str(exc)) from exc
             print(json.dumps({**outcome, "registry_written": bool(args.write)}, sort_keys=True))
+            return 0
+
+        if args.command == "propose-dimensions":
+            from .dimension_registry import DimensionRegistryError, load_registry, registry_sha256, write_registry
+            from .proposals import ProposalGateError, propose_dimensions
+
+            registry = load_registry(args.registry)
+            try:
+                raw_candidates = args.candidates.read_text(encoding="utf-8")
+                candidates = json.loads(raw_candidates)
+            except json.JSONDecodeError as exc:
+                raise ContractError(f"invalid JSON in candidates {args.candidates}: {exc.msg}") from exc
+            expected_sha = registry_sha256(args.registry) if args.write else None
+            try:
+                result = propose_dimensions(
+                    registry,
+                    candidates,
+                    count=args.count,
+                    require_new_evidence_part=args.require_new_evidence_part,
+                )
+            except ProposalGateError as exc:
+                raise ContractError(str(exc)) from exc
+            if args.write:
+                try:
+                    write_registry(args.registry, registry, expected_sha256=expected_sha)
+                except DimensionRegistryError as exc:
+                    raise ContractError(str(exc)) from exc
+            print(json.dumps({**result, "registry_written": bool(args.write)}, sort_keys=True))
             return 0
 
         if args.command == "sync-issue-labels":

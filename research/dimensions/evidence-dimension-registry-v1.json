@@ -11,7 +11,15 @@
     "per_dimension_strike_limit": 3,
     "brainstorm_states": [
       "brainstorm-new-data"
-    ]
+    ],
+    "exploration": {
+      "every_n": 4,
+      "novelty_bonus": 0.15
+    },
+    "stall": {
+      "no_validation_in_last": 2,
+      "selector_top_score_below": 0.1
+    }
   },
   "dimensions": [
     {
@@ -43,7 +51,11 @@
       ],
       "prior_evidence_strength": 0.7,
       "measurability": "high",
-      "cost_bucket": "low"
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-apparel",
+        "source-pixel-color"
+      ]
     },
     {
       "id": "hair",
@@ -59,7 +71,11 @@
       "selection_rationale": "Hair color/length is commonly hallucinated and is deterministically measurable from the existing Hair class.",
       "prior_evidence_strength": 0.6,
       "measurability": "high",
-      "cost_bucket": "low"
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-hair",
+        "source-pixel-color"
+      ]
     },
     {
       "id": "skin-color",
@@ -75,7 +91,11 @@
       "selection_rationale": "Skin tone is a frequent hallucination target and is measurable from existing seg2 masks.",
       "prior_evidence_strength": 0.5,
       "measurability": "high",
-      "cost_bucket": "low"
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-skin",
+        "source-pixel-color"
+      ]
     },
     {
       "id": "body-type",
@@ -91,7 +111,11 @@
       "selection_rationale": "Pose evidence already improved claims in arm #4; body proportions are the direct extension using the same keypoints.",
       "prior_evidence_strength": 0.8,
       "measurability": "high",
-      "cost_bucket": "low"
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pose2-keypoints",
+        "seg2-region-fraction"
+      ]
     },
     {
       "id": "lighting",
@@ -107,7 +131,11 @@
       "selection_rationale": "Lighting is a common soft-detail hallucination and is measurable from existing pixel/normal artifacts.",
       "prior_evidence_strength": 0.4,
       "measurability": "medium",
-      "cost_bucket": "low"
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "normal2",
+        "source-luminance"
+      ]
     },
     {
       "id": "setting",
@@ -123,7 +151,11 @@
       "selection_rationale": "Background is frequently over-described and is measurable from the existing seg2 Background class.",
       "prior_evidence_strength": 0.5,
       "measurability": "medium",
-      "cost_bucket": "medium"
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "seg2-background",
+        "source-pixel-color"
+      ]
     },
     {
       "id": "texture",
@@ -154,7 +186,11 @@
       ],
       "prior_evidence_strength": 0.4,
       "measurability": "medium",
-      "cost_bucket": "medium"
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "seg2-region",
+        "source-gradient"
+      ]
     },
     {
       "id": "dossier-context4k",
@@ -167,7 +203,7 @@
       "deterministic_signal": "Verified dimension specialists + relational determinations assembled per item",
       "metric_version": "context4k-roundtrip-v1",
       "data_snapshot": "first-500 core-covered cohort expanded dossier",
-      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links \u2014 beyond any single dimension.",
+      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links — beyond any single dimension.",
       "validation_methods": [
         "claim-support",
         "reconstruction",
@@ -187,7 +223,11 @@
       ],
       "prior_evidence_strength": 0.9,
       "measurability": "medium",
-      "cost_bucket": "high"
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "verified-dimension-specialists",
+        "relational-determinations"
+      ]
     }
   ]
 }
