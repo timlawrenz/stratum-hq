@@ -14,9 +14,10 @@ from research_harness import validate_comparison_parity_plan
 from research_harness.stage_b import (
     StageBGenerationSettings,
     StageBRunError,
+    _serialize_proportions,
     build_stage_b_plan,
-    freeze_stage_b_plan,
     execute_stage_b,
+    freeze_stage_b_plan,
     main,
 )
 
@@ -470,3 +471,115 @@ def test_stage_b_checks_installed_ollama_digest_before_actual_generation(tmp_pat
         )
 
     assert calls == []
+
+
+def test_stage_b_bodytype_plan_is_a_valid_four_condition_contract(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+
+    plan = build_stage_b_plan(program, candidate, settings, evidence_kind="body-type")
+
+    validate_comparison_parity_plan(plan, program)
+    assert plan["comparison_plan_id"] == "stage-b-first500-bodytype-v1"
+    condition_ids = [condition["id"] for condition in plan["conditions"]]
+    assert condition_ids == [
+        "legacy-bucketed-no-evidence",
+        "legacy-raw-no-evidence",
+        "context-raw-no-evidence",
+        "context-raw-body-type",
+    ]
+    evidence_condition = next(c for c in plan["conditions"] if c["id"] == "context-raw-body-type")
+    assert evidence_condition["evidence"]["id"] == "in-memory-body-type-proportions-v1"
+    evidence_only = next(c for c in plan["contrasts"] if c["id"] == "evidence-only")
+    assert evidence_only["variant_condition"] == "context-raw-body-type"
+    assert evidence_only["baseline_condition"] == "context-raw-no-evidence"
+    assert "anthropometric" in plan["hypothesis"]
+    specialist = evidence_condition["evidence"]["specialists"][0]
+    for field in ("scope", "inputs", "output_semantics", "provenance", "abstention_policy", "known_failure_modes", "qualification_gate"):
+        assert specialist[field]
+
+
+def test_stage_b_bodytype_plan_default_geometry_is_unchanged(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+
+    plan = build_stage_b_plan(program, candidate, settings)
+
+    assert plan["comparison_plan_id"] == "stage-b-first500-parity-v1"
+    assert [condition["id"] for condition in plan["conditions"]][-1] == "context-raw-geometry"
+    evidence_only = next(c for c in plan["contrasts"] if c["id"] == "evidence-only")
+    assert evidence_only["variant_condition"] == "context-raw-geometry"
+
+
+def test_stage_b_bodytype_freeze_binds_pose_hashes_and_validates(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+
+    plan = freeze_stage_b_plan(program, candidate, settings, evidence_kind="body-type")
+
+    validate_comparison_parity_plan(plan, program)
+    assert plan["evidence_input_artifact_sha256"]["fixture"] == {
+        "pose2.npy": _sha256((Path(program["canonical_source"]["derived_tree"]) / "fixture" / "pose2.npy").read_bytes()),
+        "seg2.npy": _sha256((Path(program["canonical_source"]["derived_tree"]) / "fixture" / "seg2.npy").read_bytes()),
+    }
+    assert plan["status"] == "PENDING"
+
+
+def test_stage_b_bodytype_serialize_proportions_abstains_and_reports(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+    del program, candidate, settings
+
+    abstained = _serialize_proportions({"subject_present": False})
+    assert "abstain from body-type claims" in abstained
+
+    measured = _serialize_proportions(
+        {
+            "subject_present": True,
+            "between_shoulders": 40.0,
+            "between_hips": 30.0,
+            "shoulder_hip_ratio": 1.3226,
+            "torso_length": 30.0,
+            "left_leg_length": None,
+            "right_leg_length": None,
+            "leg_torso_ratio": None,
+        }
+    )
+    assert "shoulder:hip width ratio: 1.3226" in measured
+    assert "left leg length (px): not measurable" in measured
+
+
+def test_stage_b_bodytype_execution_writes_evidence_condition(tmp_path: Path) -> None:
+    program, candidate, settings, research_root = _fixture(tmp_path)
+    captured: list[str] = []
+
+    def generate(image: Image.Image, prompt: str, generation: StageBGenerationSettings) -> str:
+        captured.append(prompt)
+        return f"bodytype-caption-{len(captured)}"
+
+    frozen_plan = freeze_stage_b_plan(program, candidate, settings, evidence_kind="body-type")
+    result = execute_stage_b(
+        program,
+        candidate,
+        settings,
+        output_root=research_root / "run",
+        expected_plan=frozen_plan,
+        generate=generate,
+    )
+
+    assert result["record_count"] == 4
+    assert len(captured) == 4
+    records = [json.loads(line) for line in (research_root / "run" / "records.jsonl").read_text().splitlines()]
+    body_record = next(record for record in records if record["condition_id"] == "context-raw-body-type")
+    assert "shoulder:hip width ratio" in captured[3]
+    assert captured[3].startswith("You are an expert descriptive captioner")
+    assert body_record["evidence_payload"]["subject_present"] is True
+    assert body_record["evidence_payload"]["between_shoulders"] == 40.0
+    assert body_record["selected_derived_reads"] == ["pose2.npy", "seg2.npy"]
+    assert body_record["caption_sha256"]
+    # legacy/context conditions remain geometry-free (no determinations text leaked)
+    assert "geometric relations" not in captured[2]
+    assert "geometric relations" not in captured[3]
+
+
+def test_stage_b_bodytype_rejects_unknown_evidence_kind(tmp_path: Path) -> None:
+    program, candidate, settings, _ = _fixture(tmp_path)
+
+    with pytest.raises(StageBRunError, match="unsupported Stage-B evidence_kind"):
+        build_stage_b_plan(program, candidate, settings, evidence_kind="not-a-kind")

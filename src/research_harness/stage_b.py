@@ -34,6 +34,7 @@ from stratum2.pipeline.caption2 import CAPTION2_PROMPT_TEMPLATE, build_prompt
 from stratum2.pipeline.determinations import derive_determinations
 
 from .contracts import ContractError, validate_comparison_parity_plan, validate_program
+from .proportions import ProportionError, compute_proportions
 
 
 class StageBRunError(RuntimeError):
@@ -203,6 +204,63 @@ def _no_specialist_evidence() -> dict[str, Any]:
     return evidence
 
 
+def _body_type_evidence() -> dict[str, Any]:
+    """Declared deterministic body-type / proportion specialist (arm #32)."""
+    module_path = Path(compute_proportions.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-body-type-proportions-v1",
+        "specialists": [
+            {
+                "id": "in-memory-body-type-proportions-v1",
+                "scope": "Pose2 Goliath-308 derived continuous anthropometric proportions only (shoulder/hip widths, ratios, torso/limb lengths); never body-type labels or posture/activity semantics.",
+                "inputs": "Frozen selected-item pose2.npy only; recomputed in memory during this bounded run with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous ratio measurements or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.proportions.compute_proportions "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; every ratio emits None (never fabricated) when its supporting joints are absent or below confidence threshold; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Tight crops, low-keypoint-confidence frames, and partially visible limbs make ratios abstain; width ratios are in pixel units and depend on camera frame, so absolute widths are not metric.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_proportions(proportions: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a proportions measurement dict.
+
+    Never frees text that the measurement abstained on: each unavailable ratio is
+    rendered as an explicit 'not measurable' line rather than a fabricated value.
+    """
+    lines = [
+        "BODY-TYPE PROPORTIONS (deterministic, Goliath-308 pose2 keypoints, camera-frame pixel units):"
+    ]
+    if not proportions.get("subject_present"):
+        lines.append("- no reliable body-keypoint subject present -> abstain from body-type claims")
+        return "\n".join(lines)
+    labelled: tuple[tuple[str, str], ...] = (
+        ("between_shoulders", "shoulder width (px)"),
+        ("between_hips", "hip width (px)"),
+        ("shoulder_hip_ratio", "shoulder:hip width ratio"),
+        ("torso_length", "torso length (px)"),
+        ("left_leg_length", "left leg length (px)"),
+        ("right_leg_length", "right leg length (px)"),
+        ("leg_torso_ratio", "mean leg:torso length ratio"),
+    )
+    for key, label in labelled:
+        value = proportions.get(key)
+        if value is None:
+            lines.append(f"- {label}: not measurable (joint absent or low confidence)")
+        else:
+            lines.append(f"- {label}: {value}")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -296,9 +354,11 @@ def freeze_stage_b_plan(
     program: Mapping[str, Any],
     candidate_manifest: Mapping[str, Any],
     settings: StageBGenerationSettings,
+    *,
+    evidence_kind: str = "geometry",
 ) -> dict[str, Any]:
     """Bind the exact selected geometry-input bytes before any model execution."""
-    plan = build_stage_b_plan(program, candidate_manifest, settings)
+    plan = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=evidence_kind)
     items = _candidate_items(candidate_manifest, program)
     plan["evidence_input_artifact_sha256"] = _freeze_evidence_input_artifact_hashes(
         candidate_manifest, program, items
@@ -315,8 +375,18 @@ def build_stage_b_plan(
     program: Mapping[str, Any],
     candidate_manifest: Mapping[str, Any],
     settings: StageBGenerationSettings,
+    *,
+    evidence_kind: str = "geometry",
 ) -> dict[str, Any]:
-    """Build a fully pinned four-condition comparison plan without inference."""
+    """Build a fully pinned four-condition comparison plan without inference.
+
+    `evidence_kind` selects the declared deterministic evidence specialist for
+    the evidence-only condition: ``"geometry"`` (arm #4 default, pose2+seg2
+    determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
+    is byte-identical to the historical arm-#4 plan so frozen invariants hold.
+    """
+    if evidence_kind not in ("geometry", "body-type"):
+        raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
     except ContractError as exc:
@@ -351,7 +421,44 @@ def build_stage_b_plan(
         },
     )
     no_evidence = _no_specialist_evidence()
-    geometry_evidence = _geometry_evidence()
+    if evidence_kind == "body-type":
+        evidence = _body_type_evidence()
+        evidence_condition_id = "context-raw-body-type"
+        comparison_plan_id = "stage-b-first500-bodytype-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic anthropometric "
+            "proportions (shoulder:hip width ratio, torso length, limb lengths from Goliath-308 pose2) may "
+            "improve supported body/limb description claims without increasing unsupported claims when the "
+            "source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The body-type evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on body/limb claims, or an apparent difference is attributable to an "
+            "uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Proportions are computed in memory from the frozen selected pose2 only "
+            "(min keypoint confidence 0.5, transform-agnostic continuous ratios with explicit abstention)."
+        )
+    else:
+        evidence = _geometry_evidence()
+        evidence_condition_id = "context-raw-geometry"
+        comparison_plan_id = "stage-b-first500-parity-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared in-memory deterministic geometry "
+            "may improve supported contextual coverage without increasing unsupported or contradictory claims "
+            "when the source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The evidence-only contrast does not improve the pre-registered human claim-support rubric over its "
+            "matched no-specialist condition, or an apparent difference is attributable to an uncontrolled view, "
+            "prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. Geometry is recomputed in memory from selected existing pose2/seg2 inputs only."
+        )
     aggregator = {
         "model_id": f"local-ollama-{settings.model_name.replace(':', '-').replace('/', '-')}-{settings.model_digest[:12]}",
         "provenance": (
@@ -380,21 +487,13 @@ def build_stage_b_plan(
     plan: dict[str, Any] = {
         "schema_version": 1,
         "kind": "comparison-parity-plan",
-        "comparison_plan_id": "stage-b-first500-parity-v1",
+        "comparison_plan_id": comparison_plan_id,
         "program_id": program["program_id"],
         "status": "PENDING",
         "parent_issue": candidate_manifest.get("parent_issue", 4),
         "candidate_manifest_fingerprint": candidate_manifest["manifest_fingerprint"],
-        "hypothesis": (
-            "For the frozen coverage-balanced first-500 cohort, declared in-memory deterministic geometry "
-            "may improve supported contextual coverage without increasing unsupported or contradictory claims "
-            "when the source item, view, prompt template, local model, and generation settings are controlled."
-        ),
-        "falsified_if": (
-            "The evidence-only contrast does not improve the pre-registered human claim-support rubric over its "
-            "matched no-specialist condition, or an apparent difference is attributable to an uncontrolled view, "
-            "prompt, aggregator, generation, or evaluation change."
-        ),
+        "hypothesis": hypothesis,
+        "falsified_if": falsified_if,
         "metric_version": "claim-support-rubric-v1",
         "pilot_manifest": {
             "id": manifest_id,
@@ -404,10 +503,7 @@ def build_stage_b_plan(
                 "The pre-frozen first-500 coverage-balanced 12 portrait / 6 squareish / 6 landscape cohort "
                 "removes missing core geometry availability as a confound without claiming population representativeness."
             ),
-            "coverage_notes": (
-                "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
-                "are not used as evidence inputs. Geometry is recomputed in memory from selected existing pose2/seg2 inputs only."
-            ),
+            "coverage_notes": coverage_notes,
             "items": [
                 {
                     "image_id": item["image_id"],
@@ -422,7 +518,7 @@ def build_stage_b_plan(
             condition("legacy-bucketed-no-evidence", legacy_view, legacy_prompt, no_evidence),
             condition("legacy-raw-no-evidence", raw_view, legacy_prompt, no_evidence),
             condition("context-raw-no-evidence", raw_view, context_prompt, no_evidence),
-            condition("context-raw-geometry", raw_view, context_prompt, geometry_evidence),
+            condition(evidence_condition_id, raw_view, context_prompt, evidence),
         ],
         "contrasts": [
             {
@@ -440,7 +536,7 @@ def build_stage_b_plan(
             {
                 "id": "evidence-only",
                 "baseline_condition": "context-raw-no-evidence",
-                "variant_condition": "context-raw-geometry",
+                "variant_condition": evidence_condition_id,
                 "changed_axes": ["evidence"],
             },
         ],
@@ -501,7 +597,9 @@ def _validate_frozen_execution_plan(
     except ContractError as exc:
         raise StageBRunError(f"expected comparison plan violates the comparison contract: {exc}") from exc
 
-    rebuilt = build_stage_b_plan(program, candidate_manifest, settings)
+    condition_ids = {condition.get("id") for condition in plan.get("conditions", [])}
+    rebuild_kind = "body-type" if "context-raw-body-type" in condition_ids else "geometry"
+    rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
     expected_core = {
         key: value
         for key, value in plan.items()
@@ -598,11 +696,16 @@ def _load_selected_item(
     determinations = derive_determinations(pose2, seg2)
     if determinations["subject"]["n_detections"] != 1:
         raise StageBRunError(f"detector disagreement emerged for frozen selected item {image_id}")
+    try:
+        proportions = compute_proportions(pose2)
+    except ProportionError as exc:
+        raise StageBRunError(f"proportions abort for frozen selected item {image_id}: {exc}") from exc
     return {
         "item": dict(item),
         "image": image,
         "source_sha256": observed_sha,
         "determinations": determinations,
+        "proportions": proportions,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": ["pose2.npy", "seg2.npy"],
@@ -647,6 +750,10 @@ def _render_condition(
         rendered = build_prompt(determinations)
         evidence_text = rendered.split("DETERMINATIONS:\n", 1)[-1].strip()
         return raw.copy(), _context_prompt(evidence_text), determinations
+    if condition_id == "context-raw-body-type":
+        proportions = prepared["proportions"]
+        evidence_text = _serialize_proportions(proportions)
+        return raw.copy(), _context_prompt(evidence_text), proportions
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 

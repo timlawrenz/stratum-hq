@@ -30,6 +30,8 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Verdict:** `EMPIRICAL RUN COMPLETE — PENDING_HUMAN_SPOT_CHECK`. Statistical improvement in supported claims from declared geometry on this 24-item frozen cohort with fixed settings. Not yet a PASS: single reviewer model, no human calibration of the rubric on known/null cases yet, cohort is 24 items, one-axis only. No corpus mutation or merge occurred.
 
+**Deterministic verdict (2026-08-05, harness rule):** `autonomous-verdict --base-supported 47 --variant-supported 156 --base-unsupported 99 --variant-unsupported 40 --items 24 --p-supported 0.003` → **BETTER** (support ratio 0.322 → 0.796, Δ +0.474; sign-test p=0.003 ≤ 0.05; unsupported 99 → 40, not ballooning; `inconclusive: false`). The evidence-only contrast on the frozen cohort satisfies the pre-registered BETTER gate. The `PENDING_HUMAN_SPOT_CHECK` status is advisory (single independent reviewer family, rubric not yet human-calibrated on known/null cases) and does not gate the harness verdict; a formal PASS still awaits that spot-check.
+
 ## Stage-A caption/context parity preparation — `[COMPLETED / PENDING / NON-EXECUTING]`
 
 **Date:** 2026-08-04

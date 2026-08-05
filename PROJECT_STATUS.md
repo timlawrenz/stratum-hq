@@ -1,47 +1,34 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-04
-**Phase / status:** **ACTIVE METHODOLOGY / PRE-COMPUTE HOLD** — #4 is the sole `research:active` / `research:metric-risk` arm, while #18 holds Stage B pending a direct owner decision. Stage A is completed and independently audited, but remains `PENDING` / non-executing; no Stage-B action is authorized.
+**Last updated:** 2026-08-05
+**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously.** Hold #18 is RELEASED (recorded via draft PR #28). Arm #4 (baseline/comparison parity) is the sole `research:active` / `research:metric-risk` arm and is empirically complete: 96 captions + independent gemma4 review + reviewer calibration. Its deterministic verdict is **BETTER** (support ratio 0.322→0.796, sign-test p=0.003); `PENDING_HUMAN_SPOT_CHECK` is advisory, not a gate. The dimension registry selects **arm #32 (body-type/proportions)** as the next active arm.
 
 ## Current state
 
-The canonical corpus is `crawlr/approved`; `crawlr/stratum` remains a partial derived tree. The immutable Stage-A records are exactly:
+The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains a partial derived tree (never mutated by us). Stage-A records, the first-500 coverage audit, and the frozen first-500 coverage-balanced candidate manifest remain byte-for-byte intact and noncanonical.
 
-```text
-/mnt/nas-ai-models/research/stratum/stage-a-caption-context-parity/
-  pilot-manifest.json
-  comparison-parity-plan.json
-  preparation-log.md
-  review-record.md
-```
-
-They are noncanonical pre-compute provenance records and must not be overwritten, reinterpreted, or silently replaced. Their 24-item six-slice ordinal sample is distinct from the first-500 core-covered cohort. The historical Stage-A request remains at `research/proposals/stage-a-caption-context-parity-preparation.md` / draft PR #13; its proposal text is not an execution authorization.
-
-A new read-only audit at `research/coverage/first-500-core-coverage-v1.json` confirms readable `pose2.npy`, `seg2.npy`, `normal2.npy`, `pointmap.npy`, and `matting.npy` coverage for all 500 first bytewise-ordered eligible filenames. It also confirms that only 10 have the complete later `determinations` → `caption2` → `t52` chain. `docs/FIRST_500_CORE_COHORT_PILOT_DESIGN.md` records the resulting coverage-aware, one-axis feasibility design.
-
-The new immutable noncanonical candidate record is `/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json` (file SHA-256 `8684c6e38c90b12898135235164677d780a4c897122f26a4b386f07283a9c5e0`; manifest fingerprint `b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d`). It source-hashes a 12 portrait / 6 squareish / 6 landscape subset after the first-500 audit binding revalidated. All 24 retain core and legacy coverage; none has the complete existing later chain. See `docs/FIRST_500_COVERAGE_BALANCED_CANDIDATE_FREEZE.md`.
+- Arm #4 empirical evidence: 96/96 captions → `/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1/`; 96/96 independent reviews → `stage-b-first500-parity-v1-review/`. Evidence-only contrast (cond 3→4): supported 47→156, unsupported 99→40, support ratio 32%→80%, sign-test p≈0.003, deterministic evidence-trace cross-check carried (16/24 ≥ half declared traces). Verdict per harness rule: **BETTER** (inconclusive=false).
+- The dimension registry (`research/dimensions/evidence-dimension-registry-v1.json`) is the source of truth for proposal arms #29–#36 (#37 reconstruction is documented separately). `autonomous-select` scores body-type highest (EIG 0.8, direct pose2 extension of the validated arm-#4 result).
+- Arm #32 deterministic measurement complete (CPU, existing `pose2.npy` only): 24/24 frozen items computed, 23 subject_present, 17/24 shoulder:hip ratio measurable, 13/24 leg measures, 1 abstained (low keypoint confidence), 53 low-confidence joints total. Record → `/mnt/nas-ai-models/research/stratum/stage-b-bodytype-proportions-v1.json`.
 
 ## Immediate next action
 
-The source-hashed coverage-balanced subset is frozen. Respect #18: await an owner decision that names an already-installed local aggregator and immutable generation settings, freezes the claim-support known-case/null self-audit and adversarial-review plan, and separately authorizes or denies model invocation and GPU/scheduler action for the exact manifest. Draft PR #15's prototype `caption_max_tokens` repair and PR #16's CLI-to-backend regression remain pre-inference controls only.
-
-Do **not** execute Stage B, invoke a model, use the GPU scheduler, generate/add artifacts in `crawlr/stratum`, backfill, or claim PASS/FAIL. Existing `caption2`/`t52` files cannot substitute for the missing 490-item evidence condition or for `context4k`.
+Run arm #32 body-type through the scheduler lifecycle (stage_b_launcher + stage_b_review_launcher on the local 4090) with the frozen stage-b-bodytype plan, then compute the evidence-only better-or-not verdict under the pre-registered claim-support rule, record it in `docs/EXPERIMENTS_AND_RESULTS.md` + issue #32, and advance the registry. The run is additive and noncanonical; no `crawlr/approved` / `crawlr/stratum` mutation, no backfill, no legacy overwrite.
 
 ## Live research tree
 
 - #2 is the sole open program root.
 - #3 is the preserved PENDING portrait-evidence map.
-- #4 is the sole active baseline/comparison-parity arm.
+- #4 is the active baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
 - #5 is the preserved geometry-grounded-captioning prototype.
-- #9 is closed; it resolved a comparison-plan provenance gate only.
-- #18 is the open `research:hold` / `research:needs-human` Stage-B boundary.
+- #9 is closed (comparison-plan provenance gate resolved).
+- #18 is CLOSED/released (owner directive 2026-08-04, confirmed by draft PR #28).
+- #29–#37 are registered proposal arms; #32 is the currently selected active-arm candidate.
 
 ## Automation and authority
 
-The `stratum-ffhq` strategist is re-engaged for autonomous research: read-only corpus/derived-artifact inspection, documentation, synthetic fixtures/tests, isolated branches, commits, GitHub issue maintenance, and draft PRs. It remains draft-PR-only.
-
-It may not merge, push `main`, mutate either corpus tree, backfill, install/download/invoke an image model, call the GPU scheduler, or execute Stage B. A detector disagreement is a quality anomaly, never caption content. #18 now blocks the model, metric, and Stage-B boundary until a direct owner decision is recorded.
+The `stratum-ffhq` strategist is executing the autonomous decide→research→conclude→advance loop. Under the frozen-cohort protocol it may: run the deterministic selector, compute deterministic evidence from existing artifacts, generate captions and run the independent review through the scheduler-managed 4090, write noncanonical outputs under `/mnt/nas-ai-models/research`, record verdicts, and advance the registry. It may not mutate either corpus tree, backfill, install/download new image models, use external image services, merge, or push `main` directly (draft-PR-only).
 
 ## Headline result so far
 
-**PENDING / HELD.** The comparison instrument, Stage-A provenance, and a source-hashed 24-item coverage-balanced candidate manifest are structurally available. Input-view/prompt comparisons remain designable, but the frozen subset has **0 / 24** complete existing later chains, so evidence-only remains blocked absent separately authorized deterministic preparation. #18 also blocks fixed local-aggregator provenance, metric self-audit, adversarial review, and separate Stage-B authority. The unmerged #15/#16 draft stack gives `caption_max_tokens` synthetic unit and CLI-to-backend coverage only; it is not execution authority.
+**Arm #4: BETTER** (empirical + deterministic). The frozen-cohort evidence-only geometry contrast is a statistically significant improvement in supported claims under fixed view/prompt/model/settings. Formal PASS remains gated on the advisory human spot-check. Next: arm #32 body-type evidence-only contrast.
