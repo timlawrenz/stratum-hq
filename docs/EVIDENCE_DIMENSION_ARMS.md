@@ -87,3 +87,38 @@ research-harness dimension-sweep-status       research/dimensions/evidence-dimen
   sources/dimensions, rather than inventing variants of the same space.
 - Arms defined in the registry back the proposal issues already created (#29–#36) and any future
   ones; the registry and issue tree must not drift apart.
+
+## Non-stratum (open-world) specialists
+
+The evidence space is **not** limited to stratum/Sapiens2-derived data. A dimension may declare
+one or more `specialists` — external models that measure the dimension better than the stratum
+artifacts:
+
+- **Florence-2** (base / large / Flux-Large / PromptGen, present in
+  `/mnt/fscache/essdee/ComfyUI/models/LLM`) — open-set image tagging/captioning. A strong
+  non-stratum specialist candidate for clothing/apparel, texture/material, and attribute lists.
+- **Dedicated diffusion checkpoints** (`/mnt/nas-ai-models/checkpoints`, 195 weights: SD1.5
+  blends, SDXL, flux1Schnell, sd3, pony, SUPIR, LTXV) — used for *reconstruction* validation.
+
+Specialist declarations must carry: name, source, scope, and known failure modes (enforced by
+the registry validator). Specialists must be qualified (scope + provenance + abstention +
+failure modes) before they may replace or augment a stratum measurement; they do not bypass the
+local-first / scheduler / no-mutation boundaries.
+
+## Reconstruction validation (ComfyUI round-trip)
+
+A dimension or the full dossier may use `reconstruction` (and the program milestone uses
+`roundtrip-audit`):
+
+1. Generate an image from the caption / `context4k` via local ComfyUI
+   (`/mnt/fscache/essdee/ComfyUI`, `.venv` python 3.14 + torch 2.12+cu130, CUDA on the local
+   4090) using an installed checkpoint (SD1.5, SDXL, or flux1Schnell).
+2. Score the generated image against the original source with CLIP ViT-L/14 similarity
+   (`openai/clip-vit-large-patch14` and `timm/vit_large_patch14_clip_224.openai` are already in
+   the HF cache).
+3. The reconstruction score is a **stronger, non-LLM test** of how much per-asset information
+   survives into the caption/context than claim-support alone.
+
+Constraints: local-first (sensitive imagery); scheduler-managed GPU; noncanonical output root;
+no corpus mutation/backfill; candidate arm/gate must be recorded before reconstruction results
+are treated as evidence.

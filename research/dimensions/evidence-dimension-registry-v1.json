@@ -19,7 +19,16 @@
       "deterministic_signal": "seg2 DOME-29 Apparel(1)/Upper_Clothing(23)/Lower_Clothing(13)/Torso(22)/Socks/Shoes classes + per-class dominant color from source pixels",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
-      "selection_rationale": "Clothing is a high-frequency hallucination risk and is deterministically measurable from existing seg2+pixels with no new model."
+      "selection_rationale": "Clothing is a high-frequency hallucination risk and is deterministically measurable from existing seg2+pixels with no new model.",
+      "validation_methods": ["claim-support", "reconstruction"],
+      "specialists": [
+        {
+          "name": "Florence-2-Flux-Large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set clothing/apparel attribute tagging (garment type, color) from source pixels",
+          "known_failure_modes": ["hallucinated attributes on tight crops", "long-tail garment names may drift from source truth"]
+        }
+      ]
     },
     {
       "id": "hair",
@@ -97,7 +106,16 @@
       "deterministic_signal": "per-mask gradient/edge statistics from source pixels (e.g. gradient magnitude inside seg2 regions)",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
-      "selection_rationale": "Material/texture is a common hallucination and is measurable deterministically without new models."
+      "selection_rationale": "Material/texture is a common hallucination and is measurable deterministically without new models.",
+      "validation_methods": ["claim-support", "reconstruction"],
+      "specialists": [
+        {
+          "name": "Florence-2-large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set material/texture/attribute description from source pixels",
+          "known_failure_modes": ["material attribution is confounded by lighting", "may over-specify texture"]
+        }
+      ]
     },
     {
       "id": "dossier-context4k",
@@ -110,7 +128,16 @@
       "deterministic_signal": "Verified dimension specialists + relational determinations assembled per item",
       "metric_version": "context4k-roundtrip-v1",
       "data_snapshot": "first-500 core-covered cohort expanded dossier",
-      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links — beyond any single dimension."
+      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links — beyond any single dimension.",
+      "validation_methods": ["claim-support", "reconstruction", "roundtrip-audit"],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": ["generative model does not reproduce identity/subject exactly", "CLIP score is a weak identity proxy", "GPU time per item is large"]
+        }
+      ]
     }
   ]
 }

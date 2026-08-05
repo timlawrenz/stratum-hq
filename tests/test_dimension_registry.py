@@ -141,3 +141,31 @@ def test_registry_freezes_after_exhaustion_from_live_file(tmp_path: Path) -> Non
     s = sweep_status(loaded)
     assert s["exhausted"] is True
     assert s["next_action"] == "brainstorm-new-data"
+
+
+def test_specialists_and_validation_methods_accepted() -> None:
+    reg = _registry()
+    reg["dimensions"][0]["specialists"] = [
+        {
+            "name": "Florence-2-Flux-Large",
+            "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+            "scope": "open-set clothing/attribute tagging",
+            "known_failure_modes": ["hallucinated attributes on tight crops"],
+        }
+    ]
+    reg["dimensions"][0]["validation_methods"] = ["claim-support", "reconstruction"]
+    validate_registry(reg)  # must not raise
+
+
+def test_specialists_reject_missing_field() -> None:
+    reg = _registry()
+    reg["dimensions"][0]["specialists"] = [{"name": "X", "source": "local"}]
+    with pytest.raises(DimensionRegistryError, match="scope"):
+        validate_registry(reg)
+
+
+def test_validation_methods_reject_unknown() -> None:
+    reg = _registry()
+    reg["dimensions"][0]["validation_methods"] = ["ledger-aggregation"]
+    with pytest.raises(DimensionRegistryError, match="ledger-aggregation"):
+        validate_registry(reg)

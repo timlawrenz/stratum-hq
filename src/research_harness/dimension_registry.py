@@ -30,6 +30,10 @@ REQUIRED_DIMENSION_FIELDS = (
     "selection_rationale",
 )
 
+# Optional per-dimension fields (non-stratum specialists + validation methods)
+# are validated structurally but are not required for a proposal.
+VALIDATION_METHODS = ("claim-support", "reconstruction", "roundtrip-audit")
+
 
 class DimensionRegistryError(RuntimeError):
     pass
@@ -37,6 +41,33 @@ class DimensionRegistryError(RuntimeError):
 
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _check_validation_methods(value: Any, dim_id: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise DimensionRegistryError(f"dimension {dim_id!r} validation_methods must be a string list")
+    unknown = set(value) - set(VALIDATION_METHODS)
+    if unknown:
+        raise DimensionRegistryError(
+            f"dimension {dim_id!r} validation_methods has unsupported entries {sorted(unknown)}"
+        )
+
+
+def _check_specialists(value: Any, dim_id: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list) or not value:
+        raise DimensionRegistryError(f"dimension {dim_id!r} specialists must be a non-empty list")
+    for spec in value:
+        if not isinstance(spec, Mapping):
+            raise DimensionRegistryError(f"dimension {dim_id!r} specialist must be an object")
+        for field in ("name", "source", "scope", "known_failure_modes"):
+            if field not in spec:
+                raise DimensionRegistryError(
+                    f"dimension {dim_id!r} specialist missing field {field!r}"
+                )
 
 
 def validate_registry(registry: Mapping[str, Any]) -> None:
@@ -76,6 +107,8 @@ def validate_registry(registry: Mapping[str, Any]) -> None:
         seen.add(dim_id)
         if dim["state"] not in DIMENSION_STATES:
             raise DimensionRegistryError(f"dimension {dim_id!r} has invalid state {dim['state']!r}")
+        _check_validation_methods(dim.get("validation_methods"), dim_id)
+        _check_specialists(dim.get("specialists"), dim_id)
         strikes = dim["valid_non_improving_experiments"]
         if not isinstance(strikes, int) or isinstance(strikes, bool) or strikes < 0:
             raise DimensionRegistryError(f"dimension {dim_id!r} strikes must be a non-negative integer")
