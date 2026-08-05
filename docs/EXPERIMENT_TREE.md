@@ -40,6 +40,10 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[TBD] Downstream representation and generative utility**
   * Test how `context4k` should be consumed without truncating it into the legacy 512-token T5 path, then test controlled downstream usefulness.
 
+* **[PROPOSAL] Evidence-dimension arms (draft PR #20, `docs/EVIDENCE_DIMENSION_ARMS.md`)**
+  * Each notes a deterministic measurement from existing artifacts and a claim-support delta target reusing the measured arm #4 protocol. See `[#29 clothing/apparel]`, `[#30 hair]`, `[#31 skin-color]`, `[#32 body-type/proportions]`, `[#33 lighting]`, `[#34 setting/environment]`, `[#35 texture/material]`, `[#36 full-dossier assembly + context4k compression]`.
+  * None is active. #4 remains the sole `research:active` arm.
+
 ## Concluded
 
 * **[CONCLUDED — HARNESS GATE RESOLVED] #9 — Bind comparison plans to canonical paths and specialist declarations**
