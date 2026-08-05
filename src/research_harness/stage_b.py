@@ -1086,7 +1086,16 @@ def _load_selected_item(
         if declared is not True:
             return None
         resolved = _require_contained(path, artifact_dir, f"selected {name}")
-        expected_sha = _require_sha256(expected_evidence_hashes.get(name), f"frozen evidence hash {image_id}/{name}")
+        # Only evidence-bound artifacts (members of the plan's frozen evidence
+        # hash set) are SHA-verified here; validation-only reads (e.g. pose2 for
+        # the detector-count invariant under the lighting arm) are not evidence
+        # inputs and are not hash-bound.
+        if name not in expected_evidence_hashes:
+            try:
+                return np.load(resolved.open("rb"), allow_pickle=False)
+            except (OSError, ValueError) as exc:
+                raise StageBRunError(f"selected {name} is unreadable for {image_id}") from exc
+        expected_sha = _require_sha256(expected_evidence_hashes[name], f"frozen evidence hash {image_id}/{name}")
         try:
             payload = resolved.read_bytes()
             observed_sha = _sha256(payload)
