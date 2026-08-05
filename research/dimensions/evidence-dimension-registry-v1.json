@@ -49,7 +49,7 @@
       "id": "hair",
       "name": "hair",
       "arm_issue": 30,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared hair measurements (color, area fraction, length proxy) reduce invented hair-color/coverage claims.",
       "falsified_if": "The hair-evidence condition does not improve claim support versus its matched no-evidence baseline.",
