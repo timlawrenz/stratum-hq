@@ -53,6 +53,36 @@ def _read_issue_tree_snapshot(path: Path) -> dict[str, Any]:
     raise ContractError("issue-tree snapshot must be a JSON object or GitHub issue-list array")
 
 
+def _resolve_review_dir(args: argparse.Namespace) -> str | None:
+    """Resolve the review root from --review-dir or --review-dir-from marker.
+
+    Marker resolution is deterministic: the wrapper emits a JSON marker with a
+    `review_root` field after a completed review pass, so the tick never has to
+    guess which root to conclude against. Fail-closed on ambiguity or an
+    incomplete marker.
+    """
+    from .contracts import ContractError
+
+    if args.review_dir is not None and args.review_dir_from is not None:
+        raise ContractError(
+            "autonomous-tick: pass either --review-dir or --review-dir-from, not both"
+        )
+    if args.review_dir_from is None:
+        return str(args.review_dir) if args.review_dir is not None else None
+    try:
+        marker = json.loads(args.review_dir_from.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ContractError(f"unable to read tick-ready marker {args.review_dir_from}: {exc}") from exc
+    if not isinstance(marker, dict):
+        raise ContractError(f"tick-ready marker {args.review_dir_from} must be a JSON object")
+    if marker.get("status") != "completed":
+        raise ContractError(f"tick-ready marker {args.review_dir_from} is not completed: {marker.get('status')!r}")
+    root = marker.get("review_root")
+    if not isinstance(root, str) or not root.strip():
+        raise ContractError(f"tick-ready marker {args.review_dir_from} has no review_root")
+    return root
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="research-harness")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -117,6 +147,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     tick.add_argument("registry", type=Path)
     tick.add_argument("--review-dir", type=Path, default=None,
                       help="review root for the active arm; omit to only select/activate")
+    tick.add_argument("--review-dir-from", type=Path, default=None,
+                      help="JSON marker emitted by stratum_review_poll_wrapper.py; "
+                           "the tick uses its review_root (deterministic, no path guessing)")
     tick.add_argument("--method", choices=("claim-support", "reconstruction"),
                       default="claim-support",
                       help="verdict method: claim-support (review root) or reconstruction (CLIP delta)")
@@ -235,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
 
             expected_sha = registry_sha256(args.registry) if args.write else None
             registry = load_registry(args.registry)
-            review_dir = str(args.review_dir) if args.review_dir is not None else None
+            review_dir = _resolve_review_dir(args)
             try:
                 outcome = run_tick(
                     registry,

@@ -365,6 +365,68 @@ def test_cli_autonomous_tick_empty_review_dir_is_research_pending(tmp_path) -> N
     assert payload["next_action"] == "research-pending"
 
 
+def test_cli_autonomous_tick_consumes_tick_ready_marker(tmp_path, capsys) -> None:
+    """Change 1 wiring: the tick must conclude against the review root named by
+    the wrapper's tick-ready marker — deterministic, no path guessing."""
+    import research_harness.cli as cli
+
+    reg = _registry()
+    reg["dimensions"][0]["state"] = "active"
+    review_dir = _write_reviews(tmp_path, geometry_supported=6, base_supported=2, base_unsupported=2)
+    registry_path = tmp_path / "registry.json"
+    write_registry(registry_path, reg)
+
+    marker_path = tmp_path / "tick-ready.json"
+    marker_path.write_text(json.dumps({
+        "schema_version": 1,
+        "status": "completed",
+        "review_root": review_dir,
+        "run_root": str(tmp_path / "run-root"),
+        "job_id": "stratum-test",
+    }) + "\n", encoding="utf-8")
+
+    rc = cli.main(["autonomous-tick", str(registry_path),
+                   "--review-dir-from", str(marker_path)])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    # the marker's review root was consumed: verdict computed, arm advanced, next selected
+    assert payload["next_action"] == "activate-next"
+    assert payload["verdict"]["verdict"] == "BETTER"
+    assert payload["advanced_arm"] == "body-type"
+    assert payload["next_arm"] == "mood"
+
+
+def test_cli_tick_refuses_ambiguous_review_dir_sources(tmp_path) -> None:
+    import research_harness.cli as cli
+
+    reg = _registry()
+    registry_path = tmp_path / "registry.json"
+    write_registry(registry_path, reg)
+    marker_path = tmp_path / "tick-ready.json"
+    marker_path.write_text(json.dumps({
+        "status": "completed", "review_root": str(tmp_path / "x-review")}) + "\n",
+        encoding="utf-8")
+    rc = cli.main(["autonomous-tick", str(registry_path),
+                   "--review-dir", str(tmp_path / "r-review"),
+                   "--review-dir-from", str(marker_path)])
+    assert rc == 2
+
+
+def test_cli_tick_rejects_incomplete_marker(tmp_path) -> None:
+    import research_harness.cli as cli
+
+    reg = _registry()
+    registry_path = tmp_path / "registry.json"
+    write_registry(registry_path, reg)
+    marker_path = tmp_path / "tick-ready.json"
+    marker_path.write_text(json.dumps({
+        "status": "in-flight", "review_root": str(tmp_path / "x-review")}) + "\n",
+        encoding="utf-8")
+    rc = cli.main(["autonomous-tick", str(registry_path),
+                   "--review-dir-from", str(marker_path)])
+    assert rc == 2
+
+
 def test_better_or_not_reconstruction_signature_unchanged() -> None:
     v = better_or_not(
         supported_base=0,
