@@ -46,11 +46,23 @@ This ledger records empirical findings and negative results permanently. A green
 - Paired per-item sign test on supported claims: 20 improve / 3 worsen (23 paired), one-sided binomial **p ≈ 0.000244**.
 - Deterministic cross-check independent of the LLM review: 17/24 body-type captions carry ≥1 body-descriptive vocabulary trace beyond their matched baseline captions (geometric/vocabulary carry measured on the record captions directly).
 
-**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 195 --base-unsupported 99 --variant-unsupported 14 --items 23 --p-supported 0.000244` → **BETTER** (significant p=0.000244 ≤ 0.05; support-ratio improvement; unsupported reduced, not ballooning; `inconclusive: false`).
+**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 195 --base-unsupported 99 --variant-unsupported 14 --items 23 --p-supported 0.000244` → **BETTER** (significant p=0.000244 ≤ 0.05; support-ratio improvement; unsupported reduced, not ballooning; `inconclusive: false`). **SUPERSEDED as the authoritative numbers by the ratio-only re-measurement below** (the first attempt verbalized absolute px; the re-measurement carries only scale-invariant ratios).
+
+### Arm #32 addendum — ratio-only re-measurement (2026-08-05, owner px→ratios correction)
+
+Per owner directive, absolute pixel measurements are camera-frame-dependent and not meaningful to a text-to-image model, so they must not be caption claims; only **scale-invariant ratios** (shoulder:hip, leg:torso, limb asymmetry) are verbalized, and raw px stay in the machine-readable `evidence_payload` JSON only. This is a controlled single-axis re-measurement of the same arm on the same frozen cohort / aggregator (`gemma3:27b`) / reviewer (`gemma4:e4b`).
+
+- **Corrected run:** `stage-b-bodytype-ratios-v1` → 96 records + 96 independent reviews (`stage-b-bodytype-ratios-v1-review`), scheduler lifecycle on the 4090.
+- **Evidence-only delta (corrected):** supported **47 → 188**; unsupported **99 → 22**; omissions 11 → 24; contradictions 1 → 1; abstentions 0 → 0.
+- Support ratio **32.2% → 89.5%** (Δ +0.573).
+- Paired sign-test: **22 improve / 1 worsen (23 paired), p ≈ 3e-6**.
+- **Corrected deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 188 --base-unsupported 99 --variant-unsupported 22 --items 23 --p-supported 0.000003` → **BETTER** (p=3e-6 ≤ 0.05; ratio 0.322 → 0.895; unsupported reduced; `inconclusive: false`).
+- **Result:** the BETTER verdict **survives the px→ratios correction** — it is not an artifact of verbalizing camera-frame absolutes; on the corrected scale-invariant-only evidence the signal is stronger (p≈3e-6 vs ≈2.4e-4) once px noise leaves both prompt and reviewer checklist. These corrected numbers are the authoritative arm-#32 record.
+- **Registry:** body-type `active → validated` (0 strikes) stands. A formal PASS still awaits the advisory human rubric spot-check.
 
 **Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `pose2.npy` only.
 
-**Registry advance:** body-type dimension `proposal → validated` (0 strikes). Next selector pick: clothing (arm #29, EIG 0.7). Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+**Registry advance:** body-type dimension `proposal → validated` (0 strikes) — confirmed by the corrected ratio-only re-measurement (BETTER, p≈3e-6). Next selector pick (post-clothing): hair (arm #30).
 
 ## First-500 coverage-balanced Stage-B comparison — `[EMPIRICAL RUN COMPLETE — PENDING_HUMAN_SPOT_CHECK]`
 
