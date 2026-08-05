@@ -2,6 +2,32 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #31 — skin-color/tone evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-05
+**Arm:** #31 — skin-color/tone evidence specialist
+**Code / PR:** `exp/stage-b-skin-color-arm31-20260805` (draft PR #41, stacked on the arm-#30 execution harness)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arms #4/#29/#32/#30)
+**Deterministic specialist:** `research_harness.skin_color.compute_skin_tone` (seg2 DOME-29 exposed-skin regions: Face_Neck/Torso/limb/hand/foot classes; aggregate exposure coverage + quantized dominant tone from source pixels + face/neck vs body agreement; gate-floor abstention); computed in memory per item during the bounded run. Only scale-invariant facts are verbalized (exposure fraction, quantized tone name); px stays in `evidence_payload`.
+**Deterministic probe (CPU, pre-run):** 24/24 subject present, 24/24 exposed-skin tone measurable; tone histogram tan 9 / brown 8 / dark brown 3 / medium 2 / light medium 2; 23/24 face+body both measurable (8/23 region-agree). All 24 captions carry skin-tone evidence.
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), temperature=0, seed=20260804, num_predict=384, num_ctx=4096, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family), temperature=0, seed=20260804, num_predict=2000, 512×512 input, same reviewer calibration as arms #4/#29/#32/#30.
+**Plan:** frozen `research/stage-b-plans/stage-b-skin-color-v1.json` (fingerprint `a9a681e470424eacb14193d02c28289510b8ea3d160e8fe4ed6f920f3aa9f3b1`); conditions identical to arms #4/#29/#32/#30 except the evidence condition is `context-raw-skin-color` (DOME-29 exposed-skin tone) instead of `context-raw-geometry`/`context-raw-clothing`/`context-raw-body-type`/`context-raw-hair`. All 24/24 cohort items measured and generated.
+
+**Scheduler lifecycle (local 4090):** request → poll/claim → launch → verify GPU activity → activate → heartbeat → release, through `registered-research-launcher` (job `stratum-stage-b-skin-color-v1`, completed 2026-08-05 ~17:34Z, `gpu_activity_seen: true`, 96/96, plan fingerprint verified) and the independent review pass (job `stratum-stage-b-adversarial-review-skin-color-v1`, 96/96 reviewed by gemma4:e4b, completed ~17:51Z, GPU released). Both slots released cleanly (4090 idle).
+
+**Evidence-only delta (cond 3 → 4):**
+- supported claims **47 → 176**; unsupported **99 → 21**; omissions 11 → 24; contradictions 1 → 8; abstentions 0 → 0.
+- Support ratio **32.2% → 89.3%** (Δ +0.5715).
+- Paired per-item sign test on supported claims: 20 improve / 4 worsen (24 paired), one-sided binomial **p ≈ 0.000772**.
+- Deterministic cross-check independent of the LLM review: 22/24 skin-condition captions carry the exact declared tone name beyond baseline (the remaining 2 are palette-neighbor synonyms, e.g. "fair-skinned" vs "medium"); all 24 name skin tone. Baseline captions already routinely name a skin tone (the context prompt asks for "skin details"), so the supported-claim gain is the reviewer's attribution of those claims to carried evidence — matching the hair arm's carry profile.
+
+**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 176 --base-unsupported 99 --variant-unsupported 21 --items 24 --p-supported 0.000772` → **BETTER** (significant p=0.000772 ≤ 0.05; support-ratio improvement 0.322→0.893; unsupported reduced 99→21, not ballooning; `inconclusive: false`). Confirmed by harness `autonomous-tick` from the review dir.
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root `/mnt/nas-ai-models/research/stratum/stage-b-skin-color-v1(-review)`; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `seg2.npy`/source pixels only; scale-invariant verbalization retained (owner px→ratios rule).
+
+**Registry advance:** skin-color dimension `active → validated` (0 strikes, confirmed by harness `autonomous-tick`). Next selector pick: **lighting (arm #33)** now `research:active`. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+
 ## Arm #30 — hair evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-05

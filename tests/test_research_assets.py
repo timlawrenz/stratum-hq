@@ -397,10 +397,16 @@ def test_resumption_documents_preserve_the_sole_active_arm_and_two_stage_boundar
     ledger = (ROOT / "docs" / "EXPERIMENTS_AND_RESULTS.md").read_text()
     research_readme = (ROOT / "research" / "README.md").read_text()
 
-    assert "#4 is the sole `research:active`" in status
+    # The resumption documents must name exactly one active arm and it must
+    # agree across status + tree (currently lighting #33, the selector pick
+    # after skin-color #31 concluded BETTER; the completed skin-color run is
+    # recorded in the ledger).
+    assert "is the sole `research:active`" in status
+    assert "#33 lighting" in status
     assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
     assert "The `stratum-ffhq` strategist is paused" not in status
-    assert "[ACTIVE / METRIC-RISK / PRE-COMPUTE] #4" in tree
+    assert "#33 lighting" in tree
+    assert "## Arm #31 — skin-color/tone evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`" in ledger
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[PROPOSAL — PENDING]`" in ledger
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[ACTIVE — PENDING]`" not in ledger
     assert "Stage A" in research_readme

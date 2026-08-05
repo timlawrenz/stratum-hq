@@ -11,8 +11,8 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
   * The owner-reviewed evidence-discovery map remains preserved in draft PR #7.
   * It identifies open-world candidate evidence roles and the raw-versus-bucketed input-view confound without selecting a specialist winner.
 
-* **[ACTIVE / METRIC-RISK / PRE-COMPUTE] #4 — Baseline and comparison parity**
-  * The sole `research:active` arm.
+* **[COMPLETE / EMPIRICAL BETTER / PENDING_HUMAN_SPOT_CHECK] #4 — Baseline and comparison parity**
+  * The baseline/comparison-parity arm (no longer the active arm; empirically complete, verdict BETTER, advisory human spot-check pending). The sole `research:active` arm is now **#33 lighting**.
   * Completed Stage A is immutable, independently audited, non-executing provenance work; its 24-item six-slice manifest is not the first-500 cohort. The historical request is `research/proposals/stage-a-caption-context-parity-preparation.md` / draft PR #13.
   * Read-only first-500 audit: all 500 have readable `pose2`, `seg2`, `normal2`, `pointmap`, and `matting`; only 10 have the later determinations/caption2/t52 chain.
   * [`FIRST_500_CORE_COHORT_PILOT_DESIGN.md`](FIRST_500_CORE_COHORT_PILOT_DESIGN.md) specifies the coverage-aware future selection rule and states why the current evidence-only contrast remains blocked.
@@ -43,7 +43,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
 * **[PROPOSAL] Evidence-dimension arms (draft PR #20, `docs/EVIDENCE_DIMENSION_ARMS.md`)**
   * Each notes a deterministic measurement from existing artifacts and a claim-support delta target reusing the measured arm #4 protocol. See `[#29 clothing/apparel]`, `[#30 hair]`, `[#31 skin-color]`, `[#32 body-type/proportions]`, `[#33 lighting]`, `[#34 setting/environment]`, `[#35 texture/material]`, `[#36 full-dossier assembly + context4k compression]`, `[#37 generative reconstruction validation (ComfyUI round-trip)]`.
   * The registry (`research/dimensions/evidence-dimension-registry-v1.json`) is the source of truth and now supports **non-stratum open-world specialists** (e.g. local Florence-2 for clothing/texture) and **reconstruction validation** (`claim-support` / `reconstruction` / `roundtrip-audit`) via local ComfyUI + CLIP scoring — the evidence space is not limited to stratum/Sapiens2 outputs.
-  * **Validated (2026-08-05):** clothing #29 (BETTER, p≈0.0173) and body-type #32 (ratio-corrected BETTER, p≈3e-6) and **hair #30 (BETTER, p≈0.000772, draft PR #40)**. **Active:** skin-color #31 (sole `research:active`, selector EIG 0.5). Proposals: lighting #33, setting #34, texture #35, dossier-context4k #36, reconstruction #37.
+  * **Validated (2026-08-05):** clothing #29 (BETTER, p≈0.0173), body-type #32 (ratio-corrected BETTER, p≈3e-6), **hair #30 (BETTER, p≈0.000772, draft PR #40)**, and **skin-color #31 (BETTER, p≈0.000772, draft PR #41)**. **Active:** lighting #33 (sole `research:active`, selector EIG 0.24). Proposals: setting #34, texture #35, dossier-context4k #36, reconstruction #37.
 
 ## Concluded
 
