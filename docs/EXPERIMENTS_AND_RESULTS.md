@@ -2,6 +2,34 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## First-500 coverage-balanced Stage-B comparison — `[EMPIRICAL RUN COMPLETE — PENDING_HUMAN_SPOT_CHECK]`
+
+**Date:** 2026-08-04/05
+**Arm:** #4 — baseline and comparison parity
+**Code / PR:** `exp/stage-b-first500-aggregator-20260804`, draft PR #20
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape)
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), `temperature=0`, `seed=20260804`, `num_predict=384`, `num_ctx=4096`, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family from generator), `temperature=0`, `seed=20260804`, `num_predict=2000`, `num_ctx=8192`, 512×512 input.
+
+**Goal:** Test, on the frozen cohort with fixed generation settings, whether declared in-memory geometry evidence (`pose2`+`seg2` only) changes claim support under a matched one-axis comparison.
+
+**Conditions (same item, same model/settings):**
+1. bucketed/cropped + legacy prompt + no evidence
+2. raw + legacy prompt + no evidence
+3. raw + context prompt + no evidence
+4. raw + same context prompt + geometry evidence
+
+**Empirical evidence:**
+- 96/96 captions generated and published to `/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1/` (records.jsonl, review-queue.jsonl, run-provenance.json, outputs/).
+- Independent review (gemma4:e4b) scored 96/96 into claim-support buckets at `/mnt/nas-ai-models/research/stratum/stage-b-first500-parity-v1-review/`.
+- **Evidence-only delta** (cond. 3 → 4): supported claims **47 → 156**; unsupported **99 → 40**; items with ≥1 supported claim **5/24 → 24/24**; omissions 11 → 27; contradictions 1 → 2. Support ratio (supported / supported+unsupported) **32% → 80%**.
+- Paired per-item sign test on supported claims: 19 improve / 5 worsen, one-sided binomial p≈0.003. On unsupported: 14 decrease / 8 increase, p≈0.14 (directionally reduced, not individually significant).
+- Deterministic cross-check (independent of the LLM review): all 24 geometry captions verbalize declared-evidence vocabulary; 16/24 carry ≥ half of declared traces. The supported-claim gain is traceable to evidence actually carried into the caption.
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; scheduler lease claimed/activated/heartbeated/released cleanly; model unloaded after run.
+
+**Verdict:** `EMPIRICAL RUN COMPLETE — PENDING_HUMAN_SPOT_CHECK`. Statistical improvement in supported claims from declared geometry on this 24-item frozen cohort with fixed settings. Not yet a PASS: single reviewer model, no human calibration of the rubric on known/null cases yet, cohort is 24 items, one-axis only. No corpus mutation or merge occurred.
+
 ## Stage-A caption/context parity preparation — `[COMPLETED / PENDING / NON-EXECUTING]`
 
 **Date:** 2026-08-04
