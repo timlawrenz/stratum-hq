@@ -2,6 +2,31 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #32 — body-type/proportion evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-05
+**Arm:** #32 — body-type/proportions evidence specialist
+**Code / PR:** `exp/stage-b-bodytype-arm32-20260805` (draft PR open), branches off the arm-#4 execution harness
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arm #4)
+**Deterministic specialist:** `research_harness.proportions.compute_proportions` (Goliath-308 pose2, min confidence 0.5, continuous ratios with explicit abstention); precomputed record → `/mnt/nas-ai-models/research/stratum/stage-b-bodytype-proportions-v1.json` (23/24 subjects present, 17/24 shoulder:hip ratio measurable, 13/24 leg measures, 1 abstained, 53 low-confidence joints).
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), temperature=0, seed=20260804, num_predict=384, num_ctx=4096, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family), temperature=0, seed=20260804, num_predict=2000, 512×512 input, same reviewer calibration as arm #4.
+**Plan:** frozen `research/stage-b-plans/stage-b-bodytype-v1.json` (fingerprint `37b47cea885b5fc71e801fbd33bc902454f8a21ae52b4896aac925408a44fe1b`); conditions identical to arm #4 except the evidence condition is `context-raw-body-type` (proportions) instead of `context-raw-geometry` (full determinations).
+
+**Scheduler lifecycle (local 4090):** request → poll/claim → launch → verify GPU activity → activate → heartbeat → release, through `registered-research-launcher` (job `stratum-stage-b-bodytype-v1`, completed 2026-08-05 ~11:23Z, `gpu_activity_seen: true`) and the independent review pass (job `stratum-stage-b-adversarial-review-bodytype-v1`, completed, 96/96). Both slots released cleanly (4090 idle).
+
+**Evidence-only delta (cond 3 → 4):**
+- supported claims **47 → 195**; unsupported **99 → 14**; omissions 11 → 28; contradictions 1 → 1; abstentions 0 → 5 (reviewer abstains where the evidence abstained).
+- Support ratio **32.2% → 93.3%** (Δ +0.611).
+- Paired per-item sign test on supported claims: 20 improve / 3 worsen (23 paired), one-sided binomial **p ≈ 0.000244**.
+- Deterministic cross-check independent of the LLM review: 17/24 body-type captions carry ≥1 body-descriptive vocabulary trace beyond their matched baseline captions (geometric/vocabulary carry measured on the record captions directly).
+
+**Deterministic verdict:** `autonomous-verdict --base-supported 47 --variant-supported 195 --base-unsupported 99 --variant-unsupported 14 --items 23 --p-supported 0.000244` → **BETTER** (significant p=0.000244 ≤ 0.05; support-ratio improvement; unsupported reduced, not ballooning; `inconclusive: false`).
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `pose2.npy` only.
+
+**Registry advance:** body-type dimension `proposal → validated` (0 strikes). Next selector pick: clothing (arm #29, EIG 0.7). Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+
 ## First-500 coverage-balanced Stage-B comparison — `[EMPIRICAL RUN COMPLETE — PENDING_HUMAN_SPOT_CHECK]`
 
 **Date:** 2026-08-04/05

@@ -81,7 +81,7 @@
       "id": "body-type",
       "name": "body-type/proportions",
       "arm_issue": 32,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared anthropometric ratios (shoulder:hip, torso:leg, limb lengths) improve body/limb description support.",
       "falsified_if": "Proportion evidence does not improve supported body/pose claims over baseline.",
