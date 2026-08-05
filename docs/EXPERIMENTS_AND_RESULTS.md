@@ -2,6 +2,31 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #29 — clothing/apparel evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-05
+**Arm:** #29 — clothing/apparel evidence specialist
+**Code / PR:** `exp/stage-b-clothing-arm29-20260805` (draft PR open), branches off the arm-#32 execution harness
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arms #4/#32)
+**Deterministic specialist:** `research_harness.clothing.compute_clothing` (seg2 DOME-29 garment classes + per-class dominant color from source pixels, min-floor abstention); computed in memory per item during the bounded run.
+**Aggregator:** already-installed local `gemma3:27b` (digest `a418f5838eaf…`), temperature=0, seed=20260804, num_predict=384, num_ctx=4096, loopback Ollama.
+**Independent reviewer:** `gemma4:e4b` (different family), temperature=0, seed=20260804, num_predict=2000, 512×512 input, same reviewer calibration as arms #4/#32.
+**Plan:** frozen `research/stage-b-plans/stage-b-clothing-v1.json` (fingerprint `6bfdb635459a93532cfbf7d3073991a0975c22d9c95e09d0f5ee5975dbe9b96c`); conditions identical to arms #4/#32 except the evidence condition is `context-raw-clothing` (DOME-29 garment coverage + dominant colors) instead of `context-raw-geometry`/`context-raw-body-type`. All 24/24 cohort items measured (24 subject-present, 14/24 with ≥1 garment class cleared).
+
+**Scheduler lifecycle (local 4090):** request → poll/claim → launch → verify GPU activity → activate → heartbeat → release, through `registered-research-launcher` (job `stratum-stage-b-clothing-v1`, completed 2026-08-05 ~13:15Z, `gpu_activity_seen: true`) and the independent review pass (job `stratum-stage-b-adversarial-review-clothing-v1`, completed ~13:42Z, 96/96). Both slots released cleanly (4090 idle).
+
+**Evidence-only delta (cond 3 → 4):**
+- supported claims **72 → 151**; unsupported **100 → 46**; omissions 3 → 24; contradictions 1 → 6; abstentions 0 → 0.
+- Support ratio **41.9% → 76.7%** (Δ +0.348).
+- Paired per-item sign test on supported claims: 17 improve / 6 worsen (23 paired), one-sided binomial **p ≈ 0.0173**.
+- Deterministic cross-check independent of the LLM review: declared-garment vocabulary carry was **low** (1/14 garment-bearing items had a new literal trace beyond its matched baseline). Baseline captions already named many garments (bikini tops, lace garments) and several cohort items are nude, so the carrier is modest; the supported-claim gain is nevertheless statistically significant on the reviewer rubric.
+
+**Deterministic verdict:** `autonomous-verdict --base-supported 72 --variant-supported 151 --base-unsupported 100 --variant-unsupported 46 --items 23 --p-supported 0.017345` → **BETTER** (significant p=0.0173 ≤ 0.05; support-ratio improvement; unsupported reduced, not ballooning; `inconclusive: false`).
+
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `seg2.npy`/source pixels only.
+
+**Registry advance:** clothing dimension `active → validated` (0 strikes). Next selector pick: hair (arm #30, EIG 0.6). Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check (single independent reviewer family, rubric not yet human-calibrated on known/null cases).
+
 ## Arm #32 — body-type/proportion evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-05

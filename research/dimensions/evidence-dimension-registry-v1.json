@@ -18,7 +18,7 @@
       "id": "clothing",
       "name": "clothing/apparel",
       "arm_issue": 29,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared DOME-29 clothing/apparel measurements (coverage, garment classes, per-garment dominant colors) reduce unsupported clothing claims in captions on the frozen first-500 cohort.",
       "falsified_if": "The clothing-evidence condition does not reduce unsupported clothing claims or increase supported claims versus its matched no-evidence baseline under fixed view/prompt/model/settings.",
