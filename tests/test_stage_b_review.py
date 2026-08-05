@@ -95,14 +95,14 @@ def test_build_review_plan_is_checked(tmp_path: Path) -> None:
     (run_root / "outputs" / "legacy-raw-no-evidence" / "img-1.txt").write_text("one\n")
     (run_root / "outputs" / "context-raw-geometry" / "img-1.txt").write_text("two\n")
 
-    settings = ReviewSettings(model_name="qwen3-vl:32b",
-                              digest="ff2e46876908",
+    settings = ReviewSettings(model_name="gemma4:e4b",
+                              digest="c6eb396dbd59",
                               endpoint="http://127.0.0.1:11434/api/generate",
                               temperature=0.0, seed=20260804, num_predict=768,
                               review_items="all")
     plan = build_review_plan(settings, run_root, candidate_fingerprint="cand1")
     assert plan["review_plan_id"] == "stage-b-adversarial-review-v1"
-    assert plan["reviewer_model_id"] == "local-ollama-qwen3-vl-32b-ff2e46876908"
+    assert plan["reviewer_model_id"] == "local-ollama-gemma4-e4b-c6eb396dbd59"
     assert plan["independent_of_generator"] is True
     assert plan["item_count"] == 1
     assert plan["condition_count"] == 2

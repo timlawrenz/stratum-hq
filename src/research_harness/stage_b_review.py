@@ -63,14 +63,14 @@ REVIEW_PROMPT_TEMPLATE = (
     "unsupported (the image or evidence does not support it), or omitted (an important "
     "visible fact is missing). List contradictions with the declared evidence and any "
     "abstentions (leave empty in this pass). "
-    "Output JSON ONLY with exactly these five keys, as arrays of short string notes: "
-    '{"supported_claims":[],"unsupported_claims":[],"omissions":[],"contradictions":[],"abstentions":[]}.\n\n'
+    "Output JSON ONLY with exactly these five keys, as arrays of short string notes: {shape}.\n\n"
     "DECLARED EVIDENCE:\n{evidence}\n\nCAPTION:\n{caption}"
 )
 
 
 def _build_review_prompt(evidence_text: str, caption: str) -> str:
-    return REVIEW_PROMPT_TEMPLATE.format(evidence=evidence_text, caption=caption)
+    shape = '{"supported_claims":[],"unsupported_claims":[],"omissions":[],"contradictions":[],"abstentions":[]}'
+    return REVIEW_PROMPT_TEMPLATE.format(shape=shape, evidence=evidence_text, caption=caption)
 
 
 def _canonical_json(value: Any) -> str:
@@ -179,8 +179,18 @@ def _call_reviewer(settings: ReviewSettings, prompt: str, image_path: Path) -> d
     except Exception as exc:  # network/timeout
         raise StageBReviewError(f"reviewer model call failed: {exc}") from exc
     text = result.get("response", "")
+    # strip markdown code fences (```json ... ```) before locating the JSON object
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[-1] if "\n" in stripped else ""
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
     try:
-        parsed = json.loads(text[text.find("{"): text.rfind("}") + 1])
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start < 0 or end < start:
+            raise ValueError("no JSON object found")
+        parsed = json.loads(stripped[start:end + 1])
     except (ValueError, json.JSONDecodeError, KeyError) as exc:
         raise StageBReviewError(f"reviewer returned non-JSON: {text[:200]!r}") from exc
     return _parse_review_json(parsed)

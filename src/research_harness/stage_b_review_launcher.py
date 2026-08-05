@@ -38,8 +38,8 @@ def _scheduler(action: str, args: list[str]) -> str:
 
 def _settings() -> ReviewSettings:
     return ReviewSettings(
-        model_name="qwen3-vl:32b",
-        digest="ff2e46876908",
+        model_name="gemma4:e4b",
+        digest="c6eb396dbd59",
         endpoint="http://127.0.0.1:11434/api/generate",
         temperature=0.0,
         seed=20260804,
