@@ -57,31 +57,20 @@ class ReviewSettings:
         return f"local-ollama-{safe}-{self.digest[:12]}"
 
 
-REVIEW_PROMPT_TEMPLATE = """You are an independent adversarial reviewer for a text-to-image captioning experiment.
+REVIEW_PROMPT_TEMPLATE = (
+    "You review a caption against its source image and the declared evidence. "
+    "Mark each caption statement as supported (true / consistent with evidence), "
+    "unsupported (the image or evidence does not support it), or omitted (an important "
+    "visible fact is missing). List contradictions with the declared evidence and any "
+    "abstentions (leave empty in this pass). "
+    "Output JSON ONLY with exactly these five keys, as arrays of short string notes: "
+    '{"supported_claims":[],"unsupported_claims":[],"omissions":[],"contradictions":[],"abstentions":[]}.\n\n'
+    "DECLARED EVIDENCE:\n{evidence}\n\nCAPTION:\n{caption}"
+)
 
-Given:
-- IMAGE: the source image for one caption.
-- CAPTION: the model-generated caption to evaluate.
-- DECLARED EVIDENCE: optional deterministic specialist evidence (pose2/seg2 geometry) that was available to the captioner.
 
-Score the caption against the source image and the declared evidence. Reply with ONLY a JSON object with exactly these five list fields:
-  {{"supported_claims": [...], "unsupported_claims": [...], "omissions": [...], "contradictions": [...], "abstentions": []}}
-
-Rules:
-- supported_claims: statements in the caption that are true of the image / consistent with declared evidence.
-- unsupported_claims: statements the image or evidence do NOT support (hallucinations, wrong limb/side, invented objects).
-- omissions: important visible facts the prompt-model should have captured but did not.
-- contradictions: statements contradicting the declared evidence (e.g. evidence says left leg raised, caption says both legs down).
-- abstentions: leave empty in this pass.
-
-Be strict and specific. No prose, only the JSON object.
-
-IMAGE: <image>
-DECLARED EVIDENCE:
-{evidence}
-CAPTION:
-{caption}
-"""
+def _build_review_prompt(evidence_text: str, caption: str) -> str:
+    return REVIEW_PROMPT_TEMPLATE.format(evidence=evidence_text, caption=caption)
 
 
 def _canonical_json(value: Any) -> str:
@@ -168,10 +157,11 @@ def _image_payload(image_path: Path) -> dict:
 
 def _call_reviewer(settings: ReviewSettings, prompt: str, image_path: Path) -> dict:
     from PIL import Image
-    # Normalize to RGB JPEG so the reviewer gets exactly the same view family as the generator.
+    # qwen3-vl is extremely slow / context-starved on full-res inputs; normalize
+    # to 512x512 so repeated calls stay bounded and fit under num_ctx=8192.
     with Image.open(io.BytesIO(image_path.read_bytes())) as opened:
         buffer = io.BytesIO()
-        opened.convert("RGB").save(buffer, format="JPEG", quality=95, subsampling=0)
+        opened.convert("RGB").resize((512, 512)).save(buffer, format="JPEG", quality=95, subsampling=0)
     body = {
         "model": settings.model_name,
         "prompt": prompt,
@@ -179,7 +169,7 @@ def _call_reviewer(settings: ReviewSettings, prompt: str, image_path: Path) -> d
         "stream": False,
         "keep_alive": "10m",
         "options": {"temperature": settings.temperature, "seed": settings.seed,
-                    "num_predict": settings.num_predict, "top_k": 1, "top_p": 1.0, "num_ctx": 4096},
+                    "num_predict": settings.num_predict, "top_k": 1, "top_p": 1.0, "num_ctx": 8192},
     }
     request = urlrequest.Request(settings.endpoint, data=json.dumps(body).encode("utf-8"),
                                  headers={"Content-Type": "application/json"})
@@ -191,9 +181,23 @@ def _call_reviewer(settings: ReviewSettings, prompt: str, image_path: Path) -> d
     text = result.get("response", "")
     try:
         parsed = json.loads(text[text.find("{"): text.rfind("}") + 1])
-    except (ValueError, json.JSONDecodeError) as exc:
+    except (ValueError, json.JSONDecodeError, KeyError) as exc:
         raise StageBReviewError(f"reviewer returned non-JSON: {text[:200]!r}") from exc
     return _parse_review_json(parsed)
+
+
+def _call_reviewer_with_retry(settings: ReviewSettings, prompt: str, image_path: Path, *, attempts: int = 3) -> dict:
+    last_error: StageBReviewError | None = None
+    for attempt in range(attempts):
+        try:
+            return _call_reviewer(settings, prompt, image_path)
+        except StageBReviewError as exc:
+            last_error = exc
+            # wait briefly between retry attempts to let a transient server hiccup clear
+            import time as _time
+            _time.sleep(4 + 2 * attempt)
+    assert last_error is not None
+    raise last_error
 
 
 def execute_review(settings: ReviewSettings, run_root: Path,
@@ -219,10 +223,8 @@ def execute_review(settings: ReviewSettings, run_root: Path,
         image_path = source_root / record["source_relative_path"]
         evidence = record.get("evidence_payload") or {}
         evidence_text = _canonical_json(evidence)
-        prompt = REVIEW_PROMPT_TEMPLATE.replace("{evidence}", evidence_text).replace("{caption}", record["caption"])
-        # <image> marker must be present in the prompt text; the image is attached via payload.
-        prompt = prompt.replace("IMAGE: <image>", "Consider the attached source image.")
-        score = _call_reviewer(settings, prompt, image_path)
+        prompt = _build_review_prompt(evidence_text, record["caption"])
+        score = _call_reviewer_with_retry(settings, prompt, image_path)
         results.append({
             "image_id": record["image_id"],
             "condition_id": record["condition_id"],
