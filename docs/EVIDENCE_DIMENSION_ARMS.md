@@ -67,3 +67,23 @@ This mirrors the user's framing: *"~100K tokens that describe an asset → compr
 - Every arm keeps: local models only; outputs only under the approved noncanonical research root; no `crawlr/approved`/`crawlr/stratum` mutation; no backfill; no legacy overwrite; scheduler lifecycle for any GPU action; additive artifacts only.
 - Exactly one `research:active` arm at a time (routing rule; prep work may proceed concurrently on draft branches).
 - An arm is opened as a `research:proposal` issue with full machine-readable metadata; activation requires its own selection rationale + parent recording.
+
+## Convex-sweep harness (source of truth)
+
+The dimension list is **not** maintained as hand-written issues. The source of truth is
+`research/dimensions/evidence-dimension-registry-v1.json`, validated and swept by
+`src/research_harness/dimension_registry.py` via the CLI:
+
+```bash
+research-harness validate-dimension-registry research/dimensions/evidence-dimension-registry-v1.json
+research-harness dimension-sweep-status       research/dimensions/evidence-dimension-registry-v1.json
+```
+
+- States: `proposal` → `active` → `validated` / `falsified` / `exhausted` (terminal). Three valid
+  non-improving experiments force a terminal state (`per_dimension_strike_limit: 3`).
+- The sweep is a **convex space walk**: enumerate the full dimension space first; only when every
+  dimension is terminal does `dimension-sweep-status` report `exhausted: true` with
+  `next_action: "brainstorm-new-data"` — a harness state for proposing genuinely *new* data
+  sources/dimensions, rather than inventing variants of the same space.
+- Arms defined in the registry back the proposal issues already created (#29–#36) and any future
+  ones; the registry and issue tree must not drift apart.
