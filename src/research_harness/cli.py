@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                       help="review root for the active arm; omit to only select/activate")
     tick.add_argument("--write", action="store_true",
                       help="persist registry state changes back to the registry file")
+
+    sync = sub.add_parser(
+        "sync-issue-labels",
+        help="reconcile GitHub issue state labels with the registry (idempotent)",
+    )
+    sync.add_argument("registry", type=Path)
+    sync.add_argument("--apply", action="store_true",
+                      help="actually run gh; otherwise print planned operations")
     return parser.parse_args(argv)
 
 
@@ -209,6 +218,49 @@ def main(argv: list[str] | None = None) -> int:
             if args.write:
                 args.registry.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
             print(json.dumps({**outcome, "registry_written": bool(args.write)}, sort_keys=True))
+            return 0
+
+        if args.command == "sync-issue-labels":
+            from .dimension_registry import load_registry
+            from .issue_labels import IssueLabelError, plan_issue_label_sync
+
+            registry = load_registry(args.registry)
+            try:
+                issue_numbers = sorted({
+                    dim["arm_issue"] for dim in registry["dimensions"]
+                })
+                snapshot = subprocess.run(
+                    ["gh", "issue", "list", "--state", "open", "--limit", "100",
+                     "--json", "number,labels"],
+                    capture_output=True, text=True, check=True, timeout=60,
+                )
+                issues = json.loads(snapshot.stdout)
+            except subprocess.SubprocessError as exc:
+                raise ContractError(f"gh issue list failed: {exc}") from exc
+            current_by_issue: dict[int, set[str]] = {}
+            for issue in issues:
+                number = issue.get("number")
+                if isinstance(number, int) and number in set(issue_numbers):
+                    current_by_issue[number] = {
+                        str(label.get("name")) for label in issue.get("labels", [])
+                        if isinstance(label, dict) and isinstance(label.get("name"), str)
+                    }
+            try:
+                operations = plan_issue_label_sync(registry, current_by_issue)
+            except IssueLabelError as exc:
+                raise ContractError(str(exc)) from exc
+            if args.apply:
+                for op in operations:
+                    label = op["label"]
+                    subprocess.run(
+                        ["gh", "issue", "edit", str(op["issue"]),
+                         "--add-label" if op["action"] == "add" else "--remove-label", label],
+                        capture_output=True, text=True, check=True, timeout=60,
+                    )
+                print(json.dumps({"applied": len(operations), "operations": operations},
+                                 indent=2, sort_keys=True))
+            else:
+                print(json.dumps({"planned": operations}, indent=2, sort_keys=True))
             return 0
 
         program = _read_json(args.program)
