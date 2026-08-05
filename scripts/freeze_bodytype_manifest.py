@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -28,9 +29,18 @@ from research_harness.labels import ContractError  # noqa: E402
 
 PROGRAM = ROOT / "research/program.json"
 CANDIDATE = Path("/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json")
-PLAN_OUT = ROOT / "research/stage-b-plans/first500-bodytype-v1.json"
-MANIFEST_OUT = ROOT / "research/gpu-manifests/stage-b-first500-bodytype-v1.json"
-OUTPUT_ROOT = Path("/mnt/nas-ai-models/research/stratum/stage-b-first500-bodytype-v1")
+PLAN_OUT = ROOT / "research/stage-b-plans/stage-b-bodytype-v1.json"
+MANIFEST_OUT = ROOT / "research/gpu-manifests/stage-b-bodytype-v1.json"
+OUTPUT_ROOT = Path("/mnt/nas-ai-models/research/stratum/stage-b-bodytype-v1")
+JOB_ID = "stratum-stage-b-bodytype-v1"
+
+# Optional corrected re-measure variant: set RATIOS_VARIANT=1 to emit a
+# distinct manifest/roots so the px-era records are never overwritten.
+RATIOS_VARIANT = os.environ.get("STRATUM_RATIOS_VARIANT") == "1"
+if RATIOS_VARIANT:
+    OUTPUT_ROOT = Path("/mnt/nas-ai-models/research/stratum/stage-b-bodytype-ratios-v1")
+    MANIFEST_OUT = ROOT / "research/gpu-manifests/stage-b-bodytype-ratios-v1.json"
+    JOB_ID = "stratum-stage-b-bodytype-ratios-v1"
 
 # Arm-#4 approved settings (identical), only evidence axis changes.
 SETTINGS = StageBGenerationSettings(
@@ -94,7 +104,7 @@ def main() -> int:
             "candidate_manifest_fingerprint": candidate.get("manifest_fingerprint"),
             "candidate_manifest_path": str(CANDIDATE),
             "comparison_plan_fingerprint": plan["comparison_plan_fingerprint"],
-            "comparison_plan_relative_path": "research/stage-b-plans/first500-bodytype-v1.json",
+            "comparison_plan_relative_path": "research/stage-b-plans/stage-b-bodytype-v1.json",
             "comparison_plan_sha256": _sha256(PLAN_OUT),
             "expected_record_count": 96,
             "generation": {
@@ -116,7 +126,7 @@ def main() -> int:
             "runner_source_sha256": _runner_source_hash(),
         },
         "host_route": "local",
-        "job_id": "stratum-stage-b-first500-bodytype-v1",
+        "job_id": JOB_ID,
         "launcher_id": "registered-research-launcher",
         "manifest_state": "approved",
         "maximum_duration": "2h",

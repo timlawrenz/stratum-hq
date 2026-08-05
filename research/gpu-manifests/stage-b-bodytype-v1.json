@@ -1,8 +1,8 @@
 {
-  "approved_issue": 32,
+  "approved_issue": 18,
   "authorization": {
-    "approval_issue": 32,
-    "approved_by": "timlawrenz autonomous cron delegation, 2026-08-05 — frozen-cohort protocol runbook: scheduler-managed local 4090 authorized for arm #32 (body-type) without gating on owner input; uses only already-installed local Ollama gemma3:27b + gemma4:e4b, noncanonical outputs under /mnt/nas-ai-models/research.",
+    "approval_issue": 18,
+    "approved_by": "timlawrenz direct #18 approval and autonomous-decision delegation in authenticated Hermes WebUI, 2026-08-04",
     "mode": "human_reviewed"
   },
   "execution": {
@@ -10,7 +10,7 @@
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
     "comparison_plan_fingerprint": "37b47cea885b5fc71e801fbd33bc902454f8a21ae52b4896aac925408a44fe1b",
     "comparison_plan_relative_path": "research/stage-b-plans/stage-b-bodytype-v1.json",
-    "comparison_plan_sha256": "d1be3dacb3daa46b3c442635d3b87cdee2315dbf9cd91dfbb6e2a084d9571668",
+    "comparison_plan_sha256": "9ff555a5e9e562bafbc350feb38f0d3168a41042eb79bb21294b0f51b9c9e79f",
     "expected_record_count": 96,
     "generation": {
       "context_window": 4096,
@@ -23,12 +23,12 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "959e4589085b79af704b4f72e989142f335ab1a6",
+    "git_commit": "947711871fdd47327f52cf595bf38dbaf6c043d6",
     "launcher_source_sha256": "3d1fc471bc72a6429e2b4aa0a87e11ad2f341a89c96636d532467efc3c12487e",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
     "runner_module": "research_harness.stage_b",
-    "runner_source_sha256": "37bc523d8c8f42da644080819fb9a5af1f0b45a24e1af409b0c94fccb1c80f19"
+    "runner_source_sha256": "38c5ab780cffb13f6ca221bb05eeafef8f9d67c104206e87b54b7b08d75f02bf"
   },
   "host_route": "local",
   "job_id": "stratum-stage-b-bodytype-v1",

@@ -9,7 +9,7 @@
     "candidate_manifest_fingerprint": "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
     "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
     "comparison_plan_fingerprint": "37b47cea885b5fc71e801fbd33bc902454f8a21ae52b4896aac925408a44fe1b",
-    "comparison_plan_relative_path": "research/stage-b-plans/first500-bodytype-v1.json",
+    "comparison_plan_relative_path": "research/stage-b-plans/stage-b-bodytype-v1.json",
     "comparison_plan_sha256": "9ff555a5e9e562bafbc350feb38f0d3168a41042eb79bb21294b0f51b9c9e79f",
     "expected_record_count": 96,
     "generation": {
@@ -23,19 +23,19 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "6026688fd28790b8be139b6da2131d308b3a2673",
+    "git_commit": "947711871fdd47327f52cf595bf38dbaf6c043d6",
     "launcher_source_sha256": "3d1fc471bc72a6429e2b4aa0a87e11ad2f341a89c96636d532467efc3c12487e",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
     "runner_module": "research_harness.stage_b",
-    "runner_source_sha256": "37bc523d8c8f42da644080819fb9a5af1f0b45a24e1af409b0c94fccb1c80f19"
+    "runner_source_sha256": "38c5ab780cffb13f6ca221bb05eeafef8f9d67c104206e87b54b7b08d75f02bf"
   },
   "host_route": "local",
-  "job_id": "stratum-stage-b-first500-bodytype-v1",
+  "job_id": "stratum-stage-b-bodytype-ratios-v1",
   "launcher_id": "registered-research-launcher",
   "manifest_state": "approved",
   "maximum_duration": "2h",
-  "output_root": "/mnt/nas-ai-models/research/stratum/stage-b-first500-bodytype-v1",
+  "output_root": "/mnt/nas-ai-models/research/stratum/stage-b-bodytype-ratios-v1",
   "requested_vram_gb": 22,
   "scheduler_lifecycle": [
     "request",
