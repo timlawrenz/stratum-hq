@@ -175,6 +175,39 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     propose.add_argument("--write", action="store_true",
                          help="persist the augmented registry back to the registry file atomically")
 
+    markb = sub.add_parser(
+        "mark-blocked",
+        help="classify a dimension as blocked: its gate is a policy/authority "
+             "decision, not a measurement (excluded from selector scoring)",
+    )
+    markb.add_argument("registry", type=Path)
+    markb.add_argument("dim_id", type=str)
+    markb.add_argument("--reason", type=str, required=True,
+                       help="human-readable reason the arm cannot advance by measurement")
+    markb.add_argument("--issue", type=int, default=None,
+                       help="issue number the arm is waiting on (e.g. the research:needs-human ruling)")
+    markb.add_argument("--write", action="store_true",
+                       help="persist the registry change atomically")
+
+    marku = sub.add_parser(
+        "mark-unblocked",
+        help="return a blocked dimension to an actionable state (proposal by default)",
+    )
+    marku.add_argument("registry", type=Path)
+    marku.add_argument("dim_id", type=str)
+    marku.add_argument("--state", choices=("proposal", "active"), default="proposal")
+    marku.add_argument("--write", action="store_true",
+                       help="persist the registry change atomically")
+
+    overview = sub.add_parser(
+        "program-overview",
+        help="program-state readout: validated evidence budget vs floor, goal-arm "
+             "inputs validated, blocked arms, dependency frontier (strategist step-back)",
+    )
+    overview.add_argument("registry", type=Path)
+    overview.add_argument("--program", type=Path, default=None,
+                          help="program.json to cross-check goal_floors against")
+
     sync = sub.add_parser(
         "sync-issue-labels",
         help="reconcile GitHub issue state labels with the registry (idempotent)",
@@ -356,6 +389,58 @@ def main(argv: list[str] | None = None) -> int:
                                  indent=2, sort_keys=True))
             else:
                 print(json.dumps({"planned": operations}, indent=2, sort_keys=True))
+            return 0
+
+        if args.command in ("mark-blocked", "mark-unblocked"):
+            from .dimension_registry import (
+                DimensionRegistryError,
+                load_registry,
+                mark_dimension_blocked,
+                mark_dimension_unblocked,
+                registry_sha256,
+                write_registry,
+            )
+
+            expected_sha = registry_sha256(args.registry) if args.write else None
+            registry = load_registry(args.registry)
+            try:
+                if args.command == "mark-blocked":
+                    mark_dimension_blocked(registry, args.dim_id, args.reason, issue=args.issue)
+                else:
+                    mark_dimension_unblocked(registry, args.dim_id, state=args.state)
+            except DimensionRegistryError as exc:
+                raise ContractError(str(exc)) from exc
+            if args.write:
+                try:
+                    write_registry(args.registry, registry, expected_sha256=expected_sha)
+                except DimensionRegistryError as exc:
+                    raise ContractError(str(exc)) from exc
+            final_state = next(
+                d["state"] for d in registry["dimensions"] if d["id"] == args.dim_id
+            )
+            print(json.dumps({
+                "command": args.command,
+                "dim_id": args.dim_id,
+                "state": final_state,
+                "registry_written": bool(args.write),
+            }, sort_keys=True))
+            return 0
+
+        if args.command == "program-overview":
+            from .dimension_registry import load_registry, program_overview
+
+            registry = load_registry(args.registry)
+            overview = program_overview(registry)
+            if args.program is not None:
+                program = _read_json(args.program)
+                rep = program.get("representation") or {}
+                program_floor = rep.get("expanded_dossier_min_tokens")
+                declared = (registry.get("goal_floors") or {}).get("expanded_dossier_min_tokens")
+                overview["program_floor_tokens"] = program_floor
+                overview["program_floor_matches_registry"] = (
+                    program_floor == declared if program_floor is not None else None
+                )
+            print(json.dumps(overview, sort_keys=True))
             return 0
 
         program = _read_json(args.program)

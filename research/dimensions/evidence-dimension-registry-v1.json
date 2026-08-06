@@ -19,6 +19,10 @@
     "stall": {
       "no_validation_in_last": 2,
       "selector_top_score_below": 0.1
+    },
+    "downstream_boost": {
+      "enabled": true,
+      "fraction": 0.5
     }
   },
   "dimensions": [
@@ -55,6 +59,9 @@
       "evidence_parts": [
         "seg2-apparel",
         "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -75,6 +82,9 @@
       "evidence_parts": [
         "seg2-hair",
         "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -95,6 +105,9 @@
       "evidence_parts": [
         "seg2-skin",
         "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -115,6 +128,9 @@
       "evidence_parts": [
         "pose2-keypoints",
         "seg2-region-fraction"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -135,6 +151,9 @@
       "evidence_parts": [
         "normal2",
         "source-luminance"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -155,6 +174,9 @@
       "evidence_parts": [
         "seg2-background",
         "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
@@ -190,13 +212,16 @@
       "evidence_parts": [
         "seg2-region",
         "source-gradient"
+      ],
+      "feeds": [
+        "dossier-context4k"
       ]
     },
     {
       "id": "dossier-context4k",
       "name": "full-dossier assembly and context4k compression",
       "arm_issue": 36,
-      "state": "active",
+      "state": "blocked",
       "valid_non_improving_experiments": 0,
       "hypothesis": "An expanded per-item dossier assembled from verified evidence dimensions (target >=100K tokens, claim-by-claim evidence links) can be compressed to a ~4K-token context4k artifact that preserves supported claims better than a plain 4K summarization baseline.",
       "falsified_if": "context4k does not preserve supported claims at materially higher density than a 4K baseline summarization (round-trip claim-support audit not passed).",
@@ -227,7 +252,9 @@
       "evidence_parts": [
         "verified-dimension-specialists",
         "relational-determinations"
-      ]
+      ],
+      "blocked_reason": "gate is decision #46 (research:needs-human): the 100K/4K floors are unreachable by honest expansion (measured gap ~86.5K-96.5K tok/item); advancing requires a human A/B ruling (reframe scale vs grow evidence), not a measurement",
+      "blocked_by_issue": 46
     },
     {
       "id": "reconstruction",
@@ -283,7 +310,7 @@
       "arm_issue": 47,
       "hypothesis": "A locally-run open-weight VLM producing a dense, multi-view descriptive block for a single curated woman source image (full-frame + seg2-derived focal crops), routed claim-by-claim with abstention, materially raises supported-claim density on the frozen 24-item cohort versus the deterministic dossier alone, and is a legitimately-new evidence part toward the 100K expanded-dossier floor (option B of decision #46).",
       "falsified_if": "The VLM dense description does not raise supported-claim density on the frozen cohort beyond the deterministic dossier + honest-expansion ceiling, or abstains at too low a rate to be trustworthy (unchecked verbosity), or is not distinguishable from a redundant attribute-tagger over already-validated axes.",
-      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
+      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates; VERIFIED LOCALLY 2026-08-06: qwen3-vl:32b via Ollama on both 4090 and Strix accepts image input and emits [OBSERVED]/[INFERRED]/[ABSTAIN]-tagged dense prose, all 6 subsections, zero absolute-pixel leakage, scale-invariant prose; 4090 runs 27% CPU-offload (slow), Strix runs 100% GPU = production batch host; qwen3.5-9b (Mar 2026, Apache-2.0, 262K ctx) is a newer single-GPU open candidate) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; source pixels + seg2 crop regions; local Ollama/ComfyUI stack",
       "selection_rationale": "The arm-36 honest expansion-ceiling audit proved deterministic evidence tops out at 2040-3489 tokens/item (7-50x below the 100K floor); a VLM dense-description specialist is the concrete option-B evidence source named in decision #46 and is a NEW evidence part per the open-world sourcing directive (local options exhausted).",
@@ -301,14 +328,31 @@
         "seg2-crop-region"
       ],
       "model_candidates": [
-        "open-vlm-dense-captioner"
+        "open-vlm-dense-captioner",
+        "qwen3-vl-32b-ollama",
+        "qwen3.5-9b"
       ],
       "validation_methods": [
         "claim-support",
         "roundtrip-audit"
       ],
       "state": "proposal",
-      "valid_non_improving_experiments": 0
+      "valid_non_improving_experiments": 0,
+      "feeds": [
+        "dossier-context4k"
+      ]
     }
-  ]
+  ],
+  "goal_arm": "dossier-context4k",
+  "goal_floors": {
+    "expanded_dossier_min_tokens": 4001,
+    "compact_context_min_tokens": 4000
+  },
+  "evidence_budget": {
+    "basis": "measured honest expansion-ceiling audit (commit 2bd3292, 2026-08-06; run /mnt/nas-ai-models/research/stratum/dossier-expansion-audit-v1/): base deterministic dossier 387-648 tok/item; total record (prose+payload) 2040-3489; generous honest LM elaboration ceiling 8500-13500",
+    "deterministic_min_tokens_per_item": 2040,
+    "deterministic_median_tokens_per_item": 2700,
+    "deterministic_max_tokens_per_item": 3489,
+    "honest_ceiling_max_tokens_per_item": 13500
+  }
 }

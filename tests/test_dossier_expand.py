@@ -165,7 +165,7 @@ def test_build_compression_bundle_still_refuses_under_budget_after_expansion() -
     payload = build_evidence_payload(image_id="item-1", **m)
     expanded = expand_dossier(dossier, payload)
     context = compress_dossier_to_context(expanded["expanded_dossier"])
-    with pytest.raises(DossierError, match="expanded_dossier.token_count is below the program minimum"):
+    with pytest.raises(DossierError, match="expanded_dossier.token_count is below the structural minimum"):
         build_compression_bundle(
             image_id="item-1",
             dossier=expanded["expanded_dossier"],

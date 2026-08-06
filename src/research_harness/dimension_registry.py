@@ -18,7 +18,14 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
-DIMENSION_STATES = ("proposal", "active", "validated", "falsified", "exhausted")
+DIMENSION_STATES = (
+    "proposal",
+    "active",
+    "blocked",
+    "validated",
+    "falsified",
+    "exhausted",
+)
 REQUIRED_DIMENSION_FIELDS = (
     "id",
     "name",
@@ -119,6 +126,56 @@ def _check_stall(value: Any) -> None:
         _checked_float(value["selector_top_score_below"], "sweep_terms.stall.selector_top_score_below", 0.0, 1.0)
 
 
+def _check_downstream_boost(value: Any) -> None:
+    """sweep_terms.downstream_boost = {enabled, fraction}: the selector adds
+    `fraction * value(blocked_arm)` to any actionable arm whose evidence
+    feeds/unblocks a blocked arm (dependency-graph weighting, #2)."""
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise DimensionRegistryError("sweep_terms.downstream_boost must be an object")
+    if "enabled" in value and not isinstance(value["enabled"], bool):
+        raise DimensionRegistryError("sweep_terms.downstream_boost.enabled must be a boolean")
+    if "fraction" in value:
+        _checked_float(value["fraction"], "sweep_terms.downstream_boost.fraction", 0.0, 1.0)
+
+
+def _check_goal_floors(value: Any) -> None:
+    """Top-level goal_floors: the goal arm's pre-registered token floors
+    (mirrors program.json representation); used by goal_reachability (#3)."""
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise DimensionRegistryError("registry goal_floors must be an object")
+    for key in ("expanded_dossier_min_tokens", "compact_context_min_tokens"):
+        if key not in value:
+            raise DimensionRegistryError(f"registry goal_floors missing {key!r}")
+        v = value[key]
+        if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
+            raise DimensionRegistryError(f"registry goal_floors.{key} must be a positive integer")
+
+
+def _check_evidence_budget(value: Any) -> None:
+    """Top-level evidence_budget: the MEASURED per-item token budget the
+    validated evidence can honestly produce (from the expansion-ceiling audit).
+    goal_reachability (#3) compares it against goal_floors deterministically."""
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise DimensionRegistryError("registry evidence_budget must be an object")
+    if "basis" not in value or not isinstance(value["basis"], str) or not value["basis"].strip():
+        raise DimensionRegistryError("registry evidence_budget.basis must be a non-empty string")
+    for key in (
+        "deterministic_min_tokens_per_item",
+        "deterministic_median_tokens_per_item",
+        "deterministic_max_tokens_per_item",
+        "honest_ceiling_max_tokens_per_item",
+    ):
+        if key not in value:
+            raise DimensionRegistryError(f"registry evidence_budget missing {key!r}")
+        _checked_float(value[key], f"registry evidence_budget.{key}", 0.0, 10_000_000.0)
+
+
 def _check_conclusion_history(value: Any) -> None:
     if value is None:
         return
@@ -154,6 +211,7 @@ def validate_registry(registry: Mapping[str, Any]) -> None:
         raise DimensionRegistryError("sweep_terms.brainstorm_states must include brainstorm-new-data")
     _check_exploration(sweep_terms.get("exploration"))
     _check_stall(sweep_terms.get("stall"))
+    _check_downstream_boost(sweep_terms.get("downstream_boost"))
 
     progress = registry.get("selection_progress")
     if progress is not None and (
@@ -195,6 +253,75 @@ def validate_registry(registry: Mapping[str, Any]) -> None:
             )
         if not isinstance(dim.get("arm_issue"), int) or dim["arm_issue"] <= 0:
             raise DimensionRegistryError(f"dimension {dim_id!r} arm_issue must be a positive issue number")
+        _check_string_list(dim.get("feeds"), dim_id, "feeds")
+        _check_string_list(dim.get("unblocks"), dim_id, "unblocks")
+        if dim["state"] == "blocked":
+            reason = dim.get("blocked_reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise DimensionRegistryError(
+                    f"dimension {dim_id!r} is blocked but has no non-empty blocked_reason"
+                )
+            issue = dim.get("blocked_by_issue")
+            if issue is not None and (
+                not isinstance(issue, int) or isinstance(issue, bool) or issue <= 0
+            ):
+                raise DimensionRegistryError(
+                    f"dimension {dim_id!r} blocked_by_issue must be a positive issue number"
+                )
+        budget = dim.get("token_budget_per_item")
+        if budget is not None and (
+            not isinstance(budget, (int, float)) or isinstance(budget, bool) or budget < 0
+        ):
+            raise DimensionRegistryError(
+                f"dimension {dim_id!r} token_budget_per_item must be a non-negative number"
+            )
+
+    # Dependency graph (feeds/unblocks): refs must exist, never self-refer, and
+    # must not form a cycle — the selector traverses these edges, so a cycle
+    # would make downstream weighting ill-defined.
+    edges: dict[str, set[str]] = {}
+    for dim in dims:
+        d_id = dim["id"]
+        edges[d_id] = set((dim.get("feeds") or []) + (dim.get("unblocks") or []))
+        for ref in edges[d_id]:
+            if ref == d_id:
+                raise DimensionRegistryError(
+                    f"dimension {d_id!r} dependency edges cannot reference itself"
+                )
+            if ref not in seen:
+                raise DimensionRegistryError(
+                    f"dimension {d_id!r} dependency edge references unknown dimension {ref!r}"
+                )
+    _check_dependency_acyclic(edges)
+
+    goal_arm = registry.get("goal_arm")
+    if goal_arm is not None:
+        if not isinstance(goal_arm, str) or goal_arm not in seen:
+            raise DimensionRegistryError("registry goal_arm must be a registered dimension id")
+    _check_goal_floors(registry.get("goal_floors"))
+    _check_evidence_budget(registry.get("evidence_budget"))
+
+
+def _check_dependency_acyclic(edges: Mapping[str, set[str]]) -> None:
+    """Raise DimensionRegistryError if the feeds/unblocks edges contain a cycle
+    (iterative DFS with WHITE/GRAY/BLACK coloring — no recursion-depth issues)."""
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = {node: WHITE for node in edges}
+
+    def _visit(node: str) -> None:
+        color[node] = GRAY
+        for nxt in sorted(edges.get(node, ())):
+            if color[nxt] == GRAY:
+                raise DimensionRegistryError(
+                    f"dependency graph contains a cycle through {node!r} -> {nxt!r}"
+                )
+            if color[nxt] == WHITE:
+                _visit(nxt)
+        color[node] = BLACK
+
+    for node in sorted(edges):
+        if color[node] == WHITE:
+            _visit(node)
 
 
 def load_registry(path: Path) -> dict[str, Any]:
@@ -277,6 +404,7 @@ def sweep_status(registry: Mapping[str, Any]) -> dict[str, Any]:
         "total": len(dims),
         "by_state": by_state,
         "terminal": sum(by_state.get(s, 0) for s in terminal),
+        "blocked": by_state.get("blocked", 0),
         "exhausted": exhausted,
         "stalled": stalled,
         "stall_reason": stall_reason,
@@ -287,6 +415,15 @@ def sweep_status(registry: Mapping[str, Any]) -> dict[str, Any]:
         # tasks or entirely new parts. Stall (no validation in last K cycles)
         # also fires brainstorm-on-stall while the safe menu is still open.
         "brainstorm_options": BRAINSTORM_OPTIONS if brainstorming else [],
+        # (#3) program-level gate: when the goal arm's registered expanded-floor
+        # is structurally unreachable from the measured evidence budget, emit
+        # goal_unreachable + the measured gap and route to the AUTONOMOUS
+        # "grow-evidence-supply" action, while flagging the floor
+        # renegotiation (option A) as the HUMAN decision (needs-human hold).
+        "goal_reachability": goal_reachability(registry),
+        # (#2) the actionable arms that would feed/unblock a blocked arm — the
+        # globally-useful moves the selector should prefer.
+        "dependency_frontier": dependency_frontier(registry),
     }
 
 
@@ -358,3 +495,211 @@ def render_arm_issue(registry: Mapping[str, Any], dim_id: str) -> str:
         f"## Selection rationale\n{dim['selection_rationale']}\n"
     )
     return body
+
+
+# ---------------------------------------------------------------------------
+# #1 - #4: blocked state, dependency graph, goal unreachability, program overview
+# ---------------------------------------------------------------------------
+
+
+def blocked_dimensions(registry: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Dimensions parked in the non-actionable `blocked` state (their gate is a
+    policy/authority decision, not a measurement — e.g. waiting on a human
+    A/B ruling). Blocked arms are excluded from selector scoring, so the loop
+    stops re-electing a stuck integrator and picks the best proposal instead."""
+    validate_registry(registry)
+    return [d for d in registry["dimensions"] if d["state"] == "blocked"]
+
+
+def goal_arm_id(registry: Mapping[str, Any]) -> str | None:
+    """The registered program-level goal arm (e.g. dossier-context4k), if any."""
+    validate_registry(registry)
+    return registry.get("goal_arm")
+
+
+def _downstream_edges(registry: Mapping[str, Any]) -> dict[str, set[str]]:
+    """feeds/unblocks edges as {dim_id: {downstream dim ids}} (a validated DAG)."""
+    edges: dict[str, set[str]] = {}
+    for d in registry["dimensions"]:
+        edges[d["id"]] = set((d.get("feeds") or []) + (d.get("unblocks") or []))
+    return edges
+
+
+def reachable_blocked(registry: Mapping[str, Any], dim_id: str) -> set[str]:
+    """Blocked dimensions reachable from `dim_id` along feeds/unblocks edges
+    (BFS — the graph is validated acyclic). Used by the selector's downstream
+    boost (#2) and the dependency frontier."""
+    validate_registry(registry)
+    known = {d["id"] for d in registry["dimensions"]}
+    if dim_id not in known:
+        raise DimensionRegistryError(f"unknown dimension id {dim_id!r}")
+    blocked = {d["id"] for d in registry["dimensions"] if d["state"] == "blocked"}
+    if dim_id in blocked:
+        return {dim_id}
+    edges = _downstream_edges(registry)
+    seen: set[str] = set()
+    stack = [dim_id]
+    while stack:
+        node = stack.pop()
+        for nxt in edges.get(node, ()):
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append(nxt)
+    return seen & blocked
+
+
+def goal_reachability(registry: Mapping[str, Any]) -> dict[str, Any]:
+    """Program-level signal (#3): is the goal arm's registered expanded-dossier
+    floor structurally reachable from the measured evidence budget?
+
+    Only fires when BOTH `goal_floors` and a measured `evidence_budget` are
+    registered; otherwise `declared: false` (fail-soft — never invent a
+    measurement). Routing split (owner directive 2026-08-06):
+      - grow-evidence-supply  (option B) is AUTONOMOUS work — the loop may
+        pursue it on its own (the blocked goal arm is excluded + feeders are
+        boosted by the selector);
+      - floor-renegotiation   (option A) is a HUMAN decision (needs-human hold).
+    """
+    validate_registry(registry)
+    floors = registry.get("goal_floors")
+    budget = registry.get("evidence_budget")
+    if not isinstance(floors, Mapping) or not isinstance(budget, Mapping):
+        return {"declared": False, "goal_unreachable": False}
+    floor = int(floors["expanded_dossier_min_tokens"])
+    validated_budget = float(budget.get("deterministic_max_tokens_per_item", 0.0))
+    ceiling = float(budget.get("honest_ceiling_max_tokens_per_item", validated_budget))
+    unreachable = ceiling < float(floor)
+    return {
+        "declared": True,
+        "goal_arm": goal_arm_id(registry),
+        "floor_tokens": floor,
+        "validated_budget_tokens": validated_budget,
+        "honest_ceiling_tokens": ceiling,
+        "measured_gap_tokens": round(float(floor) - validated_budget, 1),
+        "goal_unreachable": bool(unreachable),
+        "route_to": "grow-evidence-supply" if unreachable else "none",
+        "requires_human": ["floor-renegotiation"] if unreachable else [],
+        "basis": budget.get("basis", ""),
+    }
+
+
+def dependency_frontier(registry: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Actionable arms whose evidence feeds/unblocks a blocked arm — the moves
+    that keep the loop productive while the gate waits on a human decision."""
+    validate_registry(registry)
+    actionable = {"proposal", "active"}
+    blocked_ids = {d["id"] for d in blocked_dimensions(registry)}
+    if not blocked_ids:
+        return []
+    frontier: list[dict[str, Any]] = []
+    for d in registry["dimensions"]:
+        if d["state"] not in actionable:
+            continue
+        downstream = reachable_blocked(registry, d["id"]) & blocked_ids
+        if downstream:
+            frontier.append({
+                "id": d["id"],
+                "name": d.get("name", ""),
+                "state": d["state"],
+                "downstream_blocked": sorted(downstream),
+            })
+    return sorted(frontier, key=lambda f: f["id"])
+
+
+def program_overview(registry: Mapping[str, Any]) -> dict[str, Any]:
+    """Program-state readout (#4) for the strategist's step-back: validated
+    evidence budget vs the floor, % of the goal arm's inputs validated, blocked
+    count, dependency frontier, and goal reachability — so every cycle starts
+    from the whole picture instead of rediscovering it from issue prose."""
+    validate_registry(registry)
+    terminal = set(registry["sweep_terms"]["terminal_states"])
+    dims = registry["dimensions"]
+    by_state: dict[str, int] = {}
+    for d in dims:
+        by_state[d["state"]] = by_state.get(d["state"], 0) + 1
+    blocked = blocked_dimensions(registry)
+    goal = goal_arm_id(registry)
+    goal_feeders: list[str] = []
+    inputs_validated_pct = None
+    if goal is not None:
+        for d in dims:
+            if goal in set((d.get("feeds") or []) + (d.get("unblocks") or [])):
+                goal_feeders.append(d["id"])
+        if goal_feeders:
+            validated_feeder_count = sum(
+                1
+                for d in dims
+                if d["id"] in set(goal_feeders) and d["state"] in terminal
+            )
+            inputs_validated_pct = round(100.0 * validated_feeder_count / len(goal_feeders), 1)
+    return {
+        "total": len(dims),
+        "goal_arm": goal,
+        "by_state": by_state,
+        "terminal": sum(by_state.get(s, 0) for s in terminal),
+        "blocked_count": len(blocked),
+        "blocked_arms": [
+            {
+                "id": d["id"],
+                "arm_issue": d.get("arm_issue"),
+                "blocked_reason": d.get("blocked_reason"),
+                "blocked_by_issue": d.get("blocked_by_issue"),
+            }
+            for d in blocked
+        ],
+        "goal_feeders": sorted(goal_feeders),
+        "goal_inputs_validated_pct": inputs_validated_pct,
+        "dependency_frontier": dependency_frontier(registry),
+        "goal_reachability": goal_reachability(registry),
+    }
+
+
+def mark_dimension_blocked(
+    registry: dict[str, Any],
+    dim_id: str,
+    reason: str,
+    issue: int | None = None,
+) -> dict[str, Any]:
+    """Transition a dimension to the non-actionable `blocked` state: its gate is
+    a policy/authority decision, NOT a measurement (e.g. a research:needs-human
+    ruling). Requires a human-readable reason and (optionally) the issue number
+    the arm is waiting on. Preserves strikes and all other fields."""
+    validate_registry(registry)
+    if not isinstance(reason, str) or not reason.strip():
+        raise DimensionRegistryError("mark_dimension_blocked requires a non-empty reason")
+    if issue is not None and (not isinstance(issue, int) or isinstance(issue, bool) or issue <= 0):
+        raise DimensionRegistryError("blocked_by_issue must be a positive issue number")
+    found = next((d for d in registry["dimensions"] if d["id"] == dim_id), None)
+    if found is None:
+        raise DimensionRegistryError(f"unknown dimension id {dim_id!r}")
+    found["state"] = "blocked"
+    found["blocked_reason"] = reason
+    if issue is not None:
+        found["blocked_by_issue"] = issue
+    else:
+        found.pop("blocked_by_issue", None)
+    validate_registry(registry)
+    return registry
+
+
+def mark_dimension_unblocked(
+    registry: dict[str, Any],
+    dim_id: str,
+    *,
+    state: str = "proposal",
+) -> dict[str, Any]:
+    """Return a blocked dimension to an actionable state (default `proposal`,
+    so the selector re-evaluates it on its merits once the gate resolves)."""
+    validate_registry(registry)
+    if state not in ("proposal", "active"):
+        raise DimensionRegistryError("mark dim unblocked state must be 'proposal' or 'active'")
+    found = next((d for d in registry["dimensions"] if d["id"] == dim_id), None)
+    if found is None:
+        raise DimensionRegistryError(f"unknown dimension id {dim_id!r}")
+    if found["state"] != "blocked":
+        raise DimensionRegistryError(f"dimension {dim_id!r} is not blocked")
+    found["state"] = state
+    found.pop("blocked_reason", None)
+    found.pop("blocked_by_issue", None)
+    validate_registry(registry)
+    return registry

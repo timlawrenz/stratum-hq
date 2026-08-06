@@ -48,7 +48,8 @@ def program() -> dict:
         },
         "representation": {
             "expanded_dossier_target_tokens": 100_000,
-            "expanded_dossier_min_tokens": 100_000,
+            "expanded_dossier_target_role": "aspiration",
+            "expanded_dossier_min_tokens": 4_001,
             "compact_context_target_tokens": 4_000,
             "compact_context_min_tokens": 4_000,
             "legacy_text_encoder_max_tokens": 512,
@@ -291,11 +292,14 @@ def test_program_rejects_context_that_silently_fits_legacy_encoder() -> None:
         validate_program(invalid)
 
 
-def test_compression_rejects_budgets_below_the_declared_floors() -> None:
+def test_compression_rejects_dossier_below_the_structural_floor() -> None:
+    """A dossier that does not exceed the 4K compact ceiling it compresses into
+    is refused (structural floor), even though the 100K aspiration target is no
+    longer a gate."""
     bundle = {
         "schema_version": 1,
         "image_id": "example-1",
-        "expanded_dossier": {"token_count": 99_999, "evidence_ids": ["captioner:v1"]},
+        "expanded_dossier": {"token_count": 4_000, "evidence_ids": ["captioner:v1"]},
         "compact_context": {
             "token_count": 4_000,
             "claims": [{"text": "Supported.", "evidence_ids": ["captioner:v1"]}],
@@ -307,8 +311,30 @@ def test_compression_rejects_budgets_below_the_declared_floors() -> None:
         },
     }
 
-    with pytest.raises(ContractError, match="below the program minimum"):
+    with pytest.raises(ContractError, match="below the structural minimum"):
         validate_compression_bundle(bundle, program())
+
+
+def test_compression_accepts_honest_scale_dossier_below_100k_aspiration() -> None:
+    """The reframe: an honest ~13.5K dossier (below the 100K aspiration target
+    but above the structural floor) now VALIDATES — the aspiration target is
+    metadata, not a pass gate. The claim->evidence honesty path is intact."""
+    bundle = {
+        "schema_version": 1,
+        "image_id": "example-1",
+        "expanded_dossier": {"token_count": 13_500, "evidence_ids": ["captioner:v1"]},
+        "compact_context": {
+            "token_count": 4_000,
+            "claims": [{"text": "Supported.", "evidence_ids": ["captioner:v1"]}],
+        },
+        "artifacts": {
+            "structured": "context4k.json",
+            "human_readable": "context4k.md",
+            "provenance": "compression.json",
+        },
+    }
+
+    validate_compression_bundle(bundle, program())  # must not raise
 
 
 def test_gpu_manifest_rejects_unapproved_output_root_and_unsafe_duration() -> None:
