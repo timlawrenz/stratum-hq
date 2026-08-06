@@ -69,6 +69,8 @@ def run(manifest_path: Path, program_path: Path, output_root: Path, *, report: P
             expanded_prose_tokens=expanded["token_count"],
             payload_tokens=payload_tokens,
             claim_count=base_claim_count,
+            expanded_floor=program["representation"]["expanded_dossier_min_tokens"],
+            compact_floor=program["representation"]["compact_context_min_tokens"],
         )
 
         item_dir = output_root / image_id
@@ -92,6 +94,7 @@ def run(manifest_path: Path, program_path: Path, output_root: Path, *, report: P
             "lm_verbosity_ceiling": gap["lm_verbosity_ceiling"],
             "expanded_floor_gap": gap["expanded_floor_gap"],
             "expanded_floor_reached": gap["expanded_floor_reached"],
+            "max_honest_floor_reached": gap["max_honest_floor_reached"],
             "compact_floor_reached": gap["compact_floor_reached"],
             "note": gap["note"],
         })
@@ -108,6 +111,7 @@ def run(manifest_path: Path, program_path: Path, output_root: Path, *, report: P
         summary["lm_ceiling_min"] = min(r["lm_verbosity_ceiling"] for r in runs)
         summary["lm_ceiling_max"] = max(r["lm_verbosity_ceiling"] for r in runs)
         summary["any_expanded_floor_reached"] = any(r["expanded_floor_reached"] for r in runs)
+        summary["any_max_honest_floor_reached"] = any(r["max_honest_floor_reached"] for r in runs)
         summary["any_compact_floor_reached"] = any(r["compact_floor_reached"] for r in runs)
 
     report_path = Path(report) if report else (output_root / "expansion-run-summary.json")

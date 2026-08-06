@@ -155,6 +155,38 @@ def test_floor_gap_analysis_reports_honest_unreachability() -> None:
     assert g2["expanded_floor_reached"] is True
 
 
+def test_floor_gap_analysis_reframed_structural_floor_is_lm_reachable() -> None:
+    """The PR #50 reframe (structural 4001 floor + 100K aspiration) must be
+    distinguished honestly: the measured deterministic+payload record (2040-3489)
+    is under the structural floor, but the generous honest LM ceiling
+    (8500-13500) CLEARS it -- so the round-trip is feasible via the
+    scheduler-bound aggregator stage, never via fabrication.
+    """
+    structural = 4_001
+    compact = 4_000
+    # Measured mid-range item from the audit (record 2556, 22 claims -> ceiling 11000)
+    g = floor_gap_analysis(
+        expanded_prose_tokens=1_854,
+        payload_tokens=702,
+        claim_count=22,
+        expanded_floor=structural,
+        compact_floor=compact,
+    )
+    assert g["total_dossier_record_tokens"] == 2_556
+    assert g["expanded_floor_reached"] is False  # deterministic record alone: under floor
+    assert g["max_honest_floor_reached"] is True  # honest LM ceiling: clears floor
+    assert g["expanded_floor_gap"] == structural - 2_556
+    assert "reachable by HONEST LM elaboration" in g["note"]
+    assert "without fabricating content" in g["note"]  # honest positive framing, not a 100K-gap claim
+    # And a low-fact item stays honestly unreachable even at the structural floor
+    g_low = floor_gap_analysis(
+        expanded_prose_tokens=600, payload_tokens=400, claim_count=5,
+        expanded_floor=structural, compact_floor=compact,
+    )
+    assert g_low["max_honest_floor_reached"] is False
+    assert "cannot be met" in g_low["note"]
+
+
 def test_build_compression_bundle_still_refuses_under_budget_after_expansion() -> None:
     """The honesty gate must NOT be weakened by the expander: even an expanded (but still
     small) dossier must be refused by build_compression_bundle."""
