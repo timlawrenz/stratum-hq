@@ -149,9 +149,9 @@ deterministic record honestly clear the 4001 structural floor.
 - #4 is the baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
-- #29–#37 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, **#37** validated (all BETTER);
-  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**; **#47 vlm-dense-description is the sole
-  `research:active` arm** (0 proposals remain).
+- #29–#47 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, #37, and **#47 vlm-dense-description**
+  are ALL validated (all BETTER); **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**.
+  **Sweep EXHAUSTED — no active arm remains; next action brainstorm-new-data (0 proposals).**
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
