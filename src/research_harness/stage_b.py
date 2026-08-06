@@ -47,6 +47,7 @@ from .proportions import ProportionError, compute_proportions
 from .hair import HairError, compute_hair
 from .skin_color import SkinColorError, compute_skin_tone
 from .lighting import LightingError, compute_lighting
+from .setting import SettingError, compute_setting
 
 
 class StageBRunError(RuntimeError):
@@ -588,6 +589,75 @@ def _serialize_lighting(lighting: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _setting_evidence() -> dict[str, Any]:
+    """Declared deterministic setting/environment specialist (arm #34)."""
+    module_path = Path(compute_setting.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-setting-v1",
+        "specialists": [
+            {
+                "id": "in-memory-setting-v1",
+                "scope": "DOME-29 Background (class 0) coverage and source-pixel color statistics over the non-subject region only; never identity, posture, or in-subject semantics.",
+                "inputs": "Frozen selected-item seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous setting statistics with a deterministic quantized dominant background color name, tone band, vibrancy band, pattern band, and a scale-invariant background-coverage ratio, or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.setting.compute_setting "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; setting statistics are measured only when the Background region clears a raw-pixel floor and a frame-coverage floor, otherwise the fact abstains (never fabricated); detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Color names depend on lighting and white balance and are quantized palette names, not spectral measurements; a background split between two equally large regions can average into a non-existent mean color; fully shallow depth-of-field or flat backdrops make the pattern band 'solid' even when the scene is structured; background coverage is a frame share, not an absolute area.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_setting(setting: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a setting measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: whether the
+    background is measurable, its frame coverage ratio, the quantized dominant
+    background color name, tone band, vibrancy band, and pattern band.
+    Continuous values, the mean RGB hex, and the deviant fraction are
+    deliberately NOT verbalized (camera/response/white-balance dependent);
+    they exist in the machine-readable `evidence_payload` JSON (dossier /
+    compressor input).
+    """
+    lines = [
+        "SETTING (deterministic, seg2 Background region + source pixel palette):"
+    ]
+    if not setting.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from setting claims")
+        return "\n".join(lines)
+    if not setting.get("setting_measurable"):
+        lines.append("- background region did not clear the measurement gate -> abstain from setting claims")
+        reason = setting.get("abstention_reason")
+        if reason:
+            lines.append(f"  (reason: {reason})")
+        return "\n".join(lines)
+
+    coverage = setting.get("background_coverage")
+    if coverage is not None:
+        lines.append(f"- background surrounds the subject, covering {coverage:.2f} of the frame")
+    color = setting.get("dominant_background_color")
+    if color:
+        lines.append(f"- dominant background color: {color}")
+    tone = setting.get("background_tone_band")
+    if tone:
+        lines.append(f"- background tone: {tone}")
+    vibrancy = setting.get("background_vibrancy_band")
+    if vibrancy:
+        lines.append(f"- background color intensity: {vibrancy}")
+    pattern = setting.get("background_pattern_band")
+    if pattern:
+        lines.append(f"- background surface: {pattern}")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -660,6 +730,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "hair": ("pose2.npy", "seg2.npy"),
     "skin-color": ("pose2.npy", "seg2.npy"),
     "lighting": ("seg2.npy", "normal2.npy"),
+    "setting": ("seg2.npy",),
     "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
 }
 
@@ -739,7 +810,7 @@ def build_stage_b_plan(
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
     if evidence_kind not in (
-        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "context4k"
+        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "context4k"
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -885,6 +956,31 @@ def build_stage_b_plan(
             "source pixels only (presence requires a raw-pixel floor and a foreground-coverage gate; the direction fit "
             "additionally requires sufficient valid camera-facing normals, otherwise it abstains). Only scale-invariant "
             "facts are verbalized; absolute luma/normal values stay in evidence_payload."
+        )
+    elif evidence_kind == "setting":
+        evidence = _setting_evidence()
+        evidence_condition_id = "context-raw-setting"
+        comparison_plan_id = "stage-b-first500-setting-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic setting/environment "
+            "measurements (Background-class frame coverage from seg2, quantized dominant background color, "
+            "tone/vibrancy/pattern bands from the non-subject source pixels) may improve supported "
+            "setting/environment/background description claims without increasing unsupported, contradictory, "
+            "or invented background details when the source item, view, prompt template, local model, and "
+            "generation settings are controlled."
+        )
+        falsified_if = (
+            "The setting-evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on setting/environment claims, or an apparent difference is "
+            "attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "and pointmap are not used as evidence inputs. Background coverage, dominant color, and the "
+            "tone/vibrancy/pattern bands are computed in memory from the frozen selected seg2 (class 0) and the "
+            "already-decoded source pixels only (presence requires a raw-pixel floor and a frame-coverage "
+            "floor; otherwise the region abstains). Only scale-invariant facts are verbalized; absolute pixel "
+            "counts and raw RGB values stay in evidence_payload."
         )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
@@ -1078,6 +1174,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "skin-color"
     elif "context-raw-lighting" in condition_ids:
         rebuild_kind = "lighting"
+    elif "context-raw-setting" in condition_ids:
+        rebuild_kind = "setting"
     elif "context-raw-context4k" in condition_ids:
         rebuild_kind = "context4k"
     else:
@@ -1208,6 +1306,10 @@ def _load_selected_item(
         skin_tone = compute_skin_tone(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except SkinColorError as exc:
         raise StageBRunError(f"skin-color abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        setting = compute_setting(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
+    except SettingError as exc:
+        raise StageBRunError(f"setting abort for frozen selected item {image_id}: {exc}") from exc
     derived_reads = ["pose2.npy", "seg2.npy"]
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
@@ -1232,6 +1334,7 @@ def _load_selected_item(
         "hair": hair,
         "skin_tone": skin_tone,
         "lighting": lighting,
+        "setting": setting,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -1296,6 +1399,10 @@ def _render_condition(
         lighting = prepared["lighting"]
         evidence_text = _serialize_lighting(lighting)
         return raw.copy(), _context_prompt(evidence_text), lighting
+    if condition_id == "context-raw-setting":
+        setting = prepared["setting"]
+        evidence_text = _serialize_setting(setting)
+        return raw.copy(), _context_prompt(evidence_text), setting
     if condition_id == "context-raw-context4k":
         item = prepared["item"]
         lighting = prepared["lighting"]
@@ -1308,6 +1415,7 @@ def _render_condition(
             hair=prepared["hair"],
             skin=prepared["skin_tone"],
             lighting=lighting,
+            setting=prepared.get("setting"),
             determinations=prepared["determinations"],
         )
         payload = build_evidence_payload(
@@ -1317,6 +1425,7 @@ def _render_condition(
             hair=prepared["hair"],
             skin=prepared["skin_tone"],
             lighting=lighting,
+            setting=prepared.get("setting"),
             determinations=prepared["determinations"],
             source_sha256=prepared.get("source_sha256"),
         )

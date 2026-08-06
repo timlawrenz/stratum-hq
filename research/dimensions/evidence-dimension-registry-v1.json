@@ -160,7 +160,7 @@
       "id": "setting",
       "name": "setting/environment",
       "arm_issue": 34,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared background palette/non-subject statistics improve scene-environment claim support.",
       "falsified_if": "Setting evidence does not improve supported scene claims or reduce invented background details.",
@@ -183,7 +183,7 @@
       "id": "texture",
       "name": "texture/material",
       "arm_issue": 35,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared per-region texture proxies (edge/gradient statistics) reduce invented material/texture claims.",
       "falsified_if": "Texture evidence does not improve support or reduce unsupported material claims.",
@@ -353,13 +353,19 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 2,
+  "selection_progress": 3,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 1
+    },
+    {
+      "arm_id": "setting",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 2
     }
   ]
 }

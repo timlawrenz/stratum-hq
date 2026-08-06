@@ -2,6 +2,21 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #34 — setting/environment evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-06
+**Arm:** #34 — setting/environment evidence specialist
+**Code / PR:** `exp/stage-b-setting-arm34-20260806` (draft PR #53, branch from the arm-#36 lineage)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (12 portrait / 6 squareish / 6 landscape — same manifest as arms #4/#29/#30/#31/#32/#33/#36)
+**Deterministic specialist:** `research_harness.setting.compute_setting` (DOME-29 Background (class 0) frame-coverage ratio, quantized dominant background color name + hex, tone/vibrancy/pattern bands from the non-subject source pixels; raw-pixel + frame-coverage gates with explicit abstention). Evidence inputs bound: `seg2.npy`. Only scale-invariant facts are verbalized (coverage ratio, color name, bands); absolute pixel counts and raw RGB/hex stay in the machine-readable `evidence_payload`.
+**Hypothesis:** Declared background palette/non-subject statistics improve scene-environment claim support.
+**Run:** `/mnt/nas-ai-models/research/stratum/stage-b-setting-v1` (96 captions, gemma3:27b A-fingerprint, 4090 via scheduler) + independent adversarial review `/mnt/nas-ai-models/research/stratum/stage-b-setting-v1-review` (96 rows, gemma4:e4b, 512px inputs).
+**Verdict (harness-computed `autonomous-tick`):** **BETTER** — supported 47 → **177**, unsupported 99 → **33**; support ratio 0.3219 → 0.8429 (Δ +0.5209); paired positive 19/24; sign-test p = **0.003305**. `inconclusive: false`, `significant: true`.
+**Registry advance:** setting `active → validated` (0 strikes); selector next → **texture #35** (active, exploit, EIG 0.24, novelty 0.15, selection_progress 3).
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `seg2.npy`/source pixels only; scale-invariant verbalization retained (owner px→ratios rule). The setting dimension also joined the dossier (`setting-environment:v1` evidence id + render_setting + evidence_payload section) — honest evidence-density growth for the goal arm.
+**Calibration note:** the pattern-band thresholds were recalibrated after an honest deviation-histogram probe on the first 8 items (solid < 0.10 deviant fraction, busy ≥ 0.35); the first bands (0.04/0.18) over-labeled plain walls as "busy".
+**Validation:** 495 pytest passed; `validate-program` valid; `validate-dimension-registry` valid. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check.
+
 ## Arm #36 — post-ruling honest re-measurement under the reframed structural floor — `[MEASUREMENT — NOT A VERDICT]`
 
 **Date:** 2026-08-06 (cycle after PR #50 merged)
