@@ -52,14 +52,23 @@ MANIFEST = Path("/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced
 SOURCE_ROOT = Path("/mnt/nas-ai-models/training-data/crawlr/approved")
 DERIVED_ROOT = Path("/mnt/nas-ai-models/training-data/crawlr/stratum")
 
-MODEL = os.environ.get("OLM_MODEL", "qwen3-vl:32b")
-MODEL_DIGEST = os.environ.get("OLM_DIGEST", "ff2e46876908")
+# Production evidence producer (flip 2026-08-06): qwen3-vl:32b FAILED the
+# reliability gate on the real corpus — silent empty responses on vision AND
+# plain text (server-side decode wedge, not restorable without root). gemma3:27b
+# (already installed, vision-capable) is the working local alternative, verified
+# to emit the full tagged 6-subsection block on a corpus item.
+MODEL = os.environ.get("OLM_MODEL", "gemma3:27b")
+MODEL_DIGEST = os.environ.get("OLM_DIGEST", "a418f5838eaf")
 ENDPOINT = os.environ.get("OLM_ENDPOINT", "http://127.0.0.1:11434/api/generate")
 SEED = int(os.environ.get("OLM_SEED", "20260806"))
 NUM_PREDICT = int(os.environ.get("OLM_NPRED", "4096"))
-NUM_CTX = int(os.environ.get("OLM_NCTX", "16384"))
+NUM_CTX = int(os.environ.get("OLM_NCTX", "32768"))
 TIMEOUT = int(os.environ.get("OLM_TIMEOUT", "900"))
 KEEP_ALIVE = os.environ.get("OLM_KEEP_ALIVE", "5m")
+
+import socket as _socket  # noqa: E402
+
+_socket.setdefaulttimeout(max(60, TIMEOUT))  # belt-and-braces against half-open sockets
 
 PROMPT_FINGERPRINT_BODY = dict(
     sections=("SUBJECT", "GARMENTS", "HAIR", "SKIN", "POSE", "SETTING"),
@@ -67,7 +76,7 @@ PROMPT_FINGERPRINT_BODY = dict(
     scale_invariant_only=True,
     absolute_pixel_claims=False,
     single_adult_female_subject=True,
-    revival=1,
+    revival=2,
 )
 
 PROMPT = """You are the dense-description specialist for a single curated portrait photograph. The image below shows the FULL FRAME and three focal crops (face, upper body, lower body/garments) of the SAME photograph. Describe ONLY what is visible in these views of the photograph.
@@ -236,12 +245,17 @@ def _run_item(item: dict, out_dir: Path) -> dict:
 
     block = ""
     last_error = None
+    print(f"[start] {image_id} source={relative}", flush=True)
+    deadline = time.monotonic() + max(600, TIMEOUT) + 120
     for attempt in range(1, 4):
         try:
             block = _ollama_call(collage, PROMPT)
             break
         except Exception as exc:  # noqa: BLE001 - retry on transient host errors
             last_error = exc
+            print(f"[warn] {image_id} attempt {attempt} failed: {exc}", flush=True)
+            if time.monotonic() > deadline:
+                break
             time.sleep(4 + 2 * attempt)
     if not block:
         raise RuntimeError(f"ollama call failed for {image_id}: {last_error}")

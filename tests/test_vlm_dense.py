@@ -241,7 +241,7 @@ def test_vlm_dense_plan_builds_five_conditions(tmp_path: Path) -> None:
         "context-raw-vlm-dense",
     ]
     assert plan["vlm_blocks_sha256"]["fixture"] == _sha256(block.encode("utf-8"))
-    assert plan["vlm_model_digest"] == "ff2e46876908"
+    assert plan["vlm_model_digest"] == "a418f5838eaf"
     # The VLM marginal contrast is the one the tick must use explicitly.
     assert {
         "id": "vlm-marginal",

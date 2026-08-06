@@ -566,19 +566,23 @@ def _vlm_dense_evidence() -> dict[str, Any]:
         "id": "pre-generated-in-memory-vlm-dense-description-v1",
         "specialists": [
             {
-                "id": "local-qwen3-vl-32b-ollama-v1",
+                "id": "local-gemma3-27b-ollama-v1",
                 "scope": "Dense multi-view descriptive prose for a single curated woman source image (full-frame + seg2 focal crops: face, upper body, garment regions); claims tagged observed/inferred/abstained; scale-invariant ratios only in prose.",
                 "inputs": "Pre-generated per-item dense-description block (full frame + seg2-derived focal crops) verified byte-for-byte by the frozen plan's vlm_blocks_sha256; loaded from a noncanonical stage root, never from the derived tree.",
                 "output_semantics": "Structured markdown dense-description block with six subsections (SUBJECT/GARMENTS/HAIR/SKIN/POSE/SETTING); every factual statement tagged [OBSERVED]/[INFERRED]/[ABSTAIN]; no absolute pixel or raw-coordinate numbers in prose (scale-invariant ratios only); machine-readable measurements stay in evidence_payload.",
                 "provenance": (
-                    "Open-weight qwen3-vl:32b (Ollama digest ff2e46876908...) run on owned "
-                    "hardware (Strix, scheduler-managed) 2026-08-06 under an arm #47 capability "
-                    "probe + frozen batch; no hosted third-party inference of the sensitive "
-                    "corpus. Frozen prompt + deterministic crop policy; block bytes pinned by "
-                    "vlm_blocks_sha256 in the frozen comparison plan."
+                    "Open-weight gemma3:27b (Ollama digest a418f5838eaf...) run on owned "
+                    "hardware (Strix, scheduler-managed) 2026-08-06 under a frozen prompt + "
+                    "deterministic crop policy; no hosted third-party inference of the sensitive "
+                    "corpus. MODEL FLIP (2026-08-06): the pre-registered qwen3-vl:32b candidate "
+                    "FAILED qualification on the real corpus — silent empty responses on both "
+                    "vision and plain-text requests (server-side decode wedge, not restartable "
+                    "without root); gemma3:27b is the working already-local vision model, "
+                    "verified to emit the full tagged block on corpus items. Block bytes pinned "
+                    "by vlm_blocks_sha256 in the frozen comparison plan."
                 ),
-                "abstention_policy": "Claims are tagged [ABSTAIN] with a reason when a region lacks sufficient visible pixels (motion blur/occlusion/DOF); detector disagreement is a quality anomaly, never content; no absolute pixel claim in prose; a block that fails leakage/abstention checks is reported, never silently promoted to evidence.",
-                "known_failure_modes": "Learned VLM verbosity may over-specify visible attributes or drift from source truth on tight crops; abstention tagging can be sparser than warranted; a fixed 2x2 collage may underrepresent extreme crops; text is evidence, not a caption, and is only as trustworthy as the frozen prompt policy.",
+                "abstention_policy": "Claims are tagged [ABSTAIN] with a reason when a region lacks sufficient visible pixels (motion blur/occlusion/DOF); detector disagreement is a quality anomaly, never content; no absolute pixel claim in prose; a block that fails leakage/abstention checks or decodes empty is reported and abstains at generation, never silently promoted to evidence.",
+                "known_failure_modes": "Learned VLM verbosity may over-specify visible attributes or drift from source truth on tight crops; abstention tagging can be sparser than warranted; same-model-family coupling (gemma3:27b also drives caption generation) may make the evidence more decodable by the caption model — recorded as a caveat, mitigated by the gemma4:e4b independent reviewer; a fixed 2x2 collage may underrepresent extreme crops.",
                 "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
             }
         ],
@@ -1373,8 +1377,8 @@ def build_stage_b_plan(
             if not _SHA256_RE.fullmatch(block_sha):
                 raise StageBRunError(f"vlm_blocks_sha256[{item_id}] must be a lowercase SHA-256 digest")
         plan["vlm_blocks_sha256"] = dict(sorted((vlm_blocks_sha256 or {}).items()))
-        plan["vlm_model_digest"] = "ff2e46876908"
-        plan["vlm_prompt_fingerprint"] = "971ab584d9f2135c"
+        plan["vlm_model_digest"] = "a418f5838eaf"
+        plan["vlm_prompt_fingerprint"] = "2106b16cf26fd97457b8d399208262e02fc2f9bb4aa5c35bb9b6b9bdf26cbddf"
     plan["comparison_plan_fingerprint"] = _canonical_fingerprint(plan, "comparison_plan_fingerprint")
     try:
         validate_comparison_parity_plan(plan, program)
