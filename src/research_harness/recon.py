@@ -212,6 +212,26 @@ def build_frozen_plan(repo_root: Path, *, checkpoint_sha256: str, plan_id: str =
     }
 
 
+def clip_cosine(model: Any, processor: Any, image_a_path: Path, image_b_path: Path, device: str = "cpu") -> float:
+    """CLIP ViT-L/14 cosine similarity between two images.
+
+    Tolerance for transformers API drift: newer transformers return a
+    pooled output object from ``get_image_features`` instead of a tensor.
+    """
+    import torch
+    from PIL import Image
+
+    a = Image.open(image_a_path).convert("RGB")
+    b = Image.open(image_b_path).convert("RGB")
+    inputs = processor(images=[a, b], return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model.get_image_features(**inputs)
+        if not torch.is_tensor(out):
+            out = out.pooler_output  # newer transformers BaseModelOutputWithPooling
+        feats = out / out.norm(dim=-1, keepdim=True)
+        return float((feats[0] * feats[1]).sum().item())
+
+
 def aggregate_deltas(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate per-item paired similarities into the measured delta.
 

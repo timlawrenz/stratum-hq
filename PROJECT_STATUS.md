@@ -1,7 +1,31 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (arm #35 texture round-trip claim-support audit COMPLETE → **BETTER**; registry advanced; reconstruction #37 active)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm open (reconstruction #37).**
+**Last updated:** 2026-08-06 (arm #37 reconstruction round-trip COMPLETE → **BETTER**; registry advanced; vlm-dense-description #47 active)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm open (vlm-dense-description #47).**
+
+**Arm #37 RECONSTRUCTION ROUND-TRIP BETTER (2026-08-06, harness-computed, draft PR on
+`exp/stage-b-reconstruction-arm37-20260806`).** The generative reconstruction arm
+(pre-registered plan `stage-b-reconstruction-v1`: frozen 24-item pilot manifest, per-item
+`context4k.md` compact as variant prompt, fixed item-independent degraded baseline, per-item
+sha256 seeds, Juggernaut XL checkpoint sha256-pinned) generated 24×2 + 2 null images on the
+4090 via the scheduler (ComfyUI, 832×1216, dpmpp_2m/28 steps, `stratum-stage-b-reconstruction-v1`),
+then scored with CLIP ViT-L/14 (openai/clip-vit-large-patch14). `autonomous-tick --method
+reconstruction` computed **BETTER** — **reconstruction_delta +0.067888** (mean per-item
+CLIP similarity, context4k-generated vs source minus baseline-generated vs source), median
++0.075418, **22/24 paired positives**, null-case floor 0.5949 (the registered null prompt
+bounds the generic-person baseline). Registry advanced atomically: **reconstruction #37 →
+validated**, **vlm-dense-description #47 → active** (exploit, EIG 0.10, tie-broken by id,
+selection_progress 5). Run root `/mnt/nas-ai-models/research/stratum/stage-b-reconstruction-v1`
+(records.jsonl 50 rows, delta.json, run-provenance.json, outputs/ 50 PNGs).
+Incident recorded honestly in the run provenance: the scheduler claim was RELEASED AS FAILED
+at the CLIP step because the HF cache held only `config.json` for the pre-registered scorer
+(the model+processor were downloaded to `$HF_HOME` afterwards and scoring/aggregation completed
+in a separate CPU pass; the generated artifacts were complete and deterministic). Harness fix
+in the same PR: latent **one-active invariant bug** — a NOT_BETTER strike below the
+falsification limit left the struck arm active AND activated the next proposal (two
+`research:active` dims; next tick hard-failed). The strike path now keeps the arm sole-active
+(retry / brainstorm-on-stall), selection only after validate/falsify, with regression tests
+(`test_run_tick_not_better_strike_keeps_one_active`, `test_run_tick_third_strike_falsifies_then_activates_next`).
 
 **Arm #35 TEXTURE ROUND-TRIP BETTER (2026-08-06, harness-computed, PR #54).** The texture/material
 evidence kind (`research_harness.texture`, per-region-class fabric/skin surface+pattern bands from
@@ -84,27 +108,29 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   (garment-only gating abstained 13/24 on the topless-half cohort — per-class dominant-region fixed this;
   pooled-class means degenerated to a fake 11/11 "busy" — per-class normalization fixed this).
   Registry: #35 → validated, **#37 reconstruction → active** (explore slot).
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **8 validated** (body-type,
-  clothing, hair, skin-color, lighting, **dossier-context4k #36**, **setting #34**, **texture #35**),
-  **1 active (reconstruction #37 — sole `research:active`, selected via explore after the #35 tick,
-  EIG 0.10, novelty 0.15, selection_progress 4)**, **1 proposal (vlm-dense-description #47)**. Sweep not
-  exhausted, not stalled. The dependency frontier (vlm-dense-description) feeds the same goal.
-  Selector tie-break fixed (2026-08-06, id-tiebreaker regression test).
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **9 validated** (body-type,
+  clothing, hair, skin-color, lighting, **dossier-context4k #36**, **setting #34**, **texture #35**,
+  **reconstruction #37**), **1 active (vlm-dense-description #47 — sole `research:active`, selected via
+  exploit after the #37 tick, EIG 0.10, tie-broken by id, selection_progress 5)**, **0 proposals**. Sweep not
+  exhausted, not stalled; goal arm dossier-context4k validated (`goal_unreachable: false`, floor 4001,
+  gap 512). Selector tie-break fixed (2026-08-06, id-tiebreaker regression test).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
-  it 100% GPU ~9.6 tok/s, so Strix is the production batch host for any large-VLM arm.
+  it 100% GPU ~9.6 tok/s, so Strix is the production batch host for the newly-active VLM arm.
 
 ## Immediate next action
 
-**Arm #37 reconstruction is the sole `research:active` arm (selected via explore after the #35 tick,
-EIG 0.10, novelty 0.15, selection_progress 4).** This is a reconstruction-validation arm (ComfyUI
-round-trip + CLIP ViT-L/14 scoring) — not a caption-generation arm. Use the reconstruction method path
-(`autonomous-tick --method reconstruction --reconstruction-delta <D> --items 96`) once the delta is
-measured; the ComfyUI local instance at /mnt/fscache/essdee/ComfyUI is the reconstruction host. Run the
-reconstruction arm per its frozen plan; all runs additive/noncanonical, no corpus mutation, no backfill,
-no legacy overwrite. If the reconstruction delta measurement is not yet buildable (e.g. harness
-`--method reconstruction` flag not yet present), measure the honest delta and record it, then route.
+**Arm #47 vlm-dense-description is the sole `research:active` arm (selected via exploit after the #37
+tick, EIG 0.10, tie-broken by id, selection_progress 5).** This is the option-B dossier-growth evidence
+part: a locally-run open-weight VLM (`qwen3-vl:32b`, already installed; sourcing-verified 2026-08-06)
+producing a dense multi-view description block (full-frame + seg2 focal crops), tagged observed/inferred/
+abstained, scale-invariant prose. Per the verified placement: Strix (100GB usable, 100% GPU ~9.6 tok/s) is
+the production batch host for the 96-item pass (the 4090 at 27% CPU-offload is too slow). Strix jobs must
+run via `ssh:max395`; the 10GB evergreen Crawlr labeling reservation applies. Run the arm per its frozen
+plan; all runs additive/noncanonical, no corpus mutation, no backfill, no legacy overwrite. If parts of the
+augmented dossier pipeline (VLM evidence part → dossier growth toward the structural floor) are not yet
+buildable, record the instrumented gap and route.
 
 ## Live research tree
 
@@ -113,9 +139,9 @@ no legacy overwrite. If the reconstruction delta measurement is not yet buildabl
 - #4 is the baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
-- #29–#37 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, **#35** validated (all BETTER);
-  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**; **#37 reconstruction is the sole
-  `research:active` arm**; #47 is a proposal.
+- #29–#37 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, **#37** validated (all BETTER);
+  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**; **#47 vlm-dense-description is the sole
+  `research:active` arm** (0 proposals remain).
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -131,11 +157,13 @@ of the sensitive canonical corpus requires a hold.
 ## Headline result so far
 
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
-Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER.**
+Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
 claims on the frozen 24-item cohort under fixed view/prompt/model/settings. The **goal-arm round-trip is
 BETTER**: captions generated FROM the evidence-linked ≤4K compact context (supported 47→174,
-ratio 0.322→0.777, p=0.000244) beat the plain-4K summarization baseline. **Next: arm #37 reconstruction
-(sole `research:active`, explore slot, EIG 0.10).**
+ratio 0.322→0.777, p=0.000244) beat the plain-4K summarization baseline. **The generative reconstruction
+check is BETTER too** (non-LLM validation of the same compact context): context4k-generated images score
++0.0679 mean CLIP ViT-L/14 similarity over the degraded-baseline generations (22/24 paired positives).
+**Next: arm #47 vlm-dense-description (sole `research:active`, exploit slot, EIG 0.10).**

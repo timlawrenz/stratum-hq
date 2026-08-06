@@ -42,6 +42,7 @@ from .recon import (
     ReconError,
     build_frozen_plan,
     build_items,
+    clip_cosine,
     load_pilot_items,
 )
 
@@ -195,17 +196,7 @@ def load_clip_model(device: str = "cpu"):
 
 
 def clip_similarity(model: Any, processor: Any, image_a_path: Path, image_b_path: Path, device: str = "cpu") -> float:
-    import torch
-    from PIL import Image
-
-    a = Image.open(image_a_path).convert("RGB")
-    b = Image.open(image_b_path).convert("RGB")
-    inputs = processor(images=[a, b], return_tensors="pt").to(device)
-    with torch.no_grad():
-        feats = model.get_image_features(**inputs)
-        feats = feats / feats.norm(dim=-1, keepdim=True)
-        sim = float((feats[0] * feats[1]).sum().item())
-    return sim
+    return clip_cosine(model, processor, image_a_path, image_b_path, device)
 
 
 def run() -> int:
