@@ -289,6 +289,7 @@ def test_render_context4k_condition_emits_evidence_linked_compact(tmp_path: Path
         "skin-color-tone:v1",
         "lighting:v1",
         "setting-environment:v1",
+        "texture-material:v1",
         "relational-determinations:v1",
     ]
     for key in ("between_shoulders", "between_hips", "torso_length"):
