@@ -299,7 +299,7 @@
           ]
         }
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -334,7 +334,7 @@
         "claim-support",
         "roundtrip-audit"
       ],
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "feeds": [
         "dossier-context4k"
@@ -353,7 +353,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 4,
+  "selection_progress": 5,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -372,6 +372,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 3
+    },
+    {
+      "arm_id": "reconstruction",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 4
     }
   ]
 }

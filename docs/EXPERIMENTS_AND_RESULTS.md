@@ -2,6 +2,21 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #37 — generative reconstruction validation — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-06
+**Arm:** #37 — generative reconstruction validation (ComfyUI round-trip), non-LLM measure of the goal-arm context
+**Code / PR:** `exp/stage-b-reconstruction-arm37-20260806` (draft PR #55, branch from the arm-#35 lineage)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (same manifest as all prior arms)
+**Pre-registered plan:** `research/stage-b-plans/stage-b-reconstruction-v1.json` (status `preregistered`, written BEFORE generation) — variant prompt = per-item `dossier-context4k-v2/<id>/context4k.md` compact verbatim; baseline prompt = fixed item-independent degraded text (no context), identical across items; null calibration = meaningless tokens, 2 images; per-item seed = sha256(image_id) truncated, SAME across conditions; checkpoint Juggernaut XL (`Juggernaut_XL_v1759168.safetensors`, sha256 pinned `dd08fa32…`), dpmpp_2m/karras, 28 steps, cfg 7.0, 832×1216, negative prompt empty; scorer pre-registered `openai/clip-vit-large-patch14` (ViT-L/14, CLIPProcessor 224 center-crop, cosine of [CLS]).
+**Run:** `stratum-stage-b-reconstruction-v1` on the 4090 via the scheduler (request → poll claim → ComfyUI boot → VRAM verify → activate → heartbeat → generate 24×2+2 → release). 50/50 images generated and preserved under `/mnt/nas-ai-models/research/stratum/stage-b-reconstruction-v1/outputs/`.
+**Verdict (harness-computed `autonomous-tick --method reconstruction`):** **BETTER** — `reconstruction_delta = +0.067888` (mean per-item CLIP ViT-L/14 similarity: context4k-generated vs source minus baseline-generated vs source), median +0.075418, **paired positive 22/24** (2 negative, 0 ties), items 24. Null-case floor (meaningless prompt) = 0.5949 — the registered null bounds the generic-person similarity. `BETTER iff delta > 0` per the pre-registered rule.
+**Registry advance:** reconstruction `active → validated` (0 strikes); selector next → **vlm-dense-description #47** (active, exploit, EIG 0.10, tie-broken by id, selection_progress 5).
+**Incident (recorded honestly in run-provenance.json):** the scheduler claim was released with status `failed` because the CLIP image processor could not load — the HF cache held only `config.json` for the pre-registered scorer. The generated artifacts were complete and deterministic; the model+processor were then downloaded to `$HF_HOME` (`/mnt/nas-ai-models/huggingface-cache`, authorized open-weight download to owned hardware) and scoring/aggregation were completed in a separate CPU pass (`research_harness.recon_score`), which wrote `delta.json`/`records.jsonl`/`run-provenance.json` (50 rows) into the same run root. No measured number depends on the incident; it is a lifecycle transparency note. Future runs preflight the scorer before claiming.
+**Harness fix in the same PR (latent one-active invariant bug):** a NOT_BETTER verdict below the falsification limit left the struck arm `active` AND then activated the next proposal — two `research:active` dims (the next tick hard-failed with "more than one research:active arm"). `run_tick` now keeps the struck arm the sole active one (retry; brainstorm-on-stall if the sweep is stalled) and selects the next arm only after `validate`/`falsify`. Regression tests: `test_run_tick_not_better_strike_keeps_one_active`, `test_run_tick_third_strike_falsifies_then_activates_next`.
+**Boundaries respected:** local models only; read-only canonical sources; outputs only under `/mnt/nas-ai-models/research/stratum`; scheduler-managed GPU; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; scale-invariant scoring (CLIP cosine is framing-agnostic and no pixel values are quoted as evidence).
+**Validation:** 516 pytest passed; `validate-program` valid; `validate-dimension-registry` valid. Verdict BETTER is empirical on this 24-item frozen cohort under the frozen checkpoint/sampler; a formal PASS still awaits the advisory human rubric + reconstruction-protocol spot-check.
+
 ## Arm #34 — setting/environment evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-06
