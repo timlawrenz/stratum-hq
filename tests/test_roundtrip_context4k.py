@@ -281,6 +281,7 @@ def test_render_context4k_condition_emits_evidence_linked_compact(tmp_path: Path
     # Evidence-linked compact: claims carry their evidence ids, no absolute pixels.
     payload = roundtrip_record["evidence_payload"]
     assert payload["compact_claim_count"] >= 1
+    assert payload["expanded_dossier_token_count"] >= payload["base_dossier_token_count"]
     assert payload["dossier_evidence_ids"] == [
         "body-type-proportions:v1",
         "clothing-apparel:v1",

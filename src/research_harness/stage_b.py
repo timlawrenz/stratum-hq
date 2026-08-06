@@ -35,9 +35,11 @@ from stratum2.pipeline.determinations import derive_determinations
 
 from .dossier import (
     assemble_dossier,
+    build_evidence_payload,
     compress_dossier_to_context,
     context4k_text,
 )
+from .dossier_expand import expand_dossier
 
 from .contracts import ContractError, validate_comparison_parity_plan, validate_program
 from .clothing import ClothingError, compute_clothing
@@ -1308,15 +1310,32 @@ def _render_condition(
             lighting=lighting,
             determinations=prepared["determinations"],
         )
-        compact = compress_dossier_to_context(dossier)
+        payload = build_evidence_payload(
+            image_id=item["image_id"],
+            proportions=prepared["proportions"],
+            clothing=prepared["clothing"],
+            hair=prepared["hair"],
+            skin=prepared["skin_tone"],
+            lighting=lighting,
+            determinations=prepared["determinations"],
+            source_sha256=prepared.get("source_sha256"),
+        )
+        # Honest evidence-bound expansion (provenance lines + payload-bound
+        # detail, never fabricated) then deterministic compression to <=4K.
+        try:
+            expanded = expand_dossier(dossier, payload)
+        except Exception as exc:  # noqa: BLE001 - honesty gate failures must fail closed
+            raise StageBRunError(f"context4k honest expansion failed for {item['image_id']}: {exc}") from exc
+        compact = compress_dossier_to_context(expanded["expanded_dossier"])
         evidence_text = context4k_text(compact["claims"])
         meta = {
             "compact_token_count": compact["token_count"],
             "compact_under_budget": compact["under_budget"],
             "compact_claim_count": len(compact["claims"]),
             "excluded_claim_count": compact["excluded_claim_count"],
-            "dossier_token_count": dossier["token_count"],
-            "dossier_evidence_ids": dossier["evidence_ids"],
+            "expanded_dossier_token_count": expanded["token_count"],
+            "base_dossier_token_count": expanded["base_token_count"],
+            "dossier_evidence_ids": expanded["evidence_ids"],
         }
         return raw.copy(), _context_prompt(evidence_text), meta
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
