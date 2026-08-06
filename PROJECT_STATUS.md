@@ -123,13 +123,17 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 **Arm #47 vlm-dense-description is the sole `research:active` arm (selected via exploit after the #37
 tick, EIG 0.10, tie-broken by id, selection_progress 5).** This is the option-B dossier-growth evidence
-part: a locally-run open-weight VLM (`qwen3-vl:32b`, already installed; sourcing-verified 2026-08-06)
-producing a dense multi-view description block (full-frame + seg2 focal crops), tagged observed/inferred/
-abstained, scale-invariant prose. Per the verified placement: Strix (100GB usable, 100% GPU ~9.6 tok/s) is
-the production batch host for the 96-item pass (the 4090 at 27% CPU-offload is too slow). Strix jobs must
-run via `ssh:max395`; the 10GB evergreen Crawlr labeling reservation applies. Run the arm per its frozen
-plan; all runs additive/noncanonical, no corpus mutation, no backfill, no legacy overwrite. If parts of the
-augmented dossier pipeline (VLM evidence part → dossier growth toward the structural floor) are not yet
+part: an open-weight VLM (`qwen3-vl:32b`, already installed; sourcing-verified 2026-08-06) producing a
+dense multi-view description block (full-frame + seg2 focal crops), tagged observed/inferred/abstained,
+scale-invariant prose; the block is blended with the deterministic dossier compact as the evidence for a
+5-condition claim-support round-trip (baseline `context-raw-context4k`, variant `context-raw-vlm-dense`);
+the verdict isolates the VLM marginal via `autonomous-tick --baseline-condition/--evidence-condition`.
+**Harness surface LANDED 2026-08-06 (draft PR #57):** `vlm-dense` evidence kind + explicit-conditions
+tick + Strix block-batch generator/scheduler + CPU freezer, tests 525 passed. **Block batch RUNNING on
+Strix** (scheduler claim `stratum-vlm-dense-blocks-v1`, stage `/mnt/nas-ai-models/research/stratum/stage-b-vlm-dense-v1/`).
+**Next:** once `vlm-done.json` is published → freeze plan/manifest → 4090 caption generation (120 records,
+`stage-b-vlm-dense-captions-v1`) → independent review (120 rows) → tick. All runs additive/noncanonical,
+no corpus mutation, no backfill, no legacy overwrite. If parts of the augmented dossier pipeline are not
 buildable, record the instrumented gap and route.
 
 ## Live research tree
