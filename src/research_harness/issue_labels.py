@@ -9,6 +9,7 @@ issue.
 State label mapping:
   proposal   -> research:proposal
   active     -> research:active
+  blocked    -> research:needs-human  (gate is a policy/authority decision)
   validated  -> research:validated
   falsified  -> research:postmortem
   exhausted  -> research:postmortem
@@ -35,6 +36,7 @@ STATE_LABELS: set[str] = {
 _STATE_TO_LABEL: dict[str, str] = {
     "proposal": "research:proposal",
     "active": "research:active",
+    "blocked": "research:needs-human",
     "validated": "research:validated",
     "falsified": "research:postmortem",
     "exhausted": "research:postmortem",

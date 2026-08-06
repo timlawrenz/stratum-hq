@@ -28,6 +28,7 @@ from typing import Any, Mapping
 
 from .dimension_registry import (
     BRAINSTORM_OPTIONS,
+    reachable_blocked,
     validate_registry,
     validated_evidence_parts,
 )
@@ -144,6 +145,75 @@ def _exploration_config(registry: Mapping[str, Any]) -> tuple[int, float]:
             float(bonus) if isinstance(bonus, (int, float)) and not isinstance(bonus, bool) else 0.0)
 
 
+def _downstream_config(registry: Mapping[str, Any]) -> tuple[bool, float]:
+    """sweep_terms.downstream_boost = {enabled, fraction}: dependency-graph
+    weighting (#2). Returns (enabled, fraction)."""
+    sweep = registry.get("sweep_terms", {})
+    cfg = sweep.get("downstream_boost") if isinstance(sweep, Mapping) else None
+    if not isinstance(cfg, Mapping):
+        return False, 0.0
+    enabled = cfg.get("enabled", False)
+    fraction = cfg.get("fraction", 0.5)
+    if not isinstance(fraction, (int, float)) or isinstance(fraction, bool):
+        fraction = 0.0
+    # `enabled` gates the weight: disabled means zero downstream value.
+    return bool(enabled), float(fraction) if enabled else 0.0
+
+
+def _downstream_boost_for(
+    registry: Mapping[str, Any],
+    dim: Mapping[str, Any],
+    established_parts: set[str],
+    established_models: set[str],
+    novelty_bonus: float,
+    fraction: float,
+) -> float:
+    """Downstream-value boost (#2): an arm whose evidence feeds/unblocks a
+    blocked arm earns `fraction * value(blocked_arm)` per reachable blocked
+    arm. This lets the selector choose the globally-useful move (growing the
+    evidence supply toward the goal) instead of the locally-highest one, while
+    the blocked goal arm sits non-actionable waiting on a human ruling."""
+    if fraction <= 0.0:
+        return 0.0
+    dims = {d["id"]: d for d in registry["dimensions"]}
+    total = 0.0
+    for bid in reachable_blocked(registry, dim["id"]):
+        bdim = dims.get(bid)
+        if bdim is None:
+            continue
+        total += fraction * _eig_with_novelty(
+            bdim, established_parts, established_models, novelty_bonus
+        )[0]
+    return total
+
+
+def _score_dim(
+    registry: Mapping[str, Any],
+    dim: Mapping[str, Any],
+    established_parts: set[str],
+    established_models: set[str],
+    novelty_bonus: float,
+    downstream_fraction: float,
+) -> tuple[float, float, float]:
+    """Full selector score = base EIG + novelty bonus + downstream-value boost.
+
+    Returns (value, novelty_applied, downstream_applied) — deterministic and
+    consistent across the exploit path, the explore path and stall detection.
+    """
+    value, novel, applied = _eig_with_novelty(
+        dim, established_parts, established_models, novelty_bonus
+    )
+    downstream = (
+        _downstream_boost_for(
+            registry, dim, established_parts, established_models,
+            novelty_bonus, downstream_fraction,
+        )
+        if downstream_fraction > 0.0
+        else 0.0
+    )
+    return value + downstream, applied, downstream
+
+
 def select_next_arm(
     registry: Mapping[str, Any],
     *,
@@ -171,6 +241,7 @@ def select_next_arm(
         raise AutonomousError("no actionable proposal — registry is terminal; run brainstorm-new-data")
 
     every_n, novelty_bonus = _exploration_config(registry)
+    _, downstream_fraction = _downstream_config(registry)
     index = (
         int(registry.get("selection_progress", 0))
         if at_selection_index is None
@@ -180,13 +251,17 @@ def select_next_arm(
     established_parts = validated_evidence_parts(registry)
     established_models = _established_models(registry)
 
-    def _score(dim: Mapping[str, Any]) -> tuple[float, bool, float]:
-        return _eig_with_novelty(dim, established_parts, established_models, novelty_bonus)
+    def _score(dim: Mapping[str, Any]) -> tuple[float, float, float]:
+        # (value, novelty_applied, downstream_applied)
+        return _score_dim(
+            registry, dim, established_parts, established_models,
+            novelty_bonus, downstream_fraction,
+        )
 
     if exploration_slot:
         # Force the highest-uncertainty (lowest-prior) actionable proposal.
         chosen = min(actionable, key=lambda d: (_prior_number(d), d["id"]))
-        value, novel, applied = _score(chosen)
+        value, applied, downstream = _score(chosen)
         return {
             "id": chosen["id"],
             "name": chosen["name"],
@@ -198,10 +273,12 @@ def select_next_arm(
             "selected_via": "explore",
             "exploration_slot": True,
             "novelty_bonus_applied": round(applied, 4),
+            "downstream_boost_applied": round(downstream, 4),
             "all_scores": [
                 {"id": d["id"],
                  "expected_information_gain": round(_score(d)[0], 4),
-                 "novelty_bonus_applied": round(_score(d)[2], 4)}
+                 "novelty_bonus_applied": round(_score(d)[1], 4),
+                 "downstream_boost_applied": round(_score(d)[2], 4)}
                 for d in sorted(actionable, key=lambda d: (_score(d)[0], d["id"]), reverse=True)
             ],
         }
@@ -210,7 +287,7 @@ def select_next_arm(
         ((_score(d), d) for d in actionable),
         key=lambda t: (t[0], t[1]["id"]),  # deterministic: ties broken by id, never compare dicts
     )
-    (value, novel, applied), chosen = scored[-1]
+    (value, applied, downstream), chosen = scored[-1]
     chosen_id = chosen["id"]
     return {
         "id": chosen_id,
@@ -223,26 +300,32 @@ def select_next_arm(
         "selected_via": "exploit",
         "exploration_slot": False,
         "novelty_bonus_applied": round(applied, 4),
+        "downstream_boost_applied": round(downstream, 4),
         "all_scores": [
             {"id": d["id"],
              "expected_information_gain": round(_score(d)[0], 4),
-             "novelty_bonus_applied": round(_score(d)[2], 4)}
+             "novelty_bonus_applied": round(_score(d)[1], 4),
+             "downstream_boost_applied": round(_score(d)[2], 4)}
             for (s, d) in sorted(scored, key=lambda t: (t[0][0], t[1]["id"]), reverse=True)
         ],
     }
 
 
 def _top_actionable_eig(registry: Mapping[str, Any]) -> float:
-    """Best (novelty-adjusted) EIG among actionable proposals — used by the
-    selector-top-score-below stall trigger."""
+    """Best (novelty+downstream-adjusted) EIG among actionable proposals — used
+    by the selector-top-score-below stall trigger."""
     every_n, novelty_bonus = _exploration_config(registry)
+    _, downstream_fraction = _downstream_config(registry)
     established_parts = validated_evidence_parts(registry)
     established_models = _established_models(registry)
     best = 0.0
     for d in registry.get("dimensions", []):
         if d.get("state") not in ACTIONABLE:
             continue
-        value = _eig_with_novelty(d, established_parts, established_models, novelty_bonus)[0]
+        value = _score_dim(
+            registry, d, established_parts, established_models,
+            novelty_bonus, downstream_fraction,
+        )[0]
         best = max(best, value)
     return best
 
