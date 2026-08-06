@@ -33,6 +33,14 @@ from stratum.pipeline.caption import ensure_single_paragraph
 from stratum2.pipeline.caption2 import CAPTION2_PROMPT_TEMPLATE, build_prompt
 from stratum2.pipeline.determinations import derive_determinations
 
+from .dossier import (
+    assemble_dossier,
+    build_evidence_payload,
+    compress_dossier_to_context,
+    context4k_text,
+)
+from .dossier_expand import expand_dossier
+
 from .contracts import ContractError, validate_comparison_parity_plan, validate_program
 from .clothing import ClothingError, compute_clothing
 from .proportions import ProportionError, compute_proportions
@@ -501,6 +509,43 @@ def _lighting_evidence() -> dict[str, Any]:
     return evidence
 
 
+def _context4k_evidence() -> dict[str, Any]:
+    """Declared deterministic context4k compact specialist (arm #36 round-trip).
+
+    The evidence is the per-item evidence-linked compact context (the ≤4K
+    dossier compression: claim-by-claim prose where every claim carries its
+    supporting evidence ids), assembled deterministically in memory from the
+    frozen selected inputs — the same five validated dimension specialists
+    plus relational determinations that the dossier runner uses. This is the
+    round-trip claim-support audit's evidence condition: captions are generated
+    FROM the compact context and compared against the matched plain-4K
+    summarization baseline.
+    """
+    module_path = Path(assemble_dossier.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-context4k-compact-v1",
+        "specialists": [
+            {
+                "id": "in-memory-context4k-compact-v1",
+                "scope": "Per-item evidence-linked compact context (≤4K dossier compression) assembled from the five validated deterministic dimension specialists plus relational determinations; never identity, posture labels, or new facts beyond the evidence supply.",
+                "inputs": "Frozen selected-item pose2.npy, seg2.npy, normal2.npy and the source RGB pixels already decoded by this bounded run; dossier assembled and compressed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing compact claims where every claim carries its supporting evidence ids (deterministic, evidence-bound), not semantic ground truth or caption claims; absolute pixel measurements stay in the machine-readable evidence payload and are never verbalized.",
+                "provenance": (
+                    "research_harness.dossier.assemble_dossier + compress_dossier_to_context "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; an abstained measurement remains an honest abstention line and is never rescued into an invented value; the compact is never padded with fabricated filler to reach a budget; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "The compact is only as rich as the deterministic evidence supply (387-648 dossier tokens/item on the frozen cohort, under the 4001 structural floor — recorded honestly as under_budget); absolute pixel widths and raw luminances are excluded by design; a truncated last claim records its truncation rather than silently dropping the evidence link.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
 def _serialize_lighting(lighting: Mapping[str, Any]) -> str:
     """Deterministic natural-language rendering of a lighting measurement dict.
 
@@ -615,6 +660,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "hair": ("pose2.npy", "seg2.npy"),
     "skin-color": ("pose2.npy", "seg2.npy"),
     "lighting": ("seg2.npy", "normal2.npy"),
+    "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
 }
 
 
@@ -692,7 +738,9 @@ def build_stage_b_plan(
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
-    if evidence_kind not in ("geometry", "body-type", "clothing", "hair", "skin-color", "lighting"):
+    if evidence_kind not in (
+        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "context4k"
+    ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
         validate_program(program)
@@ -837,6 +885,31 @@ def build_stage_b_plan(
             "source pixels only (presence requires a raw-pixel floor and a foreground-coverage gate; the direction fit "
             "additionally requires sufficient valid camera-facing normals, otherwise it abstains). Only scale-invariant "
             "facts are verbalized; absolute luma/normal values stay in evidence_payload."
+        )
+    elif evidence_kind == "context4k":
+        evidence = _context4k_evidence()
+        evidence_condition_id = "context-raw-context4k"
+        comparison_plan_id = "stage-b-roundtrip-context4k-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, captions generated FROM the evidence-linked <=4K compact "
+            "context (the deterministic dossier compressed claim-by-claim with every claim carrying its supporting evidence "
+            "ids) may improve supported description claims without increasing unsupported claims versus the matched "
+            "plain-4K summarization baseline when the source item, view, prompt template, local model, and generation "
+            "settings are controlled."
+        )
+        falsified_if = (
+            "The context4k evidence condition does not improve the pre-registered claim-support rubric over its matched "
+            "no-specialist condition, or an apparent difference is attributable to an uncontrolled view, prompt, "
+            "aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files and pointmap "
+            "are not used as evidence inputs. The compact context is assembled deterministically in memory from the frozen "
+            "selected pose2+seg2+normal2 and the already-decoded source pixels (the five validated dimension specialists "
+            "plus relational determinations), then compressed to the <=4K budget claim-by-claim with evidence ids retained; "
+            "an under-budget compact is recorded honestly (the deterministic corpus is 387-648 dossier tokens/item) and is "
+            "never padded with fabricated filler. Only scale-invariant facts are verbalized; absolute pixel measurements "
+            "stay in the machine-readable evidence payload."
         )
     else:
         evidence = _geometry_evidence()
@@ -1005,6 +1078,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "skin-color"
     elif "context-raw-lighting" in condition_ids:
         rebuild_kind = "lighting"
+    elif "context-raw-context4k" in condition_ids:
+        rebuild_kind = "context4k"
     else:
         rebuild_kind = "geometry"
     rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
@@ -1221,6 +1296,48 @@ def _render_condition(
         lighting = prepared["lighting"]
         evidence_text = _serialize_lighting(lighting)
         return raw.copy(), _context_prompt(evidence_text), lighting
+    if condition_id == "context-raw-context4k":
+        item = prepared["item"]
+        lighting = prepared["lighting"]
+        if lighting is None:
+            lighting = {"lighting_measurable": False, "abstention_reason": "normal2.npy unavailable for this item"}
+        dossier = assemble_dossier(
+            image_id=item["image_id"],
+            proportions=prepared["proportions"],
+            clothing=prepared["clothing"],
+            hair=prepared["hair"],
+            skin=prepared["skin_tone"],
+            lighting=lighting,
+            determinations=prepared["determinations"],
+        )
+        payload = build_evidence_payload(
+            image_id=item["image_id"],
+            proportions=prepared["proportions"],
+            clothing=prepared["clothing"],
+            hair=prepared["hair"],
+            skin=prepared["skin_tone"],
+            lighting=lighting,
+            determinations=prepared["determinations"],
+            source_sha256=prepared.get("source_sha256"),
+        )
+        # Honest evidence-bound expansion (provenance lines + payload-bound
+        # detail, never fabricated) then deterministic compression to <=4K.
+        try:
+            expanded = expand_dossier(dossier, payload)
+        except Exception as exc:  # noqa: BLE001 - honesty gate failures must fail closed
+            raise StageBRunError(f"context4k honest expansion failed for {item['image_id']}: {exc}") from exc
+        compact = compress_dossier_to_context(expanded["expanded_dossier"])
+        evidence_text = context4k_text(compact["claims"])
+        meta = {
+            "compact_token_count": compact["token_count"],
+            "compact_under_budget": compact["under_budget"],
+            "compact_claim_count": len(compact["claims"]),
+            "excluded_claim_count": compact["excluded_claim_count"],
+            "expanded_dossier_token_count": expanded["token_count"],
+            "base_dossier_token_count": expanded["base_token_count"],
+            "dossier_evidence_ids": expanded["evidence_ids"],
+        }
+        return raw.copy(), _context_prompt(evidence_text), meta
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 

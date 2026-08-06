@@ -160,7 +160,7 @@
       "id": "setting",
       "name": "setting/environment",
       "arm_issue": 34,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "Declared background palette/non-subject statistics improve scene-environment claim support.",
       "falsified_if": "Setting evidence does not improve supported scene claims or reduce invented background details.",
@@ -221,7 +221,7 @@
       "id": "dossier-context4k",
       "name": "full-dossier assembly and context4k compression",
       "arm_issue": 36,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "An expanded per-item dossier assembled from verified evidence dimensions (target >=100K tokens, claim-by-claim evidence links) can be compressed to a ~4K-token context4k artifact that preserves supported claims better than a plain 4K summarization baseline.",
       "falsified_if": "context4k does not preserve supported claims at materially higher density than a 4K baseline summarization (round-trip claim-support audit not passed).",
@@ -353,5 +353,13 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 1
+  "selection_progress": 2,
+  "conclusion_history": [
+    {
+      "arm_id": "dossier-context4k",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 1
+    }
+  ]
 }
