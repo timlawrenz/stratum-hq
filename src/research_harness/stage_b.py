@@ -548,6 +548,58 @@ def _context4k_evidence() -> dict[str, Any]:
     return evidence
 
 
+def _vlm_dense_evidence() -> dict[str, Any]:
+    """Declared learned VLM dense-description specialist (arm #47).
+
+    The evidence is the per-item dense multi-view description block emitted by a
+    locally-run open-weight VLM (qwen3-vl:32b via Ollama) over the full frame +
+    seg2-derived focal crops of the single curated woman source image. The block
+    itself is NOT recomputed in-memory: it is pre-generated under a frozen
+    prompt/crop policy on owned hardware (Strix, via the scheduler) and its bytes
+    are bound in the frozen plan by `vlm_blocks_sha256` per item. The caption
+    runner loads, verifies, and renders the block as part of the evidence text —
+    this is the dossier-grow (option B) evidence part that extends the
+    deterministic dossier compact toward the expanded-dossier structural floor.
+    """
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "pre-generated-in-memory-vlm-dense-description-v1",
+        "specialists": [
+            {
+                "id": "local-qwen3-vl-32b-ollama-v1",
+                "scope": "Dense multi-view descriptive prose for a single curated woman source image (full-frame + seg2 focal crops: face, upper body, garment regions); claims tagged observed/inferred/abstained; scale-invariant ratios only in prose.",
+                "inputs": "Pre-generated per-item dense-description block (full frame + seg2-derived focal crops) verified byte-for-byte by the frozen plan's vlm_blocks_sha256; loaded from a noncanonical stage root, never from the derived tree.",
+                "output_semantics": "Structured markdown dense-description block with six subsections (SUBJECT/GARMENTS/HAIR/SKIN/POSE/SETTING); every factual statement tagged [OBSERVED]/[INFERRED]/[ABSTAIN]; no absolute pixel or raw-coordinate numbers in prose (scale-invariant ratios only); machine-readable measurements stay in evidence_payload.",
+                "provenance": (
+                    "Open-weight qwen3-vl:32b (Ollama digest ff2e46876908...) run on owned "
+                    "hardware (Strix, scheduler-managed) 2026-08-06 under an arm #47 capability "
+                    "probe + frozen batch; no hosted third-party inference of the sensitive "
+                    "corpus. Frozen prompt + deterministic crop policy; block bytes pinned by "
+                    "vlm_blocks_sha256 in the frozen comparison plan."
+                ),
+                "abstention_policy": "Claims are tagged [ABSTAIN] with a reason when a region lacks sufficient visible pixels (motion blur/occlusion/DOF); detector disagreement is a quality anomaly, never content; no absolute pixel claim in prose; a block that fails leakage/abstention checks is reported, never silently promoted to evidence.",
+                "known_failure_modes": "Learned VLM verbosity may over-specify visible attributes or drift from source truth on tight crops; abstention tagging can be sparser than warranted; a fixed 2x2 collage may underrepresent extreme crops; text is evidence, not a caption, and is only as trustworthy as the frozen prompt policy.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_vlm_dense(block_text: str) -> str:
+    """Render the frozen VLM dense-description block as caption evidence text."""
+    header = (
+        "VLM DENSE DESCRIPTION (learned multi-view evidence block, qwen3-vl:32b, "
+        "full frame + focal crops; claims tagged [OBSERVED]/[INFERRED]/[ABSTAIN]; "
+        "the model abstains rather than invents on low-detail regions):"
+    )
+    block = block_text.strip() if block_text else ""
+    if not block:
+        return header + "\n- (no VLM dense block available for this item — abstain from VLM-derived claims)"
+    return header + "\n" + block
+
+
 def _serialize_lighting(lighting: Mapping[str, Any]) -> str:
     """Deterministic natural-language rendering of a lighting measurement dict.
 
@@ -806,6 +858,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "setting": ("seg2.npy",),
     "texture": ("seg2.npy",),
     "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
+    "vlm-dense": ("pose2.npy", "seg2.npy", "normal2.npy"),
 }
 
 
@@ -854,9 +907,11 @@ def freeze_stage_b_plan(
     settings: StageBGenerationSettings,
     *,
     evidence_kind: str = "geometry",
+    vlm_blocks_sha256: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Bind the exact selected geometry-input bytes before any model execution."""
-    plan = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=evidence_kind)
+    plan = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=evidence_kind,
+                              vlm_blocks_sha256=vlm_blocks_sha256)
     items = _candidate_items(candidate_manifest, program)
     plan["evidence_input_artifact_sha256"] = _freeze_evidence_input_artifact_hashes(
         candidate_manifest, program, items, evidence_kind=evidence_kind
@@ -875,6 +930,7 @@ def build_stage_b_plan(
     settings: StageBGenerationSettings,
     *,
     evidence_kind: str = "geometry",
+    vlm_blocks_sha256: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build a fully pinned four-condition comparison plan without inference.
 
@@ -882,9 +938,18 @@ def build_stage_b_plan(
     the evidence-only condition: ``"geometry"`` (arm #4 default, pose2+seg2
     determinations) or ``"body-type"`` (arm #32, pose2 proportions). The default
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
+
+    ``"vlm-dense"`` (arm #47) builds a FIVE-condition plan: the three neutral
+    controls, the deterministic dossier compact condition
+    (``context-raw-context4k``) as the matched baseline, and the variant
+    (``context-raw-vlm-dense``) that blends the deterministic compact with the
+    pre-generated VLM dense-description block. The per-item block bytes are
+    pinned by `vlm_blocks_sha256` (required for this kind), so the plan binds
+    the exact learned evidence the caption runner renders.
     """
     if evidence_kind not in (
-        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k"
+        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
+        "vlm-dense",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1107,6 +1172,38 @@ def build_stage_b_plan(
             "never padded with fabricated filler. Only scale-invariant facts are verbalized; absolute pixel measurements "
             "stay in the machine-readable evidence payload."
         )
+    elif evidence_kind == "vlm-dense":
+        if vlm_blocks_sha256 is None:
+            raise StageBRunError("vlm-dense evidence_kind requires vlm_blocks_sha256")
+        evidence = _vlm_dense_evidence()
+        evidence_condition_id = "context-raw-vlm-dense"
+        comparison_plan_id = "stage-b-vlm-dense-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, adding the pre-generated open-weight "
+            "VLM dense multi-view description block (qwen3-vl:32b, full frame + seg2 focal crops, "
+            "tagged observed/inferred/abstained, scale-invariant prose) to the deterministic dossier "
+            "compact may materially raise supported description claims beyond the deterministic dossier "
+            "alone (option-B evidence growth toward the expanded-dossier floor) without increasing "
+            "unsupported or contradictory claims when the source item, view, prompt template, local "
+            "model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The VLM dense-description evidence condition does not improve the pre-registered "
+            "claim-support rubric over its matched deterministic-dossier compact condition (the "
+            "vlm-marginal contrast), or an apparent difference is attributable to an uncontrolled "
+            "view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs. The deterministic dossier compact is "
+            "assembled in memory from the frozen pose2+seg2+normal2 and source pixels (the validated "
+            "deterministic dimensions) exactly as the arm-36 round-trip condition. The variant blends "
+            "that compact with the pre-generated VLM dense block (pinned byte-for-byte by "
+            "vlm_blocks_sha256; block provenance: qwen3-vl:32b via local Ollama on Strix under the "
+            "scheduler, noncanonical stage root). Only scale-invariant facts are verbalized; absolute "
+            "pixel measurements stay in evidence_payload; the <=4K compact ceiling governs the compact "
+            "artifact itself, while the evidence text tested here is the expanded dossier record."
+        )
     else:
         evidence = _geometry_evidence()
         evidence_condition_id = "context-raw-geometry"
@@ -1184,9 +1281,40 @@ def build_stage_b_plan(
             condition("legacy-bucketed-no-evidence", legacy_view, legacy_prompt, no_evidence),
             condition("legacy-raw-no-evidence", raw_view, legacy_prompt, no_evidence),
             condition("context-raw-no-evidence", raw_view, context_prompt, no_evidence),
+            condition("context-raw-context4k", raw_view, context_prompt, _context4k_evidence()),
+            condition(evidence_condition_id, raw_view, context_prompt, evidence),
+        ] if evidence_kind == "vlm-dense" else [
+            condition("legacy-bucketed-no-evidence", legacy_view, legacy_prompt, no_evidence),
+            condition("legacy-raw-no-evidence", raw_view, legacy_prompt, no_evidence),
+            condition("context-raw-no-evidence", raw_view, context_prompt, no_evidence),
             condition(evidence_condition_id, raw_view, context_prompt, evidence),
         ],
         "contrasts": [
+            {
+                "id": "input-view-only",
+                "baseline_condition": "legacy-bucketed-no-evidence",
+                "variant_condition": "legacy-raw-no-evidence",
+                "changed_axes": ["input_view"],
+            },
+            {
+                "id": "prompt-only",
+                "baseline_condition": "legacy-raw-no-evidence",
+                "variant_condition": "context-raw-no-evidence",
+                "changed_axes": ["prompt"],
+            },
+            {
+                "id": "evidence-only",
+                "baseline_condition": "context-raw-no-evidence",
+                "variant_condition": "context-raw-context4k",
+                "changed_axes": ["evidence"],
+            },
+            {
+                "id": "vlm-marginal",
+                "baseline_condition": "context-raw-context4k",
+                "variant_condition": evidence_condition_id,
+                "changed_axes": ["evidence"],
+            },
+        ] if evidence_kind == "vlm-dense" else [
             {
                 "id": "input-view-only",
                 "baseline_condition": "legacy-bucketed-no-evidence",
@@ -1237,6 +1365,16 @@ def build_stage_b_plan(
             "no_silent_legacy_routing": True,
         },
     }
+    if evidence_kind == "vlm-dense":
+        item_ids = {_safe_output_segment(item.get("image_id"), "candidate item image_id") for item in items}
+        if set(vlm_blocks_sha256 or {}) != item_ids:
+            raise StageBRunError("vlm_blocks_sha256 must cover exactly the frozen items")
+        for item_id, block_sha in (vlm_blocks_sha256 or {}).items():
+            if not _SHA256_RE.fullmatch(block_sha):
+                raise StageBRunError(f"vlm_blocks_sha256[{item_id}] must be a lowercase SHA-256 digest")
+        plan["vlm_blocks_sha256"] = dict(sorted((vlm_blocks_sha256 or {}).items()))
+        plan["vlm_model_digest"] = "ff2e46876908"
+        plan["vlm_prompt_fingerprint"] = "971ab584d9f2135c"
     plan["comparison_plan_fingerprint"] = _canonical_fingerprint(plan, "comparison_plan_fingerprint")
     try:
         validate_comparison_parity_plan(plan, program)
@@ -1278,11 +1416,14 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "setting"
     elif "context-raw-texture" in condition_ids:
         rebuild_kind = "texture"
+    elif "context-raw-vlm-dense" in condition_ids:
+        rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
         rebuild_kind = "context4k"
     else:
         rebuild_kind = "geometry"
-    rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind)
+    rebuilt = build_stage_b_plan(program, candidate_manifest, settings, evidence_kind=rebuild_kind,
+                                 vlm_blocks_sha256=plan.get("vlm_blocks_sha256"))
     expected_core = {
         key: value
         for key, value in plan.items()
@@ -1470,8 +1611,64 @@ def _context_prompt(evidence_text: str) -> str:
     return _CONTEXT_PROMPT_TEMPLATE.format(evidence_text=evidence_text)
 
 
+def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Deterministic dossier -> honest expansion -> <=4K compact evidence text.
+
+    Shared by the arm-36 round-trip condition (`context-raw-context4k`) and the
+    arm-47 variant (`context-raw-vlm-dense`, which blends the compact with the
+    pre-generated VLM block). Returns (evidence_text, evidence_payload_meta).
+    """
+    item = prepared["item"]
+    lighting = prepared["lighting"]
+    if lighting is None:
+        lighting = {"lighting_measurable": False, "abstention_reason": "normal2.npy unavailable for this item"}
+    dossier = assemble_dossier(
+        image_id=item["image_id"],
+        proportions=prepared["proportions"],
+        clothing=prepared["clothing"],
+        hair=prepared["hair"],
+        skin=prepared["skin_tone"],
+        lighting=lighting,
+        setting=prepared.get("setting"),
+        texture=prepared.get("texture"),
+        determinations=prepared["determinations"],
+    )
+    payload = build_evidence_payload(
+        image_id=item["image_id"],
+        proportions=prepared["proportions"],
+        clothing=prepared["clothing"],
+        hair=prepared["hair"],
+        skin=prepared["skin_tone"],
+        lighting=lighting,
+        setting=prepared.get("setting"),
+        texture=prepared.get("texture"),
+        determinations=prepared["determinations"],
+        source_sha256=prepared.get("source_sha256"),
+    )
+    # Honest evidence-bound expansion (provenance lines + payload-bound
+    # detail, never fabricated) then deterministic compression to <=4K.
+    try:
+        expanded = expand_dossier(dossier, payload)
+    except Exception as exc:  # noqa: BLE001 - honesty gate failures must fail closed
+        raise StageBRunError(f"context4k honest expansion failed for {item['image_id']}: {exc}") from exc
+    compact = compress_dossier_to_context(expanded["expanded_dossier"])
+    evidence_text = context4k_text(compact["claims"])
+    meta = {
+        "compact_token_count": compact["token_count"],
+        "compact_under_budget": compact["under_budget"],
+        "compact_claim_count": len(compact["claims"]),
+        "excluded_claim_count": compact["excluded_claim_count"],
+        "expanded_dossier_token_count": expanded["token_count"],
+        "base_dossier_token_count": expanded["base_token_count"],
+        "dossier_evidence_ids": expanded["evidence_ids"],
+    }
+    return evidence_text, meta
+
+
 def _render_condition(
-    condition: Mapping[str, Any], prepared: Mapping[str, Any]
+    condition: Mapping[str, Any],
+    prepared: Mapping[str, Any],
+    vlm_blocks: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[Image.Image, str, dict[str, Any] | None]:
     condition_id = condition["id"]
     raw = prepared["image"]
@@ -1515,51 +1712,19 @@ def _render_condition(
         evidence_text = _serialize_texture(texture)
         return raw.copy(), _context_prompt(evidence_text), texture
     if condition_id == "context-raw-context4k":
-        item = prepared["item"]
-        lighting = prepared["lighting"]
-        if lighting is None:
-            lighting = {"lighting_measurable": False, "abstention_reason": "normal2.npy unavailable for this item"}
-        dossier = assemble_dossier(
-            image_id=item["image_id"],
-            proportions=prepared["proportions"],
-            clothing=prepared["clothing"],
-            hair=prepared["hair"],
-            skin=prepared["skin_tone"],
-            lighting=lighting,
-            setting=prepared.get("setting"),
-            texture=prepared.get("texture"),
-            determinations=prepared["determinations"],
-        )
-        payload = build_evidence_payload(
-            image_id=item["image_id"],
-            proportions=prepared["proportions"],
-            clothing=prepared["clothing"],
-            hair=prepared["hair"],
-            skin=prepared["skin_tone"],
-            lighting=lighting,
-            setting=prepared.get("setting"),
-            texture=prepared.get("texture"),
-            determinations=prepared["determinations"],
-            source_sha256=prepared.get("source_sha256"),
-        )
-        # Honest evidence-bound expansion (provenance lines + payload-bound
-        # detail, never fabricated) then deterministic compression to <=4K.
-        try:
-            expanded = expand_dossier(dossier, payload)
-        except Exception as exc:  # noqa: BLE001 - honesty gate failures must fail closed
-            raise StageBRunError(f"context4k honest expansion failed for {item['image_id']}: {exc}") from exc
-        compact = compress_dossier_to_context(expanded["expanded_dossier"])
-        evidence_text = context4k_text(compact["claims"])
-        meta = {
-            "compact_token_count": compact["token_count"],
-            "compact_under_budget": compact["under_budget"],
-            "compact_claim_count": len(compact["claims"]),
-            "excluded_claim_count": compact["excluded_claim_count"],
-            "expanded_dossier_token_count": expanded["token_count"],
-            "base_dossier_token_count": expanded["base_token_count"],
-            "dossier_evidence_ids": expanded["evidence_ids"],
-        }
+        evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
+    if condition_id == "context-raw-vlm-dense":
+        evidence_text, meta = _rendered_context4k(prepared)
+        image_id = prepared["item"]["image_id"]
+        block_entry = (vlm_blocks or {}).get(image_id)
+        block_text = (block_entry or {}).get("block_text", "")
+        block_sha = (block_entry or {}).get("block_sha256", "")
+        blended = evidence_text + "\n\n" + _serialize_vlm_dense(block_text)
+        vlm_meta = dict(meta)
+        vlm_meta["vlm_block_present"] = bool(block_text)
+        vlm_meta["vlm_block_sha256"] = block_sha
+        return raw.copy(), _context_prompt(blended), vlm_meta
     raise StageBRunError(f"unsupported Stage-B condition: {condition_id}")
 
 
@@ -1691,6 +1856,7 @@ def execute_stage_b(
     output_root: Path,
     expected_plan: Mapping[str, Any] | None = None,
     generate: Generator | None = None,
+    vlm_blocks: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Execute the frozen four-condition run and publish only noncanonical outputs.
 
@@ -1731,6 +1897,20 @@ def execute_stage_b(
         )
         for item in items
     ]
+    # Arm #47: when the plan binds VLM dense blocks, every pinned hash must be
+    # present and byte-verified before any model call (fail closed, never run a
+    # partially-verified evidence set through generation).
+    pinned_vlm = plan.get("vlm_blocks_sha256")
+    if pinned_vlm is not None:
+        for image_id in sorted(pinned_vlm):
+            entry = (vlm_blocks or {}).get(image_id)
+            if not entry or not entry.get("block_text"):
+                raise StageBRunError(f"missing VLM dense block for frozen item {image_id}")
+            observed = _sha256((entry.get("block_text") or "").encode("utf-8"))
+            if observed != pinned_vlm[image_id]:
+                raise StageBRunError(
+                    f"VLM dense block SHA-256 drifted for {image_id}: pin {pinned_vlm[image_id]}, observed {observed}"
+                )
     if generate is None:
         _verify_installed_ollama_digest(settings)
     generator = generate or _default_generate
@@ -1745,7 +1925,7 @@ def execute_stage_b(
             image_id = _safe_output_segment(item["image_id"], "candidate item image_id")
             for condition in plan["conditions"]:
                 condition_id = _safe_output_segment(condition["id"], "Stage-B condition id")
-                view, prompt, evidence_payload = _render_condition(condition, prepared_item)
+                view, prompt, evidence_payload = _render_condition(condition, prepared_item, vlm_blocks)
                 caption = ensure_single_paragraph(generator(view, prompt, settings))
                 if not caption:
                     raise StageBRunError(f"generator returned an empty caption for {image_id}/{condition_id}")
@@ -1873,7 +2053,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--num-predict", type=int, default=384)
     parser.add_argument("--context-window", type=int, default=4096)
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument("--vlm-root", type=Path, default=None,
+                        help="noncanonical stage root with per-item vlm-dense.json blocks (arm #47)")
     return parser.parse_args(argv)
+
+
+def _load_vlm_blocks(vlm_root: Path | None) -> dict[str, dict[str, Any]]:
+    """Load per-item {image_id: {block_text, block_sha256}} from a stage root."""
+    if vlm_root is None:
+        return {}
+    root = vlm_root.resolve(strict=True)
+    if not root.is_dir():
+        raise StageBRunError(f"--vlm-root is not a directory: {vlm_root}")
+    blocks: dict[str, dict[str, Any]] = {}
+    for artifact_dir in root.iterdir():
+        record = artifact_dir / "vlm-dense.json"
+        if not artifact_dir.is_dir() or not record.is_file():
+            continue
+        try:
+            payload = json.loads(record.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise StageBRunError(f"unreadable VLM block record {record}: {exc}") from exc
+        image_id = payload.get("meta", {}).get("image_id")
+        block_text = payload.get("block_text")
+        if not isinstance(image_id, str) or not isinstance(block_text, str):
+            raise StageBRunError(f"VLM block record {record} lacks image_id/block_text")
+        blocks[image_id] = {
+            "block_text": block_text,
+            "block_sha256": _sha256(block_text.encode("utf-8")),
+        }
+    return blocks
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1897,6 +2106,7 @@ def main(argv: list[str] | None = None) -> int:
             settings,
             output_root=args.output,
             expected_plan=_read_json(args.expected_plan, "expected comparison plan JSON"),
+            vlm_blocks=_load_vlm_blocks(args.vlm_root),
         )
     except StageBRunError as exc:
         print(f"research-stage-b: {exc}", file=sys.stderr)

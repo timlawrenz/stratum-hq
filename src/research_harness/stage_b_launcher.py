@@ -312,6 +312,10 @@ def _build_runner_command(
         "--timeout-seconds",
         str(settings.timeout_seconds),
     ]
+    vlm_root = execution.get("vlm_root")
+    if vlm_root:
+        command += ["--vlm-root", str(_resolved_existing_directory(Path(vlm_root), "vlm_root"))]
+    return command
 
 
 def _launch_subprocess(command: list[str], log_path: Path) -> subprocess.Popen[Any]:

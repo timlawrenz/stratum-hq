@@ -157,6 +157,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                       help="CLIP similarity delta (variant minus base) for reconstruction method")
     tick.add_argument("--items", type=int, default=None,
                       help="override the item count used for the verdict")
+    tick.add_argument("--baseline-condition", type=str, default=None,
+                      help="explicit baseline condition id (claim-support); overrides plan-derived matched baseline")
+    tick.add_argument("--evidence-condition", type=str, default=None,
+                      help="explicit evidence condition id (claim-support); overrides plan-derived evidence condition")
     tick.add_argument("--write", action="store_true",
                       help="persist registry state changes back to the registry file atomically")
 
@@ -309,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
                     method=args.method,
                     reconstruction_delta=args.reconstruction_delta,
                     items=args.items,
+                    baseline_condition=args.baseline_condition,
+                    evidence_condition=args.evidence_condition,
                 )
             except AutonomousError as exc:
                 raise ContractError(str(exc)) from exc
