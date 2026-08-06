@@ -2,18 +2,20 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
-## Arm #47 — open-weight VLM dense-description round-trip — `[IN PROGRESS — BLOCK BATCH RUNNING; NO VERDICT]`
+## Arm #47 — open-weight VLM dense-description round-trip — `[IN PROGRESS — BLOCK BATCH COMPLETE; CAPTION GENERATION RUNNING; NO VERDICT]`
 
-**Date:** 2026-08-06 (harness surface landed; block batch running on Strix)
+**Date:** 2026-08-06 (harness surface landed; block batch COMPLETE; caption generation running)
 **Arm:** #47 — vlm-dense-description (option-B dossier-growth evidence part; sole `research:active` arm, exploit, EIG 0.10, novelty 0.15, selection_progress 5)
 **Code / PR:** `feat/vlm-dense-arm47-20260806` (draft PR #57, branch from the arm-#37 lineage)
 **Harness surface (this cycle, additive):**
 - `vlm-dense` evidence kind (5-condition plan: 3 neutral controls + `context-raw-context4k` matched baseline + `context-raw-vlm-dense` variant); per-item `vlm_blocks_sha256` pinned in the frozen plan; caption runner byte-verifies blocks and fails closed on drift.
 - `autonomous-tick --baseline-condition/--evidence-condition` so the verdict isolates the **VLM marginal** (compact → compact+VLM block). Plain plan-derived derivation pairs no-evidence → combined record (a re-measurement of arm #36's direction), so explicit conditions are REQUIRED for this arm's falsified_if.
-- `scripts/vlm_dense_generate.py` (frozen qwen3-vl:32b dense-description batch; 2×2 collage of full-frame + seg2 focal crops; [OBSERVED]/[INFERRED]/[ABSTAIN]-tagged scale-invariant prose; per-item sha256 + leak/abstention stats) + `scripts/vlm_dense_scheduler.py` (owns the Strix request→poll→activate→launch→heartbeat→release lifecycle) + `scripts/freeze_vlm_dense_manifest.py`.
+- `scripts/vlm_dense_generate.py` (frozen gemma3:27b dense-description batch; 2×2 collage of full-frame + seg2 focal crops; [OBSERVED]/[INFERRED]/[ABSTAIN]-tagged scale-invariant prose; per-item sha256 + leak/abstention stats) + `scripts/vlm_dense_scheduler.py` (owns the Strix request→poll→activate→launch→heartbeat→release lifecycle) + `scripts/freeze_vlm_dense_manifest.py`.
 - Tests: `tests/test_vlm_dense.py` (9 new); full suite 525 passed; `validate-program` + `validate-dimension-registry` valid.
-**Run state:** block batch RUNNING under scheduler claim `stratum-vlm-dense-blocks-v1` on Strix (qwen3-vl:32b, digest ff2e46876908; stage root `/mnt/nas-ai-models/research/stratum/stage-b-vlm-dense-v1/`). First block measured: 1830 chars, 22 `[OBSERVED]` claims, 0 `[INFERRED]`, 0 `[ABSTAIN]`, no absolute-pixel leak. Cohort-level abstention rate is a qualification-gate item being watched.
-**Next (post-batch):** freeze plan/manifest → 4090 caption generation (24 × 5 = 120 records) → independent review (120 rows) → `autonomous-tick --baseline-condition context-raw-context4k --evidence-condition context-raw-vlm-dense` → label-sync + PR. No registry state change until then.
+**Model-qualification event (recorded):** the pre-registered **qwen3-vl:32b FAILED qualification on the real corpus** — after 10 valid blocks it began returning silent EMPTY responses on both vision and plain-text requests (server-side decode wedge, not restartable without root; reproduced on /api/generate and /api/chat across temperatures). **Production evidence producer flipped to gemma3:27b** (digest a418f5838eaf, already local, vision-capable; verified full tagged block on the same item) and the full 24-block batch was regenerated homogeneously.
+**Block batch COMPLETE (gemma3:27b, scheduler claim `stratum-vlm-dense-blocks-v1` released completed):** 24/24 items, 578 tagged claims, 0 absolute-pixel leaks, per-item block sha256 pinned.
+**Abstention-audit flag (pre-registered gate):** cohort `[ABSTAIN]` rate = **0/578** — no item emitted an abstention. The frozen cohort is high-visibility quality, so this MAY be legitimate, but a 0% abstention rate is exactly the "unchecked verbosity" risk the qualification gate warns about; it will be surfaced to the reviewer + adversarial + human spot-check, never papered over.
+**Next:** 4090 caption generation (24 × 5 = 120 records) → independent review (120 rows, gemma4:e4b) → `autonomous-tick --baseline-condition context-raw-context4k --evidence-condition context-raw-vlm-dense` → label-sync + PR. No registry state change until then.
 
 ## Arm #37 — generative reconstruction validation — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 

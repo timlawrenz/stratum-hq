@@ -39,6 +39,7 @@ from research_harness.labels import ContractError  # noqa: E402
 PROGRAM = ROOT / "research/program.json"
 CANDIDATE = Path("/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json")
 BLOCK_STAGE = Path("/mnt/nas-ai-models/research/stratum/stage-b-vlm-dense-v1")
+VLM_BLOCKS_DIR = BLOCK_STAGE / "blocks"
 VLM_DONE = BLOCK_STAGE / "vlm-done.json"
 PLAN_OUT = ROOT / "research/stage-b-plans/stage-b-vlm-dense-v1.json"
 MANIFEST_OUT = ROOT / "research/gpu-manifests/stage-b-vlm-dense-v1.json"
@@ -154,7 +155,7 @@ def main() -> int:
             "model_name": SETTINGS.model_name,
             "runner_module": "research_harness.stage_b",
             "runner_source_sha256": _runner_source_hash(),
-            "vlm_root": str(BLOCK_STAGE),
+            "vlm_root": str(VLM_BLOCKS_DIR),
         },
         "host_route": "local",
         "job_id": JOB_ID,
