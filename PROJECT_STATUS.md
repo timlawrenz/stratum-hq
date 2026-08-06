@@ -1,7 +1,7 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (arm #36 round-trip claim-support audit COMPLETE → **BETTER**; goal arm validated; registry advanced; setting #34 activated)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm open (setting #34).**
+**Last updated:** 2026-08-06 (arm #34 setting round-trip claim-support audit COMPLETE → **BETTER**; registry advanced; texture #35 active)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm open (texture #35).**
 
 **Arm #36 GOAL-ARM ROUND-TRIP BETTER (2026-08-06, harness-computed).** The reserved
 post-ruling increment LANDED end to end: the `context4k` evidence kind (PR #52),
@@ -22,8 +22,8 @@ audit is now **validated** (`goal_unreachable: false`, floor 4001, gap 512).
 
 Prior validated arms (all BETTER): #4 baseline/parity (PENDING_HUMAN_SPOT_CHECK advisory, non-gating),
 #32 body-type (BETTER), #29 clothing (BETTER), #30 hair (BETTER), #31 skin-color (BETTER),
-#33 lighting (BETTER, largest delta 32.2%→95.1%). Stage A stays bounded and non-executing at
-`research/proposals/stage-a-caption-context-parity-preparation.md`.
+#33 lighting (BETTER, largest delta 32.2%→95.1%), #34 setting (BETTER, delta +0.5209). Stage A stays
+bounded and non-executing at `research/proposals/stage-a-caption-context-parity-preparation.md`.
 
 ## Current state
 
@@ -57,12 +57,17 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 - **Arm #29 clothing:** supported 72→151, unsupported 100→46, ratio 41.9%→76.7%, p≈0.0173 → **BETTER**;
   registry `validated`.
 - **Arm #30 hair / #31 skin-color:** both BETTER, registry `validated`.
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): 6 validated (body-type,
-  clothing, hair, skin-color, lighting, **dossier-context4k #36**), **1 active (setting #34 —
-  sole `research:active`, selected via exploit after the #36 tick)**, 3 proposals (texture #35,
-  reconstruction #37, vlm-dense-description #47). Sweep not exhausted, not stalled. The dependency
-  frontier (setting/texture/vlm) feeds the same goal. Selector tie-break fixed (2026-08-06,
-  id-tiebreaker regression test).
+- **Arm #34 setting BETTER (2026-08-06, PR #53):** deterministic DOME-29 Background-class measurement
+  (frame-coverage ratio, quantized dominant color, tone/vibrancy/pattern bands, scale-invariant, abstaining)
+  computed in-memory from seg2 + source pixels. Frozen plan `stage-b-first500-setting-v1`; 4090 generation
+  (96 captions, `stage-b-setting-v1`) + independent review (96 rows, `stage-b-setting-v1-review`);
+  `autonomous-tick` computed **BETTER** (baseline 47/99 supported/unsupported → evidence 177/33;
+  ratio 0.3219 → 0.8429, Δ +0.5209; paired 19/24; **p=0.003305**). Registry: #34 → validated, #35 → active.
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): 7 validated (body-type,
+  clothing, hair, skin-color, lighting, **dossier-context4k #36**, **setting #34**), **1 active (texture
+  #35 — sole `research:active`, selected via exploit after the #34 tick)**, 2 proposals (reconstruction
+  #37, vlm-dense-description #47). Sweep not exhausted, not stalled. The dependency frontier
+  (texture/vlm) feeds the same goal. Selector tie-break fixed (2026-08-06, id-tiebreaker regression test).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
@@ -70,13 +75,11 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Arm #34 setting is the sole `research:active` arm (selected via exploit, EIG 0.30, novelty 0.15).**
-Run the setting/environment evidence specialist through the standard Stage-B lifecycle: deterministic
-DOME-29 environment/setting measurement (scene-background classes from seg2, environment color/tone from
-source pixels, depth-of-field/shallow-focus hints where available) → freeze plan+manifest (copy
-`freeze_lighting_manifest.py`) → 4090 generation → independent review via the parameterized wrapper →
-`autonomous-tick --review-dir-from … --write`. All runs are additive/noncanonical; no corpus mutation,
-no backfill, no legacy overwrite.
+**Arm #35 texture is the sole `research:active` arm (selected via exploit after the #34 tick, EIG 0.24,
+novelty 0.15, selection_progress 3).** Run the texture/material evidence specialist through the standard
+Stage-B lifecycle: deterministic seg2 texture-garment/material self-similarity statistics → freeze
+plan+manifest → 4090 generation → independent review → `autonomous-tick`. All runs are additive/noncanonical;
+no corpus mutation, no backfill, no legacy overwrite.
 
 ## Live research tree
 
@@ -85,9 +88,9 @@ no backfill, no legacy overwrite.
 - #4 is the baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
-- #29–#37 registered proposal arms; #32, #29, #30, #31, #33, #36 validated (all BETTER);
-  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**; #34 is the sole
-  `research:active` arm; #35/#37/#47 are proposals.
+- #29–#37 registered proposal arms; #32, #29, #30, #31, #33, #36, #34 validated (all BETTER);
+  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**; #35 is the sole
+  `research:active` arm; #37/#47 are proposals.
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -103,10 +106,10 @@ of the sensitive canonical corpus requires a hold.
 ## Headline result so far
 
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
-Arm #36 (goal): BETTER.**
+Arm #34: BETTER; Arm #36 (goal): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
-colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction) each significantly
-improves supported claims on the frozen 24-item cohort under fixed view/prompt/model/settings. The
-**goal-arm round-trip is BETTER**: captions generated FROM the evidence-linked ≤4K compact context
-(supported 47→174, ratio 0.322→0.777, p=0.000244) beat the plain-4K summarization baseline.
-**Next: arm #34 setting (sole `research:active`).**
+colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
+coverage/color/bands) each significantly improves supported claims on the frozen 24-item cohort under
+fixed view/prompt/model/settings. The **goal-arm round-trip is BETTER**: captions generated FROM the
+evidence-linked ≤4K compact context (supported 47→174, ratio 0.322→0.777, p=0.000244) beat the plain-4K
+summarization baseline. **Next: arm #35 texture (sole `research:active`).**
