@@ -884,7 +884,7 @@ def build_stage_b_plan(
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
     if evidence_kind not in (
-        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "context4k"
+        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k"
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
