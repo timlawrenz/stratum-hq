@@ -198,6 +198,23 @@ Per owner directive, absolute pixel measurements are camera-frame-dependent and 
 
 **Verdict:** `PENDING` — structural provenance only. Draft PR #15's `caption_max_tokens` forwarding repair was independently reviewed at `db85fe9bacc55e1c444615b027a2734d63398f61`, and stacked draft PR #16 adds a mocked CLI-to-backend regression. Stage B still needs fixed local-model/generation provenance, metric self-audit, adversarial review, and separately explicit execution authority.
 
+## Arm #47 — open-weight VLM dense-description sourcing verification — `[SOURCING VERIFIED — NOT RUN]`
+
+**Date:** 2026-08-06
+**Arm:** #47 — open-weight VLM dense multi-view description (option-B dossier growth path; prerequisite sourcing verification only — no sensitive-corpus inference, no claim-support run)
+**Code / PR:** `exp/arm47-vlm-sourcing-verified-20260806` (draft PR #48, docs-only)
+
+**Why:** The arm-36 honest expansion-ceiling audit showed deterministic evidence tops out at 2040–3489 tokens/item (7–50× below the 100K floor), so option B of decision #46 requires a genuinely-new non-deterministic evidence part. Registered via the gated `propose-dimensions` channel as a NEW evidence part (`vlm-dense-description`) + NEW model class (`open-vlm-dense-captioner`); registering it surfaced and fixed a real selector tie-break bug (dict-comparison `TypeError` on equal EIG tuples — id tiebreaker + regression test).
+
+**Open-world sourcing scan (2026-08-05/06 directive):**
+- Molmo / Molmo-72B (AI2, fully open weights+data): strongest dense-description pretraining focus (PixMo) of the candidates; arXiv 2409.17146 / 2601.10611 (Molmo2).
+- Qwen2-VL-72B / Qwen2.5-VL: strongest MMMU/OCRBench among open; better when in-scene OCR matters.
+- InternVL3-78B: strongest MIT-licensed VLM.
+
+**Local capability probe (non-sensitive synthetic image, `scripts/vlm_capability_probe.py`, 2026-08-06):** `qwen3-vl:32b` (already installed locally on 4090 + Strix, zero download) — GPU-placement measurement: **4090 (24GB) fits at only 27% CPU-offload, ~280s per 2048-token block — not viable for a 96-item batch; Strix (100GB usable) runs it 100% GPU at ~9.6 tok/s, 128K ctx — viable production batch host.** Conclusion: any large-VLM arm (option B execution) runs on Strix.
+
+**Verdict:** sourcing capability verified as a measurement, NOT passed; the arm is a `research:proposal`. Activation + the 96-item claim-support run remain gated on decision #46 ruling (option B). No disturbance to `crawlr/approved` / `crawlr/stratum`, no backfill, no hosted inference of the sensitive corpus.
+
 ## First-500 core-artifact coverage audit — `[PENDING / PRE-COMPUTE]`
 
 **Date:** 2026-08-04

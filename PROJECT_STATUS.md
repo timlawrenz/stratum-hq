@@ -1,6 +1,6 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (arm #36 decision-pending; expansion-ceiling audit + floor decision filed)
+**Last updated:** 2026-08-06 (arm #36 decision-pending; expansion-ceiling audit + floor decision filed; arm #47 proposal registered + VLM sourcing verified)
 **Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm human-decision-gated.**
 
 Hold #18 is RELEASED. **#36 dossier-context4k is the sole `research:active` arm and is BLOCKED pending human
@@ -48,9 +48,17 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   registry `validated`.
 - **Arm #30 hair / #31 skin-color:** both BETTER, registry `validated`.
 - **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): 5 validated (body-type,
-  clothing, hair, skin-color, lighting), 1 active (dossier-context4k #36), 3 proposals (setting #34,
-  texture #35, reconstruction #37). Sweep not exhausted, not stalled. `autonomous-select` keeps picking
-  dossier-context4k via exploit (EIG 0.34, novelty bonus 0.15 applied).
+  clothing, hair, skin-color, lighting), 1 active (dossier-context4k #36), 4 proposals (setting #34,
+  texture #35, reconstruction #37, **vlm-dense-description #47 — the concrete option-B evidence source,
+  pre-registered 2026-08-06 with a full declaration + qualification gate**). Sweep not exhausted, not
+  stalled. `autonomous-select` keeps picking dossier-context4k via exploit (EIG 0.34, novelty bonus 0.15
+  applied). Selector tie-break fixed (2026-08-06, id-tiebreaker regression test) — registering #47
+  surfaced and closed the dict-comparison `TypeError`.
+- **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
+  InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
+  27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
+  it 100% GPU ~9.6 tok/s, so Strix is the production batch host for any large-VLM arm. Local-options
+  exhausted confirmed by the #36 expansion-ceiling audit.
 
 ## Immediate next action
 
@@ -69,8 +77,11 @@ no backfill, no legacy overwrite.
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
 - #29–#37 registered proposal arms; #32, #29, #30, #31, #33 validated (all BETTER);
-  #36 dossier-context4k is the sole active arm and is gated on decision #46; #34/#35/#37 are proposals.
-- #46 is the open `research:needs-human` decision that gates the arm-36 round-trip.
+  #36 dossier-context4k is the sole active arm and is gated on decision #46; #34/#35/#37 are proposals;
+  #47 (vlm-dense-description) is the pre-registered option-B evidence-growth proposal (draft PR #48).
+- #46 is the open `research:needs-human` decision that gates the arm-36 round-trip. Option B's concrete
+execution path is pre-registered and sourcing-verified: proposal **#47 open-weight VLM dense description**
+(local-first, Strix batch host).
 
 ## Automation and authority
 
