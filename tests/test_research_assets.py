@@ -391,20 +391,23 @@ def test_stage_b_template_rejects_missing_explicit_global_denial(removed_denial:
         _assert_freeze_and_stage_b_are_bound(mutated)
 
 
-def test_resumption_documents_preserve_the_sole_active_arm_and_two_stage_boundary() -> None:
+def test_resumption_documents_preserve_the_active_state_and_two_stage_boundary() -> None:
     status = (ROOT / "PROJECT_STATUS.md").read_text()
     tree = (ROOT / "docs" / "EXPERIMENT_TREE.md").read_text()
     ledger = (ROOT / "docs" / "EXPERIMENTS_AND_RESULTS.md").read_text()
     research_readme = (ROOT / "research" / "README.md").read_text()
 
-    # The resumption documents must name exactly one active arm and it must
-    # agree across status + tree (currently lighting #33, the selector pick
-    # after skin-color #31 concluded BETTER; the completed skin-color run is
-    # recorded in the ledger).
-    assert "is the sole `research:active`" in status
-    assert "#33 lighting" in status
+    # The resumption documents must reflect the live one-active/two-stage
+    # invariants. As of 2026-08-06 the sweep is EXHAUSTED (10/10 validated;
+    # vlm-dense-description #47 was the last, BETTER), so there is NO active
+    # arm and the documented next action is brainstorm-new-data — the status
+    # must say so explicitly and must not resurrect a phantom sole-active arm.
+    assert "Sweep EXHAUSTED — no active arm remains" in status
+    assert "brainstorm-new-data" in status
+    assert "is the sole `research:active`" not in status
     assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
     assert "The `stratum-ffhq` strategist is paused" not in status
+    assert "#33 lighting" in status
     assert "#33 lighting" in tree
     assert "## Arm #31 — skin-color/tone evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`" in ledger
     assert "## Arm 0 — Geometry-grounded captioning prototype — `[PROPOSAL — PENDING]`" in ledger

@@ -2,6 +2,25 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #47 — open-weight VLM dense-description round-trip — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-06 (harness surface landed; block batch complete; round-trip complete)
+**Arm:** #47 — vlm-dense-description (option-B dossier-growth evidence part; was sole `research:active` arm, exploit, EIG 0.10, novelty 0.15, selection_progress 5)
+**Code / PR:** `feat/vlm-dense-arm47-20260806` (draft PR #57, branch from the arm-#37 lineage)
+**Harness surface (this cycle, additive):**
+- `vlm-dense` evidence kind (5-condition plan: 3 neutral controls + `context-raw-context4k` matched baseline + `context-raw-vlm-dense` variant); per-item `vlm_blocks_sha256` pinned in the frozen plan; caption runner byte-verifies blocks and fails closed on drift.
+- `autonomous-tick --baseline-condition/--evidence-condition` so the verdict isolates the **VLM marginal** (compact → compact+VLM block). Plain plan-derived derivation pairs no-evidence → combined record (a re-measurement of arm #36's direction), so explicit conditions are REQUIRED for this arm's falsified_if.
+- `scripts/vlm_dense_generate.py` (frozen gemma3:27b dense-description batch; 2×2 collage of full-frame + seg2 focal crops; tagged scale-invariant prose) + `scripts/vlm_dense_scheduler.py` (owns the Strix lifecycle) + `scripts/freeze_vlm_dense_manifest.py`.
+- Tests: `tests/test_vlm_dense.py` (9 new); full suite 525 passed; validators green.
+**Model-qualification event (recorded):** pre-registered **qwen3-vl:32b FAILED qualification on the real corpus** (silent empty decodes on vision and plain text; server-side wedge, not restartable without root). **Evidence producer flipped to gemma3:27b** (digest a418f5838eaf, already local) and the 24-block batch was regenerated homogeneously.
+**Round-trip run:** blocks `stage-b-vlm-dense-v1` (24/24, 578 tagged claims, 0 px leaks — cohort `[ABSTAIN]` rate 0/578 flagged for the abstention audit); captions `stage-b-vlm-dense-captions-v1` (120 records: 24×5 conditions, gemma3:27b, PENDING_INDEPENDENT_REVIEW); review `stage-b-vlm-dense-captions-v1-review` (120 rows, gemma4:e4b).
+**Verdict (harness-computed `autonomous-tick --review-dir … --baseline-condition context-raw-context4k --evidence-condition context-raw-vlm-dense --write`):** **BETTER** — VLM marginal support ratio 0.7376 → 0.9581 (Δ +0.2206), supported 163 → 206, unsupported 58 → 9 (not ballooning), **sign-test p = 0.013302**, paired 21/24 (16 positive). `item_count 24`, `significant true`, `inconclusive false`.
+**Registry advance:** vlm-dense-description `active → validated` (0 strikes); selection_progress 5. **All 10 dimensions now terminal → `dimension-sweep-status` reports `exhausted: true`, `next_action: brainstorm-new-data`.** The loop's next step is to WIDEN (new evidence parts / model candidates / data sources) via the gated `propose-dimensions`.
+**Abstention-audit flag (pre-registered gate, surfaced honestly):** the cohort block set emitted **0/578 [ABSTAIN]** tags. The claim-support reviewer independently endorsed the vlm-dense captions (206/215 supported), and the blocks carry [INFERRED] tags, but a 0% abstention rate is exactly the "unchecked verbosity" risk the qualification gate names; it remains on the human spot-check + adversarial checklist, not papered over.
+**Next (next cycle):** brainstorm-new-data → `propose-dimensions --require-new-evidence-part` for the next menu. The VLM evidence part (≈450–725 tokens/item) sits on top of the deterministic record (2040–3489 tokens/item), which together honestly clear the reframed structural floor 4001 for the goal-arm dossier — the option-B growth path is now empirically validated.
+
+
+
 ## Arm #37 — generative reconstruction validation — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-06

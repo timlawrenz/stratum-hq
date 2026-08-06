@@ -590,6 +590,8 @@ def run_tick(
     method: str = "claim-support",
     reconstruction_delta: float | None = None,
     items: int | None = None,
+    baseline_condition: str | None = None,
+    evidence_condition: str | None = None,
 ) -> dict[str, Any]:
     """One loop iteration. Returns a next_action + (optionally) verdict.
 
@@ -640,7 +642,11 @@ def run_tick(
             return {"next_action": "research-pending", "active_arm": arm["id"]}
         try:
             if method == "claim-support":
-                agg = aggregate_claim_support(review_dir or "")
+                agg = aggregate_claim_support(
+                    review_dir or "",
+                    baseline_condition=baseline_condition,
+                    evidence_condition=evidence_condition,
+                )
                 verdict = better_or_not(
                     supported_base=agg["baseline_supported"],
                     supported_variant=agg["evidence_supported"],
