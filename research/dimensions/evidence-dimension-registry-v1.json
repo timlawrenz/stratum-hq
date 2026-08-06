@@ -228,6 +228,87 @@
         "verified-dimension-specialists",
         "relational-determinations"
       ]
+    },
+    {
+      "id": "reconstruction",
+      "name": "generative reconstruction validation (ComfyUI round-trip)",
+      "arm_issue": 37,
+      "hypothesis": "Generative reconstruction is a valid, non-LLM measure of per-asset information preserved by a caption/context: images generated from a caption/context via local ComfyUI score higher in CLIP ViT-L/14 similarity against the original source than images generated from a degraded baseline (e.g. no context / truncated context), so reconstruction can validate the 100K->4K dossier pipeline independently of claim-support review.",
+      "falsified_if": "Reconstruction similarity does not correlate with information content (a fixed 4K context cannot be distinguished from a truncated/baseline context by CLIP score), or the diffusion checkpoint fails to decode the relevant attributes at all (ceiling effect / degenerate similarity).",
+      "deterministic_signal": "CLIP ViT-L/14 similarity (source vs generated-from-context4k, and source vs generated-from-degraded-baseline) via local ComfyUI over frozen diffusion checkpoints",
+      "metric_version": "reconstruction-clip-v1",
+      "data_snapshot": "first-500 core-covered cohort; local ComfyUI at /mnt/fscache/essdee/ComfyUI; 195 diffusion checkpoints at /mnt/nas-ai-models/checkpoints; CLIP ViT-L/14 openai/clip-vit-large-patch14 + timm/vit_large_patch14_clip_224.openai in HF cache",
+      "selection_rationale": "Claim-support review (gemma4/LLM) is the current sole downstream check on caption/PENDING dossier quality. Reconstruction adds a generation-grounded, non-LLM, end-to-end test that an independent reviewer cannot substitute for, and directly measures the top-level goal (context that regenerates the asset) rather than only claim agreement. It also exercises the underused local ComfyUI + NAS checkpoint inventory.",
+      "scope": "generative reconstruction of source images from dossier/context artifacts; CLIP ViT-L/14 similarity of generated vs source and vs degraded-baseline generations",
+      "inputs": "context4k.json / context4k.md / compression.json artifacts + source image (read-only canonical), frozen ComfyUI pipeline + one frozen diffusion checkpoint",
+      "output_semantics": "per-item CLIP ViT-L/14 cosine similarity (generated vs source); delta between context-driven and baseline generations; scale-invariant to camera framing",
+      "provenance": "local ComfyUI at /mnt/fscache/essdee/ComfyUI (.venv python3.14, torch 2.12+cu130); checkpoints at /mnt/nas-ai-models/checkpoints (SD1.5, SDXL, flux1Schnell, sd3, pony, SUPIR); CLIP ViT-L/14 openai/clip-vit-large-patch14 and timm/vit_large_patch14_clip_224.openai in HF cache",
+      "abstention_policy": "reject generations failing sanity checks (empty/discarded generation, sampler error, degenerate output); abstain when the diffusion checkpoint fails to decode relevant attributes (ceiling effect) and report it, never treating failure as a BETTER signal",
+      "qualification_gate": "PASS only after: (a) a frozen cohort and fixed ComfyUI checkpoint + sampler/generation settings; (b) a controlled one-axis comparison (full context vs baseline) scoring original vs generated with a fixed CLIP ViT-L/14 model; (c) calibration of the scoring on known cases and a null case (empty/meaningless prompt); (d) independent review of the reconstruction protocol; and (e) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "known_failure_modes": [
+        "generative model does not reproduce identity/subject exactly",
+        "CLIP score is a weak identity proxy",
+        "GPU time per item is large",
+        "ceiling effect / degenerate similarity can make DELTA uninformative"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "context4k-reconstruction",
+        "clip-vitl14-similarity"
+      ],
+      "validation_methods": [
+        "reconstruction",
+        "roundtrip-audit"
+      ],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
+        }
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "vlm-dense-description",
+      "name": "open-weight VLM dense multi-view description",
+      "arm_issue": 47,
+      "hypothesis": "A locally-run open-weight VLM producing a dense, multi-view descriptive block for a single curated woman source image (full-frame + seg2-derived focal crops), routed claim-by-claim with abstention, materially raises supported-claim density on the frozen 24-item cohort versus the deterministic dossier alone, and is a legitimately-new evidence part toward the 100K expanded-dossier floor (option B of decision #46).",
+      "falsified_if": "The VLM dense description does not raise supported-claim density on the frozen cohort beyond the deterministic dossier + honest-expansion ceiling, or abstains at too low a rate to be trustworthy (unchecked verbosity), or is not distinguishable from a redundant attribute-tagger over already-validated axes.",
+      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; source pixels + seg2 crop regions; local Ollama/ComfyUI stack",
+      "selection_rationale": "The arm-36 honest expansion-ceiling audit proved deterministic evidence tops out at 2040-3489 tokens/item (7-50x below the 100K floor); a VLM dense-description specialist is the concrete option-B evidence source named in decision #46 and is a NEW evidence part per the open-world sourcing directive (local options exhausted).",
+      "scope": "dense multi-view descriptive prose for a single curated woman source image: full-frame + focal crops (face, upper body, garment regions derived from seg2); evidence prose, not a caption",
+      "inputs": "decoded source RGB full-frame + fixed focal crops derived from seg2 regions; frozen prompt",
+      "output_semantics": "structured markdown block of dense descriptive claims (subject, garments, hair, skin, setting, pose, facial detail), each claim tagged observed/inferred/abstained; no absolute pixel or raw-coordinate numbers in prose; scale-invariant ratios only; machine-readable measurements stay in evidence_payload JSON",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: Molmo/Molmo-72B (AI2, fully open weights+data, PixMo dense-caption pretraining, top captioning benchmark; arXiv 2409.17146); Qwen2-VL-72B/Qwen2.5-VL (open weight, strongest MMMU/OCRBench); InternVL3-78B (MIT license). No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen prompt + deterministic crop policy; emit [ABSTAIN] on regions with insufficient visible pixels (motion blur/occlusion/DOF crop); detector/measurement disagreement is a quality anomaly, never content; no absolute pixel claim in prose",
+      "qualification_gate": "PASS only after: (a) frozen crop/prompt/view policy with pinned digests; (b) controlled document-utility check reproducing every fact deterministic specialists already declare on a known case AND adding materially more supported claims on the frozen 24-item cohort (claim-support rubric v1, same reviewer); (c) calibration on known cases + null case; (d) abstention audit (observed/inferred/abstained rates, unchecked verbosity is a fail); (e) independent adversarial review of the protocol; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "vlm-dense-description",
+        "seg2-crop-region"
+      ],
+      "model_candidates": [
+        "open-vlm-dense-captioner"
+      ],
+      "validation_methods": [
+        "claim-support",
+        "roundtrip-audit"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ]
 }

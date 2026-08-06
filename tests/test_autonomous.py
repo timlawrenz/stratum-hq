@@ -82,6 +82,53 @@ def test_select_next_arm_skips_struck_out() -> None:
     assert selected["id"] == "mood"
 
 
+def _twin(id_: str) -> dict:
+    """A proposal scoring EXACTLY like body-type (identical EIG tuple), so any
+    dict-comparison in the selector sort would crash with a TypeError."""
+    return {
+        "id": id_,
+        "name": id_,
+        "arm_issue": 90,
+        "state": "proposal",
+        "valid_non_improving_experiments": 0,
+        "hypothesis": f"h {id_}",
+        "falsified_if": f"f {id_}",
+        "deterministic_signal": f"signal {id_}",
+        "metric_version": "claim-support-rubric-v1",
+        "data_snapshot": "s",
+        "selection_rationale": f"twin of body-type {id_}",
+        "prior_evidence_strength": 0.8,
+        "measurability": "high",
+        "cost_bucket": "low",
+    }
+
+
+def test_select_next_arm_ties_broken_by_id_never_compare_dicts() -> None:
+    """A selector sort that falls back to comparing dimension dicts must never
+    happen: when two actionable proposals tie on the full EIG tuple the
+    selector breaks ties by id instead of crashing with
+    `TypeError: '<' not supported between instances of 'dict'`. Regression for
+    the bug hit on 2026-08-06 after registering proposal #47 (vlm-dense-
+    description) revealed the exploit-path sort had no id tiebreaker."""
+    reg = _registry()
+    reg["dimensions"] = [
+        _twin("body-type"),
+        _twin("alpha"),
+        _twin("beta"),
+    ]
+    # All three score identically -> a plain sorted((score, dim)) would compare
+    # dicts. Expect deterministic id-ordered result (no crash).
+    selected = select_next_arm(reg)
+    assert selected["id"] == "body-type"  # max over (score, id) = id asc
+    assert selected["selected_via"] == "exploit"
+    # All_scores are present and also id-ordered.
+    ids = [s["id"] for s in selected["all_scores"]]
+    assert ids == sorted(ids, reverse=True)
+    assert selected["all_scores"][0]["expected_information_gain"] == (
+        selected["all_scores"][-1]["expected_information_gain"]
+    )
+
+
 def test_better_or_not_returns_better_on_strong_supported_gain() -> None:
     result = better_or_not(
         supported_base=47,

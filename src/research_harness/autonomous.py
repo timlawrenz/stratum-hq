@@ -206,7 +206,10 @@ def select_next_arm(
             ],
         }
 
-    scored = sorted((_score(d), d) for d in actionable)
+    scored = sorted(
+        ((_score(d), d) for d in actionable),
+        key=lambda t: (t[0], t[1]["id"]),  # deterministic: ties broken by id, never compare dicts
+    )
     (value, novel, applied), chosen = scored[-1]
     chosen_id = chosen["id"]
     return {
