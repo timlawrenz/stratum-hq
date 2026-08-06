@@ -17,6 +17,21 @@ This ledger records empirical findings and negative results permanently. A green
 **Calibration note:** the pattern-band thresholds were recalibrated after an honest deviation-histogram probe on the first 8 items (solid < 0.10 deviant fraction, busy ≥ 0.35); the first bands (0.04/0.18) over-labeled plain walls as "busy".
 **Validation:** 495 pytest passed; `validate-program` valid; `validate-dimension-registry` valid. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check.
 
+## Arm #35 — texture/material evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-06
+**Arm:** #35 — texture/material evidence specialist
+**Code / PR:** `exp/stage-b-texture-arm35-20260806` (draft PR #54, branch from the arm-#34 lineage)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (same manifest as all prior arms)
+**Deterministic specialist:** `research_harness.texture.compute_texture` (per-region-class texture statistics: dominant measurable fabric class surface/pattern bands, dominant skin class surface band, from seg2 masks + source-pixel gradients; per-channel p99.9-normalized gradients over the 1-px-eroded region interior so the silhouette boundary never counts as texture). Evidence inputs bound: `seg2.npy`. Only scale-invariant facts are verbalized (bands/fractions); absolute gradient values and pixel counts stay in the machine-readable `evidence_payload`.
+**Hypothesis:** Declared per-region texture proxies (edge/gradient statistics) reduce invented material/texture claims.
+**Run:** `/mnt/nas-ai-models/research/stratum/stage-b-texture-v1` (96 captions, gemma3:27b A-fingerprint, 4090 via scheduler) + independent adversarial review `/mnt/nas-ai-models/research/stratum/stage-b-texture-v1-review` (96 rows, gemma4:e4b, 512px inputs).
+**Verdict (harness-computed `autonomous-tick`):** **BETTER** — supported 47 → **167**, unsupported 99 → **34**; support ratio 0.3219 → 0.8308 (Δ +0.5089); paired positive 21/24; sign-test p = **0.000139**. `inconclusive: false`, `significant: true`.
+**Registry advance:** texture `active → validated` (0 strikes); selector next → **reconstruction #37** (active, explore slot, EIG 0.10, novelty 0.15, selection_progress 4).
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `seg2.npy`/source pixels only; scale-invariant verbalization retained. The texture dimension also joined the dossier (`texture-material:v1` evidence id + render_texture + evidence_payload section) — honest evidence-density growth for the goal arm.
+**Calibration note:** the first garment-only design abstained on 13/24 items (the cohort is ~half topless portraits with no garment classes) and pooled per-class means degenerated into a fake 11/11 "busy". Per-class dominant-region measurement (fabric where present else skin) restored 24/24 measurability, and the erosion fix removed a pure silhouette-boundary artifact that inflated edge_fraction; bands were then recalibrated on the real cohort (fabric 4/3/3, pattern 5/3/2, skin 15/7/2 — no band ≥ 75%).
+**Validation:** 506 pytest passed; `validate-program` valid; `validate-dimension-registry` valid. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check.
+
 ## Arm #36 — post-ruling honest re-measurement under the reframed structural floor — `[MEASUREMENT — NOT A VERDICT]`
 
 **Date:** 2026-08-06 (cycle after PR #50 merged)

@@ -60,6 +60,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "skin-color-tone:v1",
     "lighting:v1",
     "setting-environment:v1",
+    "texture-material:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -267,6 +268,30 @@ def render_setting(setting: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_texture(texture: Mapping[str, Any]) -> list[str]:
+    lines: list[str] = []
+    if not texture.get("texture_measurable"):
+        reason = texture.get("abstention_reason")
+        lines.append("texture: abstain (no measurable fabric or skin region)" + (f" ({reason})" if reason else ""))
+        return lines
+    fabric_class = texture.get("fabric_class")
+    if fabric_class:
+        tex = texture.get("fabric_texture_band")
+        pat = texture.get("fabric_pattern_band")
+        if tex:
+            lines.append(f"texture: dominant fabric ({fabric_class}) surface {tex}")
+        if pat:
+            lines.append(f"texture: dominant fabric ({fabric_class}) pattern {pat}")
+    else:
+        lines.append("texture: abstain (no measurable fabric region for material claims)")
+    skin_class = texture.get("skin_class")
+    if skin_class:
+        tex = texture.get("skin_texture_band")
+        if tex:
+            lines.append(f"texture: dominant skin surface ({skin_class}) {tex}")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -307,6 +332,28 @@ def _setting_payload(setting: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _texture_payload(texture: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not texture:
+        return {}
+    payload = {
+        "fabric_class": texture.get("fabric_class"),
+        "fabric_coverage": texture.get("fabric_coverage"),
+        "fabric_edge_fraction": texture.get("fabric_edge_fraction"),
+        "fabric_deviant_fraction": texture.get("fabric_deviant_fraction"),
+        "fabric_texture_band": texture.get("fabric_texture_band"),
+        "fabric_pattern_band": texture.get("fabric_pattern_band"),
+        "skin_class": texture.get("skin_class"),
+        "skin_coverage": texture.get("skin_coverage"),
+        "skin_edge_fraction": texture.get("skin_edge_fraction"),
+        "skin_mean_gradient": texture.get("skin_mean_gradient"),
+        "skin_texture_band": texture.get("skin_texture_band"),
+    }
+    ab = texture.get("abstention_reason")
+    if texture.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -316,6 +363,7 @@ def build_evidence_payload(
     skin: Mapping[str, Any],
     lighting: Mapping[str, Any],
     setting: Mapping[str, Any] | None = None,
+    texture: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -377,6 +425,7 @@ def build_evidence_payload(
                 "light_residual": lighting.get("light_residual"),
             },
             "setting": _setting_payload(setting),
+            "texture": _texture_payload(texture),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -403,6 +452,7 @@ def assemble_dossier(
     skin: Mapping[str, Any],
     lighting: Mapping[str, Any],
     setting: Mapping[str, Any] | None = None,
+    texture: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -418,6 +468,7 @@ def assemble_dossier(
         ("skin-color-tone:v1", "skin-color", render_skin_color(skin)),
         ("lighting:v1", "lighting", render_lighting(lighting)),
         ("setting-environment:v1", "setting", render_setting(setting or {})),
+        ("texture-material:v1", "texture", render_texture(texture or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

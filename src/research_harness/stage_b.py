@@ -48,6 +48,7 @@ from .hair import HairError, compute_hair
 from .skin_color import SkinColorError, compute_skin_tone
 from .lighting import LightingError, compute_lighting
 from .setting import SettingError, compute_setting
+from .texture import TextureError, compute_texture
 
 
 class StageBRunError(RuntimeError):
@@ -658,6 +659,78 @@ def _serialize_setting(setting: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _texture_evidence() -> dict[str, Any]:
+    """Declared deterministic texture/material specialist (arm #35)."""
+    module_path = Path(compute_texture.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-texture-v1",
+        "specialists": [
+            {
+                "id": "in-memory-texture-v1",
+                "scope": "Per-region-class texture/material statistics (dominant measurable fabric class: Apparel/Upper_Clothing/Lower_Clothing; dominant measurable skin class) from seg2 masks + source pixels; never identity, posture, or in-subject semantics beyond surface roughness/pattern of the dominant class.",
+                "inputs": "Frozen selected-item seg2.npy and the source RGB pixels already decoded by this bounded run; recomputed in memory with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing continuous texture statistics with deterministic quantized texture bands (smooth/some texture/textured), fabric pattern bands (solid/some variation/busy), and scale-invariant edge/deviant fractions, or explicit abstention, not semantic ground truth or caption claims.",
+                "provenance": (
+                    "research_harness.texture.compute_texture "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; fabric claims are measured only when the dominant garment class clears a raw-pixel floor and a frame-coverage floor, otherwise the fabric fact abstains (never fabricated); skin claims abstain when no skin class clears the floors; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Gradient statistics conflate illumination boundaries with material edges (a shadow crease can read as texture); very coarse knits and fine patterns can fall in the same edge-fraction band; fabric print detection depends on color distance from the region mean and can miss tone-on-tone prints; skin bands are calibrated lower than fabric and may mislabel stubble/freckles as texture.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_texture(texture: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a texture measurement dict.
+
+    Verbalizes only scale-invariant, caption-relevant facts: whether texture
+    is measurable, the dominant fabric class's texture/pattern bands when a
+    garment class cleared the gates, and the dominant skin class's surface
+    band. Continuous gradient values, deviant fractions, and pixel counts are
+    deliberately NOT verbalized (camera/response/white-balance dependent);
+    they exist in the machine-readable `evidence_payload` JSON (dossier /
+    compressor input).
+    """
+    lines = [
+        "TEXTURE (deterministic, seg2 region-class masks + source pixel gradients):"
+    ]
+    if not texture.get("subject_present"):
+        lines.append("- no reliable foreground subject present -> abstain from texture claims")
+        return "\n".join(lines)
+    if not texture.get("texture_measurable"):
+        lines.append("- no fabric or skin region cleared the measurement gate -> abstain from texture claims")
+        reason = texture.get("abstention_reason")
+        if reason:
+            lines.append(f"  (reason: {reason})")
+        return "\n".join(lines)
+
+    fabric_class = texture.get("fabric_class")
+    if fabric_class:
+        fabric_tex = texture.get("fabric_texture_band")
+        fabric_pat = texture.get("fabric_pattern_band")
+        if fabric_tex:
+            lines.append(f"- dominant fabric ({fabric_class}): surface {fabric_tex}")
+        if fabric_pat:
+            lines.append(f"- dominant fabric ({fabric_class}): pattern {fabric_pat}")
+    else:
+        lines.append("- no measurable fabric region -> abstain from fabric/material claims")
+
+    skin_class = texture.get("skin_class")
+    if skin_class:
+        skin_tex = texture.get("skin_texture_band")
+        if skin_tex:
+            lines.append(f"- dominant skin surface ({skin_class}): {skin_tex}")
+    else:
+        lines.append("- no measurable skin region -> abstain from skin-surface claims")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -731,6 +804,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "skin-color": ("pose2.npy", "seg2.npy"),
     "lighting": ("seg2.npy", "normal2.npy"),
     "setting": ("seg2.npy",),
+    "texture": ("seg2.npy",),
     "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
 }
 
@@ -810,7 +884,7 @@ def build_stage_b_plan(
     is byte-identical to the historical arm-#4 plan so frozen invariants hold.
     """
     if evidence_kind not in (
-        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "context4k"
+        "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k"
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -981,6 +1055,32 @@ def build_stage_b_plan(
             "already-decoded source pixels only (presence requires a raw-pixel floor and a frame-coverage "
             "floor; otherwise the region abstains). Only scale-invariant facts are verbalized; absolute pixel "
             "counts and raw RGB values stay in evidence_payload."
+        )
+    elif evidence_kind == "texture":
+        evidence = _texture_evidence()
+        evidence_condition_id = "context-raw-texture"
+        comparison_plan_id = "stage-b-first500-texture-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic texture/material "
+            "measurements (per-region-class edge/gradient statistics from seg2 masks + source pixels: "
+            "dominant fabric class texture/pattern bands, dominant skin class surface band) may improve "
+            "supported texture/material/fabric description claims without increasing unsupported, "
+            "contradictory, or invented material details when the source item, view, prompt template, "
+            "local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The texture-evidence condition does not improve the pre-registered claim-support rubric over its "
+            "matched no-specialist condition on texture/material claims, or an apparent difference is "
+            "attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "and pointmap are not used as evidence inputs. Texture statistics are computed in memory from the "
+            "frozen selected seg2 (per class mask) and the already-decoded source pixels only (a region class "
+            "requires a raw-pixel floor and a frame-coverage floor; otherwise the fact abstains). Statistics "
+            "are per-channel-99.9-percentile-normalized so exposure/white balance cannot inflate gradients; "
+            "only scale-invariant bands/fractions are verbalized; absolute gradient values and pixel counts "
+            "stay in evidence_payload."
         )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
@@ -1176,6 +1276,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "lighting"
     elif "context-raw-setting" in condition_ids:
         rebuild_kind = "setting"
+    elif "context-raw-texture" in condition_ids:
+        rebuild_kind = "texture"
     elif "context-raw-context4k" in condition_ids:
         rebuild_kind = "context4k"
     else:
@@ -1310,6 +1412,10 @@ def _load_selected_item(
         setting = compute_setting(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except SettingError as exc:
         raise StageBRunError(f"setting abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        texture = compute_texture(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
+    except TextureError as exc:
+        raise StageBRunError(f"texture abort for frozen selected item {image_id}: {exc}") from exc
     derived_reads = ["pose2.npy", "seg2.npy"]
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
@@ -1335,6 +1441,7 @@ def _load_selected_item(
         "skin_tone": skin_tone,
         "lighting": lighting,
         "setting": setting,
+        "texture": texture,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -1403,6 +1510,10 @@ def _render_condition(
         setting = prepared["setting"]
         evidence_text = _serialize_setting(setting)
         return raw.copy(), _context_prompt(evidence_text), setting
+    if condition_id == "context-raw-texture":
+        texture = prepared["texture"]
+        evidence_text = _serialize_texture(texture)
+        return raw.copy(), _context_prompt(evidence_text), texture
     if condition_id == "context-raw-context4k":
         item = prepared["item"]
         lighting = prepared["lighting"]
@@ -1416,6 +1527,7 @@ def _render_condition(
             skin=prepared["skin_tone"],
             lighting=lighting,
             setting=prepared.get("setting"),
+            texture=prepared.get("texture"),
             determinations=prepared["determinations"],
         )
         payload = build_evidence_payload(
@@ -1426,6 +1538,7 @@ def _render_condition(
             skin=prepared["skin_tone"],
             lighting=lighting,
             setting=prepared.get("setting"),
+            texture=prepared.get("texture"),
             determinations=prepared["determinations"],
             source_sha256=prepared.get("source_sha256"),
         )
