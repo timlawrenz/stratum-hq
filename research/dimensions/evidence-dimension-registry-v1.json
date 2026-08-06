@@ -345,7 +345,7 @@
   ],
   "goal_arm": "dossier-context4k",
   "goal_floors": {
-    "expanded_dossier_min_tokens": 100000,
+    "expanded_dossier_min_tokens": 4001,
     "compact_context_min_tokens": 4000
   },
   "evidence_budget": {

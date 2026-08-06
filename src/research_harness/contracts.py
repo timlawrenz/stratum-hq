@@ -399,9 +399,14 @@ def _validate_stratum_policy_profile(program: Mapping[str, Any]) -> None:
         raise ContractError("stratum policy profile requires the NAS research artifact root")
 
     representation = _require_mapping(program["representation"], "representation")
+    # Stratum policy profile (schema v2, owner directive 2026-08-06): the 100K
+    # expanded-dossier number is an ASPIRATION metadata target, not a pass gate.
+    # The only hard floor is structural — the dossier must exceed the 4K compact
+    # ceiling it compresses into (4001). The compact ceiling (4000) and the
+    # legacy-encoder floor (512) are real consumer constraints and stay pinned.
     expected_tokens = {
         "expanded_dossier_target_tokens": 100_000,
-        "expanded_dossier_min_tokens": 100_000,
+        "expanded_dossier_min_tokens": 4_001,
         "compact_context_target_tokens": 4_000,
         "compact_context_min_tokens": 4_000,
         "legacy_text_encoder_max_tokens": 512,
@@ -409,6 +414,11 @@ def _validate_stratum_policy_profile(program: Mapping[str, Any]) -> None:
     for key, expected in expected_tokens.items():
         if representation[key] != expected:
             raise ContractError(f"stratum policy profile requires {key}={expected}")
+    if representation.get("expanded_dossier_target_role", "aspiration") != "aspiration":
+        raise ContractError(
+            "stratum policy profile requires expanded_dossier_target_role='aspiration' "
+            "(the 100K target is metadata, not a pass gate)"
+        )
 
     scheduler = _require_mapping(program["gpu_scheduler"], "gpu_scheduler")
     if scheduler.get("scheduler_project") != "stratum-contextual-specialist-research":
@@ -439,8 +449,8 @@ def _validate_stratum_policy_profile(program: Mapping[str, Any]) -> None:
 def validate_program(program: Mapping[str, Any]) -> None:
     """Validate the durable program configuration before autonomous work begins."""
     program = _require_mapping(program, "program")
-    if program.get("schema_version") != 1:
-        raise ContractError("program schema_version must be 1")
+    if program.get("schema_version") not in (1, 2):
+        raise ContractError("program schema_version must be 1 (legacy strict floor) or 2 (directional)")
     _require_canonical_meaningful_string(program.get("program_id"), "program_id")
 
     source = _require_mapping(program.get("canonical_source"), "canonical_source")
@@ -479,15 +489,16 @@ def validate_program(program: Mapping[str, Any]) -> None:
         "artifact_policy.canonical_source_write_allowed",
     )
 
-    representation = _require_mapping(program.get("representation"), "representation")
+    representation = _require_mapping(program["representation"], "representation")
     expanded = _require_positive_number(
         representation.get("expanded_dossier_target_tokens"),
         "representation.expanded_dossier_target_tokens",
     )
-    expanded_min = _require_positive_number(
-        representation.get("expanded_dossier_min_tokens"),
-        "representation.expanded_dossier_min_tokens",
-    )
+    # The expanded-dossier floor is STRUCTURAL, not aspirational: the dossier
+    # must be strictly larger than the compact context it compresses into,
+    # otherwise "expand-then-compress" is vacuous. It defaults to
+    # compact_context_target_tokens + 1 when omitted. The 100K target is an
+    # ASPIRATION metadata value (target_role "aspiration"), never a pass gate.
     compact = _require_positive_number(
         representation.get("compact_context_target_tokens"),
         "representation.compact_context_target_tokens",
@@ -496,12 +507,24 @@ def validate_program(program: Mapping[str, Any]) -> None:
         representation.get("compact_context_min_tokens"),
         "representation.compact_context_min_tokens",
     )
+    if representation.get("expanded_dossier_min_tokens") is None:
+        expanded_min = compact + 1.0
+    else:
+        expanded_min = _require_positive_number(
+            representation.get("expanded_dossier_min_tokens"),
+            "representation.expanded_dossier_min_tokens",
+        )
     legacy = _require_positive_number(
         representation.get("legacy_text_encoder_max_tokens"),
         "representation.legacy_text_encoder_max_tokens",
     )
-    if expanded_min > expanded:
-        raise ContractError("expanded_dossier_min_tokens must not exceed expanded_dossier_target_tokens")
+    target_role = representation.get("expanded_dossier_target_role", "aspiration")
+    if target_role not in ("aspiration", "gate"):
+        raise ContractError("representation.expanded_dossier_target_role must be 'aspiration' or 'gate'")
+    if expanded_min <= compact:
+        raise ContractError("expanded_dossier_min_tokens must exceed compact_context_target_tokens")
+    if expanded < expanded_min:
+        raise ContractError("expanded_dossier_target_tokens must not be below expanded_dossier_min_tokens")
     if compact_min > compact:
         raise ContractError("compact_context_min_tokens must not exceed compact_context_target_tokens")
     if expanded <= compact or expanded_min < compact_min:
@@ -933,8 +956,18 @@ def validate_compression_bundle(bundle: Mapping[str, Any], program: Mapping[str,
     dossier = _require_mapping(bundle.get("expanded_dossier"), "expanded_dossier")
     expanded_tokens = _require_positive_number(dossier.get("token_count"), "expanded_dossier.token_count")
     representation = _require_mapping(program["representation"], "representation")
-    if expanded_tokens < float(representation["expanded_dossier_min_tokens"]):
-        raise ContractError("expanded_dossier.token_count is below the program minimum")
+    # Structural floor only: the dossier must exceed the compact ceiling it
+    # compresses into (default compact_target + 1). The 100K aspiration target
+    # is NOT enforced here — honest evidence density is the objective, and the
+    # claim->evidence path below is the anti-fabrication gate, not a token count.
+    structural_floor = float(
+        representation.get("expanded_dossier_min_tokens")
+        or (float(representation["compact_context_target_tokens"]) + 1.0)
+    )
+    if expanded_tokens < structural_floor:
+        raise ContractError("expanded_dossier.token_count is below the structural minimum")
+    if expanded_tokens <= float(representation["compact_context_target_tokens"]):
+        raise ContractError("expanded_dossier must exceed the compact-context ceiling")
     evidence_ids = dossier.get("evidence_ids")
     if not isinstance(evidence_ids, list) or not evidence_ids or not all(
         isinstance(item, str) and item for item in evidence_ids
