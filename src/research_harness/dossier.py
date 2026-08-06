@@ -59,6 +59,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "hair:v1",
     "skin-color-tone:v1",
     "lighting:v1",
+    "setting-environment:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -243,6 +244,29 @@ def render_lighting(lighting: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_setting(setting: Mapping[str, Any]) -> list[str]:
+    lines: list[str] = []
+    if not setting.get("setting_measurable"):
+        reason = setting.get("abstention_reason")
+        lines.append("setting: abstain (background not measurable)" + (f" ({reason})" if reason else ""))
+        return lines
+    coverage = setting.get("background_coverage")
+    if isinstance(coverage, (int, float)):
+        lines.append(f"setting: background covers {float(coverage):.2f} of the frame")
+    color = setting.get("dominant_background_color")
+    if color:
+        lines.append(f"setting: dominant background color {color}")
+    for key, label in (
+        ("background_tone_band", "setting: background tone"),
+        ("background_vibrancy_band", "setting: background color intensity"),
+        ("background_pattern_band", "setting: background surface"),
+    ):
+        value = setting.get(key)
+        if value:
+            lines.append(f"{label} {value}")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -265,6 +289,24 @@ def render_relational(det: Mapping[str, Any]) -> list[str]:
 # Deterministic dossier assembly + context4k compression.
 # ---------------------------------------------------------------------------
 
+def _setting_payload(setting: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not setting:
+        return {}
+    payload = {
+        "background_coverage": setting.get("background_coverage"),
+        "dominant_background_color": setting.get("dominant_background_color"),
+        "dominant_background_hex": setting.get("dominant_background_hex"),
+        "background_tone_band": setting.get("background_tone_band"),
+        "background_vibrancy_band": setting.get("background_vibrancy_band"),
+        "background_pattern_band": setting.get("background_pattern_band"),
+        "background_deviant_fraction": setting.get("background_deviant_fraction"),
+    }
+    ab = setting.get("abstention_reason")
+    if setting.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -273,6 +315,7 @@ def build_evidence_payload(
     hair: Mapping[str, Any],
     skin: Mapping[str, Any],
     lighting: Mapping[str, Any],
+    setting: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -333,6 +376,7 @@ def build_evidence_payload(
                 "light_vector": lighting.get("light_vector"),
                 "light_residual": lighting.get("light_residual"),
             },
+            "setting": _setting_payload(setting),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -358,6 +402,7 @@ def assemble_dossier(
     hair: Mapping[str, Any],
     skin: Mapping[str, Any],
     lighting: Mapping[str, Any],
+    setting: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -372,6 +417,7 @@ def assemble_dossier(
         ("hair:v1", "hair", render_hair(hair)),
         ("skin-color-tone:v1", "skin-color", render_skin_color(skin)),
         ("lighting:v1", "lighting", render_lighting(lighting)),
+        ("setting-environment:v1", "setting", render_setting(setting or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
