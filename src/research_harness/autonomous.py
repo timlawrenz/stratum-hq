@@ -665,15 +665,32 @@ def run_tick(
         except AutonomousError:
             return {"next_action": "research-pending", "active_arm": arm["id"]}
         strikes = arm["valid_non_improving_experiments"]
+        concluded_state: str
         if verdict["verdict"] == "BETTER":
             advance_dimension(registry, arm["id"], state="validated", strikes=strikes)
             _record_conclusion(arm["id"], verdict["verdict"], "validated", agg)
+            concluded_state = "validated"
         else:
             strikes += 1
             new_state = "falsified" if strikes >= strike_limit else "active"
             advance_dimension(registry, arm["id"], state=new_state, strikes=strikes)
             _record_conclusion(arm["id"], verdict["verdict"], new_state, agg)
-        # Select the next arm from the updated registry.
+            concluded_state = new_state
+        if concluded_state == "active":
+            # A valid non-improving verdict below the falsification limit keeps
+            # the SAME arm the sole research:active one (one-active invariant).
+            # Surface brainstorm first if the sweep is stalled; otherwise retry
+            # the arm on the next research cycle (never activate a second arm).
+            stall_reason = _tick_stall_reason(registry)
+            if stall_reason is not None:
+                return {"next_action": "brainstorm-on-stall", "verdict": verdict,
+                        "advanced_arm": arm["id"], "aggregate": agg,
+                        "stall_reason": stall_reason,
+                        "brainstorm_options": BRAINSTORM_OPTIONS}
+            return {"next_action": "research-pending", "active_arm": arm["id"],
+                    "verdict": verdict, "advanced_arm": arm["id"], "aggregate": agg}
+        # Select the next arm from the updated registry (the concluded arm is
+        # terminal/validated, so the slot is free).
         proposals = [d for d in registry["dimensions"]
                      if d["state"] in ("proposal",) and d["id"] != arm["id"]]
         if proposals:

@@ -208,6 +208,55 @@ def test_run_tick_reconstruction_requires_delta() -> None:
         run_tick(reg, method="reconstruction", reconstruction_delta=None)
 
 
+def test_run_tick_not_better_strike_keeps_one_active() -> None:
+    """A valid NOT_BETTER below the falsification limit records a strike and
+    keeps the SAME arm the sole research:active one (one-active invariant).
+    It must NOT activate a second arm while the struck arm is still active."""
+    reg = _registry()
+    reg["dimensions"][0]["state"] = "active"
+    out = run_tick(
+        reg,
+        method="reconstruction",
+        reconstruction_delta=-0.01,
+        items=24,
+    )
+    assert out["verdict"]["verdict"] == "NOT_BETTER"
+    assert out["next_action"] == "research-pending"
+    assert out["advanced_arm"] == "body-type"
+    assert out["active_arm"] == "body-type"
+    acts = [d["state"] for d in reg["dimensions"]]
+    assert acts == ["active", "proposal"]  # mood NEVER activated
+    assert reg["dimensions"][0]["valid_non_improving_experiments"] == 1
+    assert reg["dimensions"][1]["state"] == "proposal"
+    assert reg.get("selection_progress", 0) == 0  # no selection happened
+    hist = reg["conclusion_history"]
+    assert hist[-1]["verdict"] == "NOT_BETTER"
+    assert hist[-1]["state"] == "active"
+
+
+def test_run_tick_third_strike_falsifies_then_activates_next() -> None:
+    """At the falsification limit a NOT_BETTER closes the arm (falsified) and
+    only then the next proposal is activated — still exactly one active."""
+    reg = _registry()
+    reg["dimensions"][0]["state"] = "active"
+    reg["dimensions"][0]["valid_non_improving_experiments"] = 2
+    out = run_tick(
+        reg,
+        method="reconstruction",
+        reconstruction_delta=-0.01,
+        items=24,
+    )
+    assert out["verdict"]["verdict"] == "NOT_BETTER"
+    assert out["next_action"] == "activate-next"
+    assert out["advanced_arm"] == "body-type"
+    assert out["next_arm"] == "mood"
+    assert reg["dimensions"][0]["state"] == "falsified"
+    assert reg["dimensions"][0]["valid_non_improving_experiments"] == 3
+    assert reg["dimensions"][1]["state"] == "active"
+    acts = [d["state"] for d in reg["dimensions"]]
+    assert sorted(acts) == ["active", "falsified"]
+
+
 def test_run_tick_records_conclusion_history_and_progress(tmp_path) -> None:
     reg = _registry()
     reg["dimensions"][0]["state"] = "active"
