@@ -276,6 +276,39 @@
       ],
       "state": "proposal",
       "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "vlm-dense-description",
+      "name": "open-weight VLM dense multi-view description",
+      "arm_issue": 47,
+      "hypothesis": "A locally-run open-weight VLM producing a dense, multi-view descriptive block for a single curated woman source image (full-frame + seg2-derived focal crops), routed claim-by-claim with abstention, materially raises supported-claim density on the frozen 24-item cohort versus the deterministic dossier alone, and is a legitimately-new evidence part toward the 100K expanded-dossier floor (option B of decision #46).",
+      "falsified_if": "The VLM dense description does not raise supported-claim density on the frozen cohort beyond the deterministic dossier + honest-expansion ceiling, or abstains at too low a rate to be trustworthy (unchecked verbosity), or is not distinguishable from a redundant attribute-tagger over already-validated axes.",
+      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; source pixels + seg2 crop regions; local Ollama/ComfyUI stack",
+      "selection_rationale": "The arm-36 honest expansion-ceiling audit proved deterministic evidence tops out at 2040-3489 tokens/item (7-50x below the 100K floor); a VLM dense-description specialist is the concrete option-B evidence source named in decision #46 and is a NEW evidence part per the open-world sourcing directive (local options exhausted).",
+      "scope": "dense multi-view descriptive prose for a single curated woman source image: full-frame + focal crops (face, upper body, garment regions derived from seg2); evidence prose, not a caption",
+      "inputs": "decoded source RGB full-frame + fixed focal crops derived from seg2 regions; frozen prompt",
+      "output_semantics": "structured markdown block of dense descriptive claims (subject, garments, hair, skin, setting, pose, facial detail), each claim tagged observed/inferred/abstained; no absolute pixel or raw-coordinate numbers in prose; scale-invariant ratios only; machine-readable measurements stay in evidence_payload JSON",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: Molmo/Molmo-72B (AI2, fully open weights+data, PixMo dense-caption pretraining, top captioning benchmark; arXiv 2409.17146); Qwen2-VL-72B/Qwen2.5-VL (open weight, strongest MMMU/OCRBench); InternVL3-78B (MIT license). No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen prompt + deterministic crop policy; emit [ABSTAIN] on regions with insufficient visible pixels (motion blur/occlusion/DOF crop); detector/measurement disagreement is a quality anomaly, never content; no absolute pixel claim in prose",
+      "qualification_gate": "PASS only after: (a) frozen crop/prompt/view policy with pinned digests; (b) controlled document-utility check reproducing every fact deterministic specialists already declare on a known case AND adding materially more supported claims on the frozen 24-item cohort (claim-support rubric v1, same reviewer); (c) calibration on known cases + null case; (d) abstention audit (observed/inferred/abstained rates, unchecked verbosity is a fail); (e) independent adversarial review of the protocol; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "vlm-dense-description",
+        "seg2-crop-region"
+      ],
+      "model_candidates": [
+        "open-vlm-dense-captioner"
+      ],
+      "validation_methods": [
+        "claim-support",
+        "roundtrip-audit"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ]
 }
