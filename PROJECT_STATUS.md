@@ -129,12 +129,11 @@ scale-invariant prose; the block is blended with the deterministic dossier compa
 5-condition claim-support round-trip (baseline `context-raw-context4k`, variant `context-raw-vlm-dense`);
 the verdict isolates the VLM marginal via `autonomous-tick --baseline-condition/--evidence-condition`.
 **Harness surface LANDED 2026-08-06 (draft PR #57):** `vlm-dense` evidence kind + explicit-conditions
-tick + Strix block-batch generator/scheduler + CPU freezer, tests 525 passed. **Block batch RUNNING on
-Strix** (scheduler claim `stratum-vlm-dense-blocks-v1`, stage `/mnt/nas-ai-models/research/stratum/stage-b-vlm-dense-v1/`).
-**Next:** once `vlm-done.json` is published → freeze plan/manifest → 4090 caption generation (120 records,
-`stage-b-vlm-dense-captions-v1`) → independent review (120 rows) → tick. All runs additive/noncanonical,
-no corpus mutation, no backfill, no legacy overwrite. If parts of the augmented dossier pipeline are not
-buildable, record the instrumented gap and route.
+tick + Strix block-batch generator/scheduler + CPU freezer, tests 525 passed. **Block batch COMPLETE
+(gemma3:27b, after qwen3-vl:32b FAILED qualification on the real corpus — silent empty decode; 24/24
+blocks, 578 tagged claims, 0 leaks; 0% cohort abstention flagged for the abstention audit).** Caption
+generation COMPLETE (120 records, 5 conditions, run `stage-b-vlm-dense-captions-v1`,
+PENDING_INDEPENDENT_REVIEW). **Next:** independent review (120 rows, gemma4:e4b) → tick.
 
 ## Live research tree
 
