@@ -335,7 +335,7 @@
         "claim-support",
         "roundtrip-audit"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "feeds": [
         "dossier-context4k"
@@ -379,6 +379,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 4
+    },
+    {
+      "arm_id": "vlm-dense-description",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 5
     }
   ]
 }

@@ -1,7 +1,7 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (arm #37 reconstruction round-trip COMPLETE → **BETTER**; registry advanced; vlm-dense-description #47 active)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running autonomously, one arm open (vlm-dense-description #47).**
+**Last updated:** 2026-08-06 (arm #47 vlm-dense-description round-trip COMPLETE → **BETTER**; registry advanced; sweep now EXHAUSTED → brainstorm-new-data)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; ALL 10 registered arms now validated; next action brainstorm-new-data (widen the menu).**
 
 **Arm #37 RECONSTRUCTION ROUND-TRIP BETTER (2026-08-06, harness-computed, draft PR on
 `exp/stage-b-reconstruction-arm37-20260806`).** The generative reconstruction arm
@@ -108,12 +108,21 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   (garment-only gating abstained 13/24 on the topless-half cohort — per-class dominant-region fixed this;
   pooled-class means degenerated to a fake 11/11 "busy" — per-class normalization fixed this).
   Registry: #35 → validated, **#37 reconstruction → active** (explore slot).
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **9 validated** (body-type,
-  clothing, hair, skin-color, lighting, **dossier-context4k #36**, **setting #34**, **texture #35**,
-  **reconstruction #37**), **1 active (vlm-dense-description #47 — sole `research:active`, selected via
-  exploit after the #37 tick, EIG 0.10, tie-broken by id, selection_progress 5)**, **0 proposals**. Sweep not
-  exhausted, not stalled; goal arm dossier-context4k validated (`goal_unreachable: false`, floor 4001,
-  gap 512). Selector tie-break fixed (2026-08-06, id-tiebreaker regression test).
+- **Arm #47 VLM DENSE-DESCRIPTION ROUND-TRIP BETTER (2026-08-06, harness-computed, draft PR #57).**
+  The option-B dossier-growth evidence part landed end to end: frozen block batch
+  (qwen3-vl:32b → **gemma3:27b** after the former FAILED qualification on the real corpus — silent empty
+  decode), 5-condition claim-support round-trip, independent review, and
+  `autonomous-tick --baseline-condition context-raw-context4k --evidence-condition context-raw-vlm-dense`
+  computed **BETTER** — VLM marginal support ratio 0.7376 → 0.9581 (Δ +0.2206), 163→206 supported,
+  58→9 unsupported, **sign-test p=0.013302**, paired 21/24. Registry: **vlm-dense-description
+  active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
+  records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
+  **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **10/10 validated**
+  (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
+  reconstruction #37, **vlm-dense-description #47**), 0 active, 0 blocked, 0 proposals.
+  `dimension-sweep-status`: `exhausted: true`, `next_action: brainstorm-new-data`, `goal_unreachable:
+  false` (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
@@ -121,19 +130,17 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Arm #47 vlm-dense-description is the sole `research:active` arm (selected via exploit after the #37
-tick, EIG 0.10, tie-broken by id, selection_progress 5).** This is the option-B dossier-growth evidence
-part: an open-weight VLM (`qwen3-vl:32b`, already installed; sourcing-verified 2026-08-06) producing a
-dense multi-view description block (full-frame + seg2 focal crops), tagged observed/inferred/abstained,
-scale-invariant prose; the block is blended with the deterministic dossier compact as the evidence for a
-5-condition claim-support round-trip (baseline `context-raw-context4k`, variant `context-raw-vlm-dense`);
-the verdict isolates the VLM marginal via `autonomous-tick --baseline-condition/--evidence-condition`.
-**Harness surface LANDED 2026-08-06 (draft PR #57):** `vlm-dense` evidence kind + explicit-conditions
-tick + Strix block-batch generator/scheduler + CPU freezer, tests 525 passed. **Block batch COMPLETE
-(gemma3:27b, after qwen3-vl:32b FAILED qualification on the real corpus — silent empty decode; 24/24
-blocks, 578 tagged claims, 0 leaks; 0% cohort abstention flagged for the abstention audit).** Caption
-generation COMPLETE (120 records, 5 conditions, run `stage-b-vlm-dense-captions-v1`,
-PENDING_INDEPENDENT_REVIEW). **Next:** independent review (120 rows, gemma4:e4b) → tick.
+**The sweep is EXHAUSTED: all 10 registered arms are validated (last: vlm-dense-description #47
+BETTER). `dimension-sweep-status` returns `next_action: brainstorm-new-data`.** Per the loop contract,
+DO NOT re-run the same arm patterns — WIDEN: draft N genuinely-new candidate dimensions (new evidence
+parts / new model classes / new data sources, e.g. relational/interaction, temporal/sequence,
+generative/reconstruction extensions, new-model dense-describer candidates from a fresh literature
+scan), each with the full declaration (scope/inputs/output_semantics/provenance/abstention_policy/
+qualification_gate) and a NEW evidence part or model class, and register through the gated command:
+`research_harness.cli propose-dimensions research/dimensions/evidence-dimension-registry-v1.json
+--candidates <json> --count N --require-new-evidence-part --write`. The goal arm dossier-context4k is
+validated (round-trip BETTER), goal_unreachable false; the VLM evidence part (validated) plus the
+deterministic record honestly clear the 4001 structural floor.
 
 ## Live research tree
 
