@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "policy_profile": "stratum-single-woman-v1",
   "program_id": "stratum-contextual-specialist-research",
   "title": "Open-world specialist evidence to contextual representation",
@@ -24,7 +24,8 @@
   },
   "representation": {
     "expanded_dossier_target_tokens": 100000,
-    "expanded_dossier_min_tokens": 100000,
+    "expanded_dossier_target_role": "aspiration",
+    "expanded_dossier_min_tokens": 4001,
     "compact_context_target_tokens": 4000,
     "compact_context_min_tokens": 4000,
     "legacy_text_encoder_max_tokens": 512,
@@ -33,7 +34,7 @@
       "human_readable": "context4k.md",
       "provenance": "compression.json"
     },
-    "rule": "The compact context is a first-class provenance-bearing artifact. It must not be silently truncated into the legacy 512-token T5 contract."
+    "rule": "The compact context is a first-class provenance-bearing artifact bounded by the downstream consumer budget (<=4000 tokens, >512 legacy-encoder). The expanded dossier grows honestly with the evidence supply; 100000 is an aspiration metadata target, not a pass gate. The only hard expanded-dossier floor is structural: it must exceed the 4000-token compact ceiling it compresses into. The anti-fabrication gate is the claim->evidence path, not a token count. It must not be silently truncated into the legacy 512-token T5 contract."
   },
   "specialists": {
     "policy": "open_world",

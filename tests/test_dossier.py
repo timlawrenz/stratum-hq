@@ -181,12 +181,13 @@ def test_build_compression_bundle_validates_against_contract() -> None:
     program = _program()
     dossier = assemble_dossier(image_id="item-1", **m)
     context = compress_dossier_to_context(dossier)
-    # Honest finding: the deterministic-only dossier (~K tokens) is far below
-    # the 100K expanded-dossier floor and the compact context below the 4K
-    # floor. The contract correctly refuses to certify an under-budget bundle —
-    # reaching the program floor requires the aggregator expansion stage (the
-    # scheduler-bound round-trip audit). This is the designed honesty gate.
-    with pytest.raises(DossierError, match="expanded_dossier.token_count is below the program minimum"):
+    # Honest finding: the deterministic-only dossier (~K tokens) is below the
+    # STRUCTURAL expanded-dossier floor (it must exceed the 4K compact ceiling
+    # it compresses into). The contract correctly refuses to certify an
+    # under-floor bundle — the dossier must grow (more evidence / the aggregator
+    # expansion stage) before it can honestly exceed the compact ceiling. This
+    # is the designed honesty gate; the 100K aspiration target is not a gate.
+    with pytest.raises(DossierError, match="expanded_dossier.token_count is below the structural minimum"):
         build_compression_bundle(image_id="item-1", dossier=dossier, context=context, program=program)
 
 
