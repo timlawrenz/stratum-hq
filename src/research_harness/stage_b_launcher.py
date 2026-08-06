@@ -287,7 +287,7 @@ def _build_runner_command(
     candidate_path = _resolved_existing_file(
         Path(execution["candidate_manifest_path"]), "frozen candidate manifest"
     )
-    return [
+    command = [
         sys.executable,
         "-m",
         "research_harness.stage_b",
