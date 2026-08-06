@@ -221,7 +221,7 @@
       "id": "dossier-context4k",
       "name": "full-dossier assembly and context4k compression",
       "arm_issue": 36,
-      "state": "blocked",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "An expanded per-item dossier assembled from verified evidence dimensions (target >=100K tokens, claim-by-claim evidence links) can be compressed to a ~4K-token context4k artifact that preserves supported claims better than a plain 4K summarization baseline.",
       "falsified_if": "context4k does not preserve supported claims at materially higher density than a 4K baseline summarization (round-trip claim-support audit not passed).",
@@ -252,9 +252,7 @@
       "evidence_parts": [
         "verified-dimension-specialists",
         "relational-determinations"
-      ],
-      "blocked_reason": "gate is decision #46 (research:needs-human): the 100K/4K floors are unreachable by honest expansion (measured gap ~86.5K-96.5K tok/item); advancing requires a human A/B ruling (reframe scale vs grow evidence), not a measurement",
-      "blocked_by_issue": 46
+      ]
     },
     {
       "id": "reconstruction",
@@ -349,10 +347,11 @@
     "compact_context_min_tokens": 4000
   },
   "evidence_budget": {
-    "basis": "measured honest expansion-ceiling audit (commit 2bd3292, 2026-08-06; run /mnt/nas-ai-models/research/stratum/dossier-expansion-audit-v1/): base deterministic dossier 387-648 tok/item; total record (prose+payload) 2040-3489; generous honest LM elaboration ceiling 8500-13500",
+    "basis": "measured honest expansion-ceiling audit, program-floor-aware (2026-08-06; run /mnt/nas-ai-models/research/stratum/dossier-expansion-audit-v2/): base deterministic dossier 387-648 tok/item; total record (prose+payload) 2040-3489; generous honest LM elaboration ceiling 8500-13500; under the reframed structural floor 4001 any_max_honest_floor_reached=true (24/24), deterministic record alone false",
     "deterministic_min_tokens_per_item": 2040,
     "deterministic_median_tokens_per_item": 2700,
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
-  }
+  },
+  "selection_progress": 1
 }

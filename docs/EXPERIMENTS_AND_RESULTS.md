@@ -2,6 +2,18 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #36 — post-ruling honest re-measurement under the reframed structural floor — `[MEASUREMENT — NOT A VERDICT]`
+
+**Date:** 2026-08-06 (cycle after PR #50 merged)
+**Arm:** #36 — dossier-context4k (goal arm, unblocked post-ruling)
+**Code:** `research_harness/dossier_expand.py` made program-floor-aware (`floor_gap_analysis` now reads the contract's `expanded_dossier_min_tokens`; the audit runner passes both floors). Regression test added (`test_floor_gap_analysis_reframed_structural_floor_is_lm_reachable`).
+**Run:** `/mnt/nas-ai-models/research/stratum/dossier-expansion-audit-v2/` (24/24 frozen items, CPU-only, same frozen manifest as v1 — only the floor the audit compares against changed).
+**Measured:** expanded prose 1358–2525 (median 1841.5); total dossier record 2040–3489; generous honest LM elaboration ceiling 8500–13500 tokens/item.
+**Honest verdict under the reframed contract (structural expanded floor 4001, compact 4000):**
+- deterministic+payload record alone: `any_expanded_floor_reached = false` (still under 4001)
+- **`any_max_honest_floor_reached = true` for all 24 items** — the honest LM elaboration ceiling clears the structural floor, so the round-trip claim-support audit is feasible at honest scale via the scheduler-bound aggregator expansion stage, without fabricating content.
+**Registry:** `dossier-context4k` unblocked (`mark-unblocked` after the #46 ruling landed via owner-merged PR #50) → `proposal`; selector re-picks it via exploit (EIG 0.34). **No PASS/verdict**: this is a re-measurement, not an empirical BETTER/NOT_BETTER conclusion. The v1 "7–50× gap vs 100K" framing is superseded by the reframed 4001 structural floor.
+
 ## Arm #33 — lighting evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-05

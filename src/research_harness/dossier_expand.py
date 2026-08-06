@@ -275,7 +275,17 @@ def floor_gap_analysis(
     expanded_floor: int = 100_000,
     compact_floor: int = 4_000,
 ) -> dict[str, Any]:
-    """Compare an item's honest token ceiling against the program floors."""
+    """Compare an item's honest token ceiling against the program floors.
+
+    `expanded_floor` should come from the program contract
+    (``representation.expanded_dossier_min_tokens``): the pre-reframe contract
+    used the absolute 100K aspiration as a blocking floor; the reframed
+    contract uses a structural floor (dossier must exceed the compact ceiling,
+    e.g. 4001 vs the 4K compact context). The function reports BOTH the
+    measured deterministic+payload record and the generous honest LM ceiling so
+    a structural floor that the aggregator stage can honestly clear is
+    distinguishable from an aspiration that honest elaboration cannot reach.
+    """
     total_record = expanded_prose_tokens + payload_tokens
     # Honest analytic upper bound for verbose-but-grounded LM elaboration: each of the
     # `claim_count` bounded facts may receive at most LM_TOKENS_PER_CLAIM_HONEST_MAX tokens
@@ -284,6 +294,26 @@ def floor_gap_analysis(
     # that same corpus; the analytic ceiling is what an honest LM could reach on the SAME
     # fact set (so it can exceed total_record, but is still bounded by facts x max/fact).
     lm_ceiling = claim_count * LM_TOKENS_PER_CLAIM_HONEST_MAX
+    max_honest_reached = lm_ceiling >= expanded_floor
+    if max_honest_reached:
+        note = (
+            f"the {expanded_floor}-token floor is reachable by HONEST LM elaboration: the "
+            f"measured deterministic+payload record is {total_record} tokens/item, and the "
+            f"generous honest LM ceiling ({claim_count} facts x "
+            f"{LM_TOKENS_PER_CLAIM_HONEST_MAX}) is {lm_ceiling} tokens/item -- the "
+            f"scheduler-bound aggregator expansion stage can clear it without fabricating "
+            f"content. The deterministic record alone does not; the compact floor "
+            f"({compact_floor}) is only met by the expanded prose."
+        )
+    else:
+        note = (
+            f"the {expanded_floor // 1000}K/{compact_floor // 1000}K floors cannot be met by "
+            f"honest elaboration of the bounded evidence fact set: measured deterministic + "
+            f"payload record is {total_record} tokens/item, and the generous honest LM "
+            f"ceiling ({claim_count} facts x {LM_TOKENS_PER_CLAIM_HONEST_MAX}) is {lm_ceiling} "
+            f"tokens/item -- {expanded_floor - lm_ceiling} tokens short. Exceeding that "
+            "ceiling would require fabricating content, which the honesty gate forbids."
+        )
     return {
         "expanded_prose_tokens": expanded_prose_tokens,
         "payload_tokens": payload_tokens,
@@ -293,14 +323,7 @@ def floor_gap_analysis(
         "compact_floor": compact_floor,
         "expanded_floor_gap": expanded_floor - total_record,
         "expanded_floor_reached": total_record >= expanded_floor,
-        "max_honest_floor_reached": lm_ceiling >= expanded_floor,
+        "max_honest_floor_reached": max_honest_reached,
         "compact_floor_reached": expanded_prose_tokens >= compact_floor,
-        "note": (
-            f"the {expanded_floor // 1000}K/{compact_floor // 1000}K floors cannot be met by "
-            f"honest elaboration of the bounded evidence fact set: measured deterministic + "
-            f"payload record is {total_record} tokens/item, and the generous honest LM "
-            f"ceiling ({claim_count} facts x {LM_TOKENS_PER_CLAIM_HONEST_MAX}) is {lm_ceiling} "
-            f"tokens/item -- {expanded_floor - lm_ceiling} tokens short. Exceeding that "
-            "ceiling would require fabricating content, which the honesty gate forbids."
-        ),
+        "note": note,
     }
