@@ -228,6 +228,54 @@
         "verified-dimension-specialists",
         "relational-determinations"
       ]
+    },
+    {
+      "id": "reconstruction",
+      "name": "generative reconstruction validation (ComfyUI round-trip)",
+      "arm_issue": 37,
+      "hypothesis": "Generative reconstruction is a valid, non-LLM measure of per-asset information preserved by a caption/context: images generated from a caption/context via local ComfyUI score higher in CLIP ViT-L/14 similarity against the original source than images generated from a degraded baseline (e.g. no context / truncated context), so reconstruction can validate the 100K->4K dossier pipeline independently of claim-support review.",
+      "falsified_if": "Reconstruction similarity does not correlate with information content (a fixed 4K context cannot be distinguished from a truncated/baseline context by CLIP score), or the diffusion checkpoint fails to decode the relevant attributes at all (ceiling effect / degenerate similarity).",
+      "deterministic_signal": "CLIP ViT-L/14 similarity (source vs generated-from-context4k, and source vs generated-from-degraded-baseline) via local ComfyUI over frozen diffusion checkpoints",
+      "metric_version": "reconstruction-clip-v1",
+      "data_snapshot": "first-500 core-covered cohort; local ComfyUI at /mnt/fscache/essdee/ComfyUI; 195 diffusion checkpoints at /mnt/nas-ai-models/checkpoints; CLIP ViT-L/14 openai/clip-vit-large-patch14 + timm/vit_large_patch14_clip_224.openai in HF cache",
+      "selection_rationale": "Claim-support review (gemma4/LLM) is the current sole downstream check on caption/PENDING dossier quality. Reconstruction adds a generation-grounded, non-LLM, end-to-end test that an independent reviewer cannot substitute for, and directly measures the top-level goal (context that regenerates the asset) rather than only claim agreement. It also exercises the underused local ComfyUI + NAS checkpoint inventory.",
+      "scope": "generative reconstruction of source images from dossier/context artifacts; CLIP ViT-L/14 similarity of generated vs source and vs degraded-baseline generations",
+      "inputs": "context4k.json / context4k.md / compression.json artifacts + source image (read-only canonical), frozen ComfyUI pipeline + one frozen diffusion checkpoint",
+      "output_semantics": "per-item CLIP ViT-L/14 cosine similarity (generated vs source); delta between context-driven and baseline generations; scale-invariant to camera framing",
+      "provenance": "local ComfyUI at /mnt/fscache/essdee/ComfyUI (.venv python3.14, torch 2.12+cu130); checkpoints at /mnt/nas-ai-models/checkpoints (SD1.5, SDXL, flux1Schnell, sd3, pony, SUPIR); CLIP ViT-L/14 openai/clip-vit-large-patch14 and timm/vit_large_patch14_clip_224.openai in HF cache",
+      "abstention_policy": "reject generations failing sanity checks (empty/discarded generation, sampler error, degenerate output); abstain when the diffusion checkpoint fails to decode relevant attributes (ceiling effect) and report it, never treating failure as a BETTER signal",
+      "qualification_gate": "PASS only after: (a) a frozen cohort and fixed ComfyUI checkpoint + sampler/generation settings; (b) a controlled one-axis comparison (full context vs baseline) scoring original vs generated with a fixed CLIP ViT-L/14 model; (c) calibration of the scoring on known cases and a null case (empty/meaningless prompt); (d) independent review of the reconstruction protocol; and (e) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "known_failure_modes": [
+        "generative model does not reproduce identity/subject exactly",
+        "CLIP score is a weak identity proxy",
+        "GPU time per item is large",
+        "ceiling effect / degenerate similarity can make DELTA uninformative"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "context4k-reconstruction",
+        "clip-vitl14-similarity"
+      ],
+      "validation_methods": [
+        "reconstruction",
+        "roundtrip-audit"
+      ],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
+        }
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ]
 }
