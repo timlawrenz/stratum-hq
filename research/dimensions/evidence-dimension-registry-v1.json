@@ -283,7 +283,7 @@
       "arm_issue": 47,
       "hypothesis": "A locally-run open-weight VLM producing a dense, multi-view descriptive block for a single curated woman source image (full-frame + seg2-derived focal crops), routed claim-by-claim with abstention, materially raises supported-claim density on the frozen 24-item cohort versus the deterministic dossier alone, and is a legitimately-new evidence part toward the 100K expanded-dossier floor (option B of decision #46).",
       "falsified_if": "The VLM dense description does not raise supported-claim density on the frozen cohort beyond the deterministic dossier + honest-expansion ceiling, or abstains at too low a rate to be trustworthy (unchecked verbosity), or is not distinguishable from a redundant attribute-tagger over already-validated axes.",
-      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
+      "deterministic_signal": "learned VLM dense description (Molmo-72B / Qwen2.5-VL / InternVL3-78B candidates; VERIFIED LOCALLY 2026-08-06: qwen3-vl:32b via Ollama on both 4090 and Strix accepts image input and emits [OBSERVED]/[INFERRED]/[ABSTAIN]-tagged dense prose, all 6 subsections, zero absolute-pixel leakage, scale-invariant prose; 4090 runs 27% CPU-offload (slow), Strix runs 100% GPU = production batch host; qwen3.5-9b (Mar 2026, Apache-2.0, 262K ctx) is a newer single-GPU open candidate) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; source pixels + seg2 crop regions; local Ollama/ComfyUI stack",
       "selection_rationale": "The arm-36 honest expansion-ceiling audit proved deterministic evidence tops out at 2040-3489 tokens/item (7-50x below the 100K floor); a VLM dense-description specialist is the concrete option-B evidence source named in decision #46 and is a NEW evidence part per the open-world sourcing directive (local options exhausted).",
@@ -301,7 +301,9 @@
         "seg2-crop-region"
       ],
       "model_candidates": [
-        "open-vlm-dense-captioner"
+        "open-vlm-dense-captioner",
+        "qwen3-vl-32b-ollama",
+        "qwen3.5-9b"
       ],
       "validation_methods": [
         "claim-support",
