@@ -6,7 +6,7 @@ This ledger records empirical findings and negative results permanently. A green
 
 **Date:** 2026-08-06
 **Arm:** #37 — generative reconstruction validation (ComfyUI round-trip), non-LLM measure of the goal-arm context
-**Code / PR:** `exp/stage-b-reconstruction-arm37-20260806` (draft PR #55, branch from the arm-#35 lineage)
+**Code / PR:** `exp/stage-b-reconstruction-arm37-20260806` (draft PR #56, branch from the arm-#35 lineage)
 **Cohort:** frozen 24-item first-500 coverage-balanced subset (same manifest as all prior arms)
 **Pre-registered plan:** `research/stage-b-plans/stage-b-reconstruction-v1.json` (status `preregistered`, written BEFORE generation) — variant prompt = per-item `dossier-context4k-v2/<id>/context4k.md` compact verbatim; baseline prompt = fixed item-independent degraded text (no context), identical across items; null calibration = meaningless tokens, 2 images; per-item seed = sha256(image_id) truncated, SAME across conditions; checkpoint Juggernaut XL (`Juggernaut_XL_v1759168.safetensors`, sha256 pinned `dd08fa32…`), dpmpp_2m/karras, 28 steps, cfg 7.0, 832×1216, negative prompt empty; scorer pre-registered `openai/clip-vit-large-patch14` (ViT-L/14, CLIPProcessor 224 center-crop, cosine of [CLS]).
 **Run:** `stratum-stage-b-reconstruction-v1` on the 4090 via the scheduler (request → poll claim → ComfyUI boot → VRAM verify → activate → heartbeat → generate 24×2+2 → release). 50/50 images generated and preserved under `/mnt/nas-ai-models/research/stratum/stage-b-reconstruction-v1/outputs/`.
