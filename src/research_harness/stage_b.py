@@ -64,6 +64,12 @@ from .image_focus import (
     ImageFocusError,
     compute_image_focus,
 )
+from .apparent_age import (
+    ApparentAgeError,
+    compute_apparent_age,
+    MODEL_DIR as APPARENT_AGE_MODEL_DIR,
+    MODEL_SHA256 as APPARENT_AGE_MODEL_SHA256,
+)
 
 
 class StageBRunError(RuntimeError):
@@ -1311,6 +1317,95 @@ def _serialize_scene_category(scene: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _apparent_age_evidence() -> dict[str, Any]:
+    """Declared open-weight MiVOLO-V2 apparent-age specialist (arm #73)."""
+    module_path = Path(compute_apparent_age.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_sha = APPARENT_AGE_MODEL_SHA256
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-apparent-age-v1",
+        "specialists": [
+            {
+                "id": "in-memory-apparent-age-v1",
+                "scope": "Coarse scale-invariant apparent-age band (late-teens-to-early-twenties / "
+                         "early-twenties / mid-twenties / late-twenties-or-older) of the single subject "
+                         "from a locally-run open-weight MiVOLO-V2 age+gender transformer (face+body "
+                         "multi-input) over the seg2 Face_Neck crop / full-frame face union + subject "
+                         "body crop. Only the coarse band is verbalized; never identity, never a precise "
+                         "numeric age in prose; gender is payload-only (the corpus is curated to one "
+                         "woman).",
+                "inputs": ("Frozen selected-item already-decoded full-frame source RGB (SHA-bound via the "
+                           "item's source_sha256) + seg2 DOME-29 Face_Neck/subject masks; local open-weight "
+                           "MiVOLO-V2 (Apache-2.0, HF transformers remote-code path + vendored mivolo code, "
+                           "model.safetensors sha256 {model_sha}). Recomputed in memory during this bounded "
+                           "run with no crawlr/stratum write; model run on owned hardware only.").format(
+                    model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant coarse apparent-age band with a "
+                                     "surfaced abstention on small/turned/occluded faces or model/input "
+                                     "failure, not age ground truth or caption claims; the raw floating age "
+                                     "estimate stays in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.apparent_age.compute_apparent_age "
+                    f"SHA-256 {code_hash}; model iitolstykh/mivolo_v2 (Apache-2.0, "
+                    f"face+body multi-input) sha256 {model_sha}, run locally on owned hardware, "
+                    "computed in memory during this bounded run with no crawlr/stratum write, no hosted "
+                    "third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing or detector count is not exactly one; abstain "
+                                      "(emit None/band with a surfaced reason) when the seg2 Face_Neck "
+                                      "region is too small or MiVOLO fails to yield a plausible age on "
+                                      "every face candidate. Never overwrite an ambiguous age with a "
+                                      "confident-looking guess. Detector disagreement remains a quality "
+                                      "anomaly, never prompt content."),
+                "known_failure_modes": ("MiVOLO-V2 is trained on a public age dataset and can be biased "
+                                        "for non-representative faces; apparent age is not biological age "
+                                        "and must never be verbalized as exact; on a homogeneous portrait "
+                                        "cohort the raw band distribution clusters (here mid-20s), so "
+                                        "bands were re-cut at the measured distribution gaps (2/6/12/4, "
+                                        "max share 50%) to avoid a degenerate 75%+ band."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial "
+                                       "reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_apparent_age(age: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of an apparent-age dict.
+
+    Verbalizes ONLY the coarse scale-invariant age band (or a surfaced
+    abstention). The raw floating age estimate and the gender probe remain in
+    the machine-readable `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "APPARENT-AGE (MiVOLO-V2 open-weight age+gender transformer, coarse scale-invariant band):"
+    ]
+    if not age or not age.get("age_band"):
+        lines.append("- apparent-age not measured for this item")
+        return "\n".join(lines)
+    if age.get("abstained"):
+        reason = age.get("abstention_reason") or "apparent age not measurable"
+        lines.append(f"- apparent-age abstained ({reason})")
+        return "\n".join(lines)
+    band = age.get("age_band")
+    text = {
+        "late-teens-to-early-twenties": "the subject appears to be in her late teens to early twenties",
+        "early-twenties": "the subject appears to be in her early twenties",
+        "mid-twenties": "the subject appears to be in her mid-twenties",
+        "late-twenties-to-thirties": "the subject appears to be in her late twenties or older",
+    }.get(band)
+    if text:
+        lines.append(f"- {text} (coarse scale-invariant band, not an exact age)")
+    else:
+        lines.append("- apparent-age measured but no confident band")
+    return "\n".join(lines)
+
+
 # Frozen open-weight MediaPipe FaceLandmarker asset (arm #68, same mesh as
 # arm #60 face-geometry, new evidence part: camera-relative head orientation).
 # face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
@@ -1675,6 +1770,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # DOME-29 class mask for the subject/background region split. seg2 is the
     # only derived evidence input; no new model.
     "image-focus": ("seg2.npy",),
+    # Arm #73 apparent-age: open-weight MiVOLO-V2 consumes the already-decoded
+    # source RGB (SHA-bound via the item's source_sha256) + the seg2 Face_Neck /
+    # subject masks for the face/body crop policy; seg2 is read-only validation
+    # data, never mutated.
+    "apparent-age": ("seg2.npy",),
 }
 
 
@@ -1767,7 +1867,7 @@ def build_stage_b_plan(
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
-        "image-focus",
+        "image-focus", "apparent-age",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2228,6 +2328,36 @@ def build_stage_b_plan(
             "CPU only. Only scale-invariant focus/DOF bands are verbalized; raw acutance numbers and "
             "canonical dims stay in evidence_payload and are never caption claims."
         )
+    elif evidence_kind == "apparent-age":
+        evidence = _apparent_age_evidence()
+        evidence_condition_id = "context-raw-apparent-age"
+        comparison_plan_id = "stage-b-first500-apparent-age-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared apparent-age estimation (a "
+            "coarse scale-invariant age band from a locally-run open-weight MiVOLO-V2 age+gender "
+            "transformer over the seg2 Face_Neck crop / full-frame face union + subject body crop, all "
+            "scale-invariant, owned hardware) may reduce unsupported age-related claims ('she looks "
+            "young', 'in her twenties') or increase supported age claims in captions versus its matched "
+            "no-evidence baseline when the source item, view, prompt template, local model, and "
+            "generation settings are controlled."
+        )
+        falsified_if = (
+            "The apparent-age evidence condition does not reduce unsupported age claims or increase "
+            "supported claims versus its matched no-evidence baseline, or the MiVOLO-V2 model fails "
+            "qualification on real corpus items (high abstention / degenerate age bands), or an apparent "
+            "difference is attributable to an uncontrolled view, prompt, aggregator, generation, or "
+            "evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pose2 are not used as evidence inputs (pose2 stays a validation-only read for the "
+            "exactly-one-subject invariant). Apparent age is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 Face_Neck + subject masks) + the already-decoded source RGB via the local "
+            "open-weight MiVOLO-V2 (Apache-2.0, owned hardware, HF transformers remote-code path + "
+            "vendored mivolo code; model.safetensors bound by sha256). Only scale-invariant coarse age "
+            "bands are verbalized; the raw floating age estimate and gender probe stay in evidence_payload "
+            "and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2515,6 +2645,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "camera-viewing-angle"
     elif "context-raw-image-focus" in condition_ids:
         rebuild_kind = "image-focus"
+    elif "context-raw-apparent-age" in condition_ids:
+        rebuild_kind = "apparent-age"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2587,6 +2719,7 @@ def _load_selected_item(
     include_gaze_head: bool = False,
     include_camera_viewing_angle: bool = False,
     include_image_focus: bool = False,
+    include_apparent_age: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2742,6 +2875,13 @@ def _load_selected_item(
             image_focus = compute_image_focus(rgb, seg2)
         except ImageFocusError as exc:
             raise StageBRunError(f"image-focus abort for frozen selected item {image_id}: {exc}") from exc
+    apparent_age = None
+    if include_apparent_age:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
+        try:
+            apparent_age = compute_apparent_age(seg2, rgb, model_dir=APPARENT_AGE_MODEL_DIR)
+        except ApparentAgeError as exc:
+            raise StageBRunError(f"apparent-age abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2776,6 +2916,7 @@ def _load_selected_item(
         "gaze_head": gaze_head,
         "camera_viewing_angle": camera_viewing_angle,
         "image_focus": image_focus,
+        "apparent_age": apparent_age,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2833,6 +2974,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         gaze_head=prepared.get("gaze_head"),
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
         image_focus=prepared.get("image_focus"),
+        apparent_age=prepared.get("apparent_age"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2853,6 +2995,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         gaze_head=prepared.get("gaze_head"),
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
         image_focus=prepared.get("image_focus"),
+        apparent_age=prepared.get("apparent_age"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2958,6 +3101,10 @@ def _render_condition(
         focus = prepared["image_focus"]
         evidence_text = _serialize_image_focus(focus)
         return raw.copy(), _context_prompt(evidence_text), focus
+    if condition_id == "context-raw-apparent-age":
+        apparent_age = prepared.get("apparent_age")
+        evidence_text = _serialize_apparent_age(apparent_age)
+        return raw.copy(), _context_prompt(evidence_text), apparent_age
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3170,6 +3317,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-image-focus"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #73: only the apparent-age run invokes the locally-run open-weight
+    # MiVOLO-V2 (owned hardware) — gate on the frozen plan's conditions so
+    # other arms never pay the model cost.
+    include_apparent_age = any(
+        str(condition.get("id")) == "context-raw-apparent-age"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3185,6 +3339,7 @@ def execute_stage_b(
             include_gaze_head=include_gaze_head,
             include_camera_viewing_angle=include_camera_viewing_angle,
             include_image_focus=include_image_focus,
+            include_apparent_age=include_apparent_age,
         )
         for item in items
     ]
