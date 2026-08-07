@@ -2,6 +2,21 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Arm #75 — image-focus / depth-of-field evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-07 (frozen-cohort two-pass calibration probe → freeze → 96-caption generation → independent review → deterministic tick)
+**Arm:** #75 — image-focus-depth-of-field (NEW deterministic evidence part, no new model; option-B dossier growth → feeds `dossier-context4k`)
+**Code / PR:** `exp/stage-b-image-focus-arm75-20260807` (chain base = `exp/stage-b-gaze-head-arm68-20260807`)
+**Measurement (scale-invariant, calibrated on the frozen 24-item cohort):**
+- Acutance = median |∇luminance| on the REGION INTERIOR (subject eroded 2 px, background 3 px, silhouette-halo-free) of the canonical-512 luminance gradient (source RGB resampled to long-side 512, so acutance is comparable across native resolutions).
+- **DOF axis** = background_subject ratio of interior medians; cuts 0.45/0.80 → **9/8/7** (blurred/soft/sharp background), max share 37.5% — the discriminating depth-of-field axis.
+- **Subject-focus axis** = subject/full-frame ratio of interior medians; cuts 0.9/1.6 → **3/12/9** (softer/comparable/crisp), max share 50%.
+- Rejected: subject-vs-frame-P99 (24/24 <= 0.16, degenerate). Guards: flat-background (bg_p99 < 4.0) and flat-subject (no divide-by-zero) honest abstentions.
+**Round-trip (harness-computed):** baseline 47 supported / 99 unsupported (ratio 0.3219) → evidence **149 supported / 33 unsupported (ratio 0.8187)**, Δ +0.4968, paired positive **15/17**, **sign-test p=0.001175** → **BETTER** (registry: image-focus-depth-of-field → validated, cycle 14). Runs: `stage-b-image-focus-v1` (96) + `-review` (96).
+**Tick advanced:** **apparent-age #73 → active** (exploit, selection_progress 15). One-active invariant holds (19 validated + 1 active + 1 proposal #76).
+**Validation:** full pytest suite 610 passed; `validate-program` valid; `validate-dimension-registry` valid.
+**Label-sync (`sync-issue-labels --apply`):** #75 −`research:active` +`research:validated`; #73 −`research:proposal` +`research:active`.
+
 ## Post-exhaustion brainstorm-widen (2026-08-06) — `[BRAINSTORM — 5 NEW PROPOSALS REGISTERED; POSE-ARTICULATION SELECTED ACTIVE]`
 
 **Date:** 2026-08-06 (after arm #47 vlm-dense-description validated → sweep EXHAUSTED → gate returned `next_action: brainstorm-new-data`)
