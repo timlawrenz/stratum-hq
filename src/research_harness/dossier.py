@@ -69,6 +69,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "scene-category:v1",
     "gaze-head-orientation:v1",
     "camera-viewing-angle:v1",
+    "image-focus:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -592,6 +593,49 @@ def render_camera_viewing_angle(framing: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_image_focus(focus: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant focus / depth-of-field claim (arm #75).
+
+    Verbalizes ONLY the scale-invariant focus/DOF bands (subject-vs-frame
+    interior acutance band + background-vs-subject DOF band); raw acutance
+    numbers and canonical dims stay in the machine-readable payload and are
+    never caption claims.
+    """
+    if focus.get("abstained"):
+        reason = focus.get("abstention_reason") or "focus not measurable"
+        return [f"image-focus: abstain ({reason})"]
+    if not focus or (not focus.get("subject_focus_band") and not focus.get("dof_band")):
+        # Dimension not measured for this item (e.g. non-image-focus runs) —
+        # emit no claim, never a fabricated focus statement.
+        return []
+    lines: list[str] = []
+    sb = focus.get("subject_focus_band")
+    if sb == "subject-crisp":
+        lines.append("image-focus: subject is the crispest in-focus part of the frame")
+    elif sb == "subject-softer":
+        lines.append("image-focus: subject looks softer than the rest of the frame")
+    elif sb == "subject-comparable":
+        lines.append("image-focus: subject and frame are in similar focus")
+    db = focus.get("dof_band")
+    if db == "background-blurred":
+        lines.append(
+            "image-focus: background is clearly softer than the subject (shallow depth-of-field look)"
+        )
+    elif db == "background-sharp":
+        lines.append(
+            "image-focus: background is about as sharp as the subject (deep-focus look)"
+        )
+    elif db == "background-soft":
+        lines.append("image-focus: background is somewhat softer than the subject")
+    elif focus.get("dof_abstained"):
+        lines.append(
+            f"image-focus: depth-of-field not assessed ({focus.get('dof_abstention_reason')})"
+        )
+    if not lines:
+        lines.append("image-focus: focus measured (no distinctive band)")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -825,6 +869,30 @@ def _camera_viewing_angle_payload(framing: Mapping[str, Any] | None) -> dict[str
     return payload
 
 
+def _image_focus_payload(focus: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not focus:
+        return {}
+    payload = {
+        "subject_focus_band": focus.get("subject_focus_band"),
+        "dof_band": focus.get("dof_band"),
+        "subject_acutance_median": focus.get("subject_acutance_median"),
+        "background_acutance_median": focus.get("background_acutance_median"),
+        "background_p99": focus.get("background_p99"),
+        "background_std": focus.get("background_std"),
+        "global_acutance_median": focus.get("global_acutance_median"),
+        "dof_ratio": focus.get("dof_ratio"),
+        "subject_vs_frame_ratio": focus.get("subject_vs_frame_ratio"),
+        "subject_share": focus.get("subject_share"),
+        "canonical_dims": focus.get("canonical_dims"),
+    }
+    ab = focus.get("abstention_reason")
+    if focus.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    if focus.get("dof_abstained"):
+        payload["dof_abstention"] = focus.get("dof_abstention_reason") or "dof not assessed"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -843,6 +911,7 @@ def build_evidence_payload(
     scene_category: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
+    image_focus: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -913,6 +982,7 @@ def build_evidence_payload(
             "scene_category": _scene_category_payload(scene_category),
             "gaze_head": _gaze_head_payload(gaze_head),
             "camera_viewing_angle": _camera_viewing_angle_payload(camera_viewing_angle),
+            "image_focus": _image_focus_payload(image_focus),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -948,6 +1018,7 @@ def assemble_dossier(
     scene_category: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
+    image_focus: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -972,6 +1043,7 @@ def assemble_dossier(
         ("scene-category:v1", "scene-category", render_scene_category(scene_category or {})),
         ("gaze-head-orientation:v1", "gaze-head-orientation", render_gaze_head(gaze_head or {})),
         ("camera-viewing-angle:v1", "camera-viewing-angle", render_camera_viewing_angle(camera_viewing_angle or {})),
+        ("image-focus:v1", "image-focus", render_image_focus(image_focus or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

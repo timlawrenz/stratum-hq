@@ -12,7 +12,7 @@ This is a living map. GitHub issues are the detailed source of truth; this docum
   * It identifies open-world candidate evidence roles and the raw-versus-bucketed input-view confound without selecting a specialist winner.
 
 * **[COMPLETE / EMPIRICAL BETTER / PENDING_HUMAN_SPOT_CHECK] #4 — Baseline and comparison parity**
-  * The baseline/comparison-parity arm (no longer the active arm; empirically complete, verdict BETTER, advisory human spot-check pending). The sole `research:active` arm is now **#47 vlm-dense-description**.
+  * The baseline/comparison-parity arm (no longer the active arm; empirically complete, verdict BETTER, advisory human spot-check pending). The sole `research:active` arm is now **#73 apparent-age** (image-focus-depth-of-field #75 validated BETTER 2026-08-07).
   * Completed Stage A is immutable, independently audited, non-executing provenance work; its 24-item six-slice manifest is not the first-500 cohort. The historical request is `research/proposals/stage-a-caption-context-parity-preparation.md` / draft PR #13.
   * Read-only first-500 audit: all 500 have readable `pose2`, `seg2`, `normal2`, `pointmap`, and `matting`; only 10 have the later determinations/caption2/t52 chain.
   * [`FIRST_500_CORE_COHORT_PILOT_DESIGN.md`](FIRST_500_CORE_COHORT_PILOT_DESIGN.md) specifies the coverage-aware future selection rule and states why the current evidence-only contrast remains blocked.

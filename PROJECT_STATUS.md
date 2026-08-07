@@ -1,9 +1,11 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #74 camera-viewing-angle ROUND-TRIP COMPLETE → BETTER; arm #68 gaze-head BETTER too; image-focus-depth-of-field #75 activated as the sole active arm)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 18 validated (all 15 feeders + dossier-context4k + reconstruction + gaze-head #68 + camera-viewing-angle #74) + 1 active (image-focus-dof #75) + 2 proposals (apparent-age #73, affordance-contact #76); 0 blocked.**
+**Last updated:** 2026-08-07 (arm #75 image-focus-depth-of-field ROUND-TRIP COMPLETE → BETTER; arm #74 camera-viewing-angle BETTER; arm #68 gaze-head BETTER; apparent-age #73 now the sole active arm)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 19 validated (all 15 feeders + dossier-context4k + reconstruction + gaze-head #68 + camera-viewing-angle #74 + image-focus-dof #75) + 1 active (apparent-age #73) + 1 proposal (affordance-contact #76); 0 blocked.**
 
-**Arm #74 camera-viewing-angle ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, on `exp/stage-b-gaze-head-arm68-20260807` / PR #72 branch).** NEW-EVIDENCE-PART camera-relative framing (deterministic, no new model). Calibration probe on the frozen 24-item cohort produced an **honest re-scope** per the band-degeneracy rule: 24/24 measured, but this portrait-centric corpus is homogeneous — shot-scale 88% full-body and camera-height 100% eye-level (degenerate uniform axes) → both silenced to payload-only; **only the headroom band (tight 16 / normal 3 / wide 5, max 67%) is verbalized**. Round-trip: baseline 47 supported / 99 unsupported (ratio 0.3219) → evidence **192 supported / 4 unsupported (ratio 0.9796)**, Δ +0.6577, paired 24/24, **sign-test p=0.000772** → **BETTER** (registry validated, cycle 13). Runs: `stage-b-camera-viewing-angle-v1` (96) + `-review` (96). Tick advanced: **image-focus-depth-of-field #75 → active — image-focus-depth-of-field (#75, deterministic seg2-split acutance) is the sole `research:active` arm** (exploit, selection_progress 14).
+**Arm #75 image-focus-depth-of-field ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, on `exp/stage-b-image-focus-arm75-20260807`).** NEW-EVIDENCE-PART deterministic focus / depth-of-field quality (no new model), computed in memory from the already-decoded source RGB (SHA-bound via source_sha256) + seg2 region split, acutance measured on the region INTERIOR of the canonical-512 luminance gradient (silhouette-halo-free). Two-pass calibration probe on the frozen 24-item cohort: **DOF ratio** (background interior median / subject interior median acutance, cuts 0.45/0.80 → 9/8/7, max share 37.5%) and **subject-vs-frame ratio** (cuts 0.9/1.6 → 3/12/9, max share 50%) — both scale-invariant and non-degenerate; subject-vs-frame-P99 was rejected (24/24 degenerate); flat-background guard (bg_p99 < 4.0) abstains honestly on untextured backdrops. Support ratio 0.3219 → 0.8187 (Δ +0.4968), supported 47 → 149, unsupported 99 → 33, paired positive 15/17, sign-test p=0.001175. Registry: image-focus-depth-of-field → **validated** (cycle 14); **apparent-age #73 → active** (exploit, selection_progress 15). Runs: `stage-b-image-focus-v1` (96) + `-review` (96). One-active invariant holds (19 validated + 1 active + 1 proposal).
+
+**Arm #74 camera-viewing-angle ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, on `exp/stage-b-gaze-head-arm68-20260807` / PR #72 branch).** NEW-EVIDENCE-PART camera-relative framing (deterministic, no new model). Calibration probe on the frozen 24-item cohort produced an **honest re-scope** per the band-degeneracy rule: 24/24 measured, but this portrait-centric corpus is homogeneous — shot-scale 88% full-body and camera-height 100% eye-level (degenerate uniform axes) → both silenced to payload-only; **only the headroom band (tight 16 / normal 3 / wide 5, max 67%) is verbalized**. Round-trip: baseline 47 supported / 99 unsupported (ratio 0.3219) → evidence **192 supported / 4 unsupported (ratio 0.9796)**, Δ +0.6577, paired 24/24, **sign-test p=0.000772** → **BETTER** (registry validated, cycle 13). Runs: `stage-b-camera-viewing-angle-v1` (96) + `-review` (96).
 
 **Arm #68 gaze/head-orientation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #72 on `exp/stage-b-gaze-head-arm68-20260807`).** NEW-EVIDENCE-PART camera-interaction axis reusing the SAME validated open-weight MediaPipe FaceLandmarker 478-point mesh as arm #60 (owned hardware, local CPU, `face_landmarker.task` sha256 64184e229b...): scale-invariant head-orientation bands — yaw (facing camera / partially turned / profile or turned away), pitch (level / tilted down / tilted up, cohort-centered calibration), and in-plane roll from the stable eye-line angle — via the canonical six-point PnP head-pose fit (classic OpenCV model, y-flip measured on this cohort to fix a degenerate out-of-plane fit; Euler via the classic OpenCV decomposition; plausibility gates |pitch|≤85° / |yaw|≤90°). Band calibration probe on the frozen 24-item cohort: 21/24 detected (union policy, 3 honest abstains matching arm #60), yaw 4/5/12 (max 57%), pitch 7/6/8 (max 38%), roll 10/11 (max 52%) — all bands under the 75% degeneracy line; two independent estimators (PnP and landmark-projection) agree the corpus genuinely has many turned heads. Support ratio 0.3219 → 0.9673 (Δ +0.6454), supported 47 → 207, unsupported 99 → 7, paired positive 20/20, sign-test p=1e-06. Registry: gaze-head-orientation → **validated** → sweep EXHAUSTED (17/17) → brainstorm-widen (below).**
 
@@ -146,12 +148,12 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **18 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **19 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
   reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
   **matting-alpha #59**, **face-geometry #60**, **object-relations #61**, **scene-category #69**,
-  **gaze-head-orientation #68**, **camera-viewing-angle #74**),
-  **1 active (image-focus-depth-of-field #75), 2 proposals (apparent-age #73, affordance-contact #76)**,
+  **gaze-head-orientation #68**, **camera-viewing-angle #74**, **image-focus-depth-of-field #75**),
+  **1 active (apparent-age #73), 1 proposal (affordance-contact #76)**,
   0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none`
   (research-pending on the active arm), `goal_unreachable: false`
   (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
@@ -162,18 +164,8 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Image-focus-depth-of-field (#75, `research:active`, deterministic seg2-split acutance/focus — CPU,
-no new model) is the sole active arm; sweep `exhausted: false`, next action research-pending.**
-Camera-viewing-angle (#74) is VALIDATED BETTER (this cycle) and gaze-head (#68) was validated earlier
-this cycle too; the exhausted menu was widened with 4 proposals (#73 apparent-age, #74 camera-viewing-
-angle, #75 image-focus-dof, #76 affordance-contact). Per the round-trip recipe, the next arm's first
-step is the deterministic measurement: build the `research_harness` image-focus module (global +
-subject/background-region sharpness / acutance from source pixels + seg2 region split → focus-quality
-and depth-of-field bands, scale-invariant), capability + band-calibration probe on the frozen 24-item
-cohort first (no band >= 75%; watch for the same portrait-cohort homogeneity that forced the
-camera-viewing-angle re-scope), then freeze the plan, run the standard 96-caption generation +
-independent review round-trip and `autonomous-tick`. 2 proposals remain in the menu (apparent-age #73
-needs MiVOLO-V2 sourcing + qualification; affordance-contact #76 is deterministic).
+**Apparent-age (#73, `research:active`, NEW model class MiVOLO-V2 — needs open-world sourcing + qualification on the local stack first; image-focus-depth-of-field #75 VALIDATED BETTER this cycle) is the sole `research:active` arm; sweep `exhausted: false`, next action research-pending.**
+Per the open-world sourcing directive, the next arm's first step is the **model capability probe**: verify MiVOLO-V2 (age+gender regression, Apache-2.0, arXiv 2307.04616) runs on owned hardware (local 4090 CPU or Strix) on a non-sensitive synthetic image BEFORE any real-corpus commitment — the #47 qwen3-vl lesson (downloadable ≠ usable on these GPUs). Then the frozen-cohort calibration probe (band-degeneracy rule: no band ≥ 75%), freeze the plan, run the standard 96-caption generation + independent review round-trip and `autonomous-tick`. 1 proposal remains in the menu (affordance-contact #76, deterministic).
 
 ## Live research tree
 
@@ -194,8 +186,9 @@ needs MiVOLO-V2 sourcing + qualification; affordance-contact #76 is deterministi
   VALIDATED BETTER + **#68 gaze-head-orientation VALIDATED BETTER** (2026-08-07). Registry menu hit
   EXHAUSTED (17/17) → **Third widen (2026-08-07) registered #73 apparent-age, #74 camera-viewing-angle,
   #75 image-focus-dof, #76 affordance-contact** (all name a NEW evidence part / model class).
-  **#74 camera-viewing-angle VALIDATED BETTER (2026-08-07); image-focus-depth-of-field #75 is the sole
-  `research:active` arm** (selected_via exploit, selection_progress 14); #73/#76 remain proposals.
+  **#74 camera-viewing-angle VALIDATED BETTER (2026-08-07); image-focus-depth-of-field #75 VALIDATED
+  BETTER (2026-08-07); apparent-age #73 is the sole
+  `research:active` arm** (selected_via exploit, selection_progress 15); #76 remains a proposal.
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
