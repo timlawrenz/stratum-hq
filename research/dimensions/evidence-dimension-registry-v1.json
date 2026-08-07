@@ -426,7 +426,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -457,7 +457,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0
     },
     {
@@ -503,7 +503,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 9,
+  "selection_progress": 10,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -552,6 +552,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 8
+    },
+    {
+      "arm_id": "face-geometry",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 9
     }
   ]
 }

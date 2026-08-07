@@ -64,6 +64,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "pose-articulation:v1",
     "pointmap-depth:v1",
     "matting-alpha:v1",
+    "face-geometry:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -433,6 +434,42 @@ def render_matting_alpha(matting: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_face_geometry(face: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant facial-geometry claims (arm #60, MediaPipe FaceLandmarker).
+
+    Verbalizes ONLY scale-invariant facial-ratio bands (eye spacing, mouth
+    width, jaw width, plausibility-gated mid-face share). Landmark coordinates,
+    pixel bbox, and absolute ratios stay in the machine-readable payload and
+    are never caption claims (camera-frame-dependent).
+    """
+    if face.get("abstained"):
+        reason = face.get("abstention_reason") or "face not measurable"
+        return [f"face-geometry: abstain ({reason})"]
+
+    lines: list[str] = []
+    eye = face.get("eye_spacing_band")
+    if eye == "close-set":
+        lines.append("face-geometry: eyes are set close together relative to the face")
+    elif eye == "wide-set":
+        lines.append("face-geometry: eyes are set wide apart relative to the face")
+    mouth = face.get("mouth_band")
+    if mouth == "narrow":
+        lines.append("face-geometry: mouth is narrow relative to the face")
+    elif mouth == "wide":
+        lines.append("face-geometry: mouth is wide relative to the face")
+    jaw = face.get("jaw_band")
+    if jaw == "narrow":
+        lines.append("face-geometry: jawline is narrow (tapered) relative to the face")
+    elif jaw == "wide":
+        lines.append("face-geometry: jawline is broad relative to the face")
+    mid = face.get("midface_band")
+    if mid == "short":
+        lines.append("face-geometry: mid-face (nose-to-chin) is short relative to the face")
+    elif mid == "tall":
+        lines.append("face-geometry: mid-face (nose-to-chin) is tall relative to the face")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -568,6 +605,31 @@ def _matting_alpha_payload(matting: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _face_geometry_payload(face: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not face:
+        return {}
+    payload = {
+        "n_landmarks": face.get("n_landmarks"),
+        "via": face.get("via"),
+        "z_span_rel": face.get("z_span_rel"),
+        "face_bbox_px": face.get("face_bbox_px"),
+        "eye_spacing_face_width": face.get("eye_spacing_face_width"),
+        "interpupillary_face_width": face.get("interpupillary_face_width"),
+        "mouth_face_width": face.get("mouth_face_width"),
+        "jaw_face_width": face.get("jaw_face_width"),
+        "midface_share": face.get("midface_share"),
+        "eye_spacing_band": face.get("eye_spacing_band"),
+        "mouth_band": face.get("mouth_band"),
+        "jaw_band": face.get("jaw_band"),
+        "midface_band": face.get("midface_band"),
+        "midface_plausibility_abstained": face.get("midface_plausibility_abstained"),
+    }
+    ab = face.get("abstention_reason")
+    if face.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -581,6 +643,7 @@ def build_evidence_payload(
     articulation: Mapping[str, Any] | None = None,
     pointmap_depth: Mapping[str, Any] | None = None,
     matting_alpha: Mapping[str, Any] | None = None,
+    face_geometry: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -646,6 +709,7 @@ def build_evidence_payload(
             "pose_articulation": _pose_articulation_payload(articulation),
             "pointmap_depth": _pointmap_depth_payload(pointmap_depth),
             "matting_alpha": _matting_alpha_payload(matting_alpha),
+            "face_geometry": _face_geometry_payload(face_geometry),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -676,6 +740,7 @@ def assemble_dossier(
     articulation: Mapping[str, Any] | None = None,
     pointmap_depth: Mapping[str, Any] | None = None,
     matting_alpha: Mapping[str, Any] | None = None,
+    face_geometry: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -695,6 +760,7 @@ def assemble_dossier(
         ("pose-articulation:v1", "pose-articulation", render_pose_articulation(articulation or {})),
         ("pointmap-depth:v1", "pointmap-depth", render_pointmap_depth(pointmap_depth or {})),
         ("matting-alpha:v1", "matting-alpha", render_matting_alpha(matting_alpha or {})),
+        ("face-geometry:v1", "face-geometry", render_face_geometry(face_geometry or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
