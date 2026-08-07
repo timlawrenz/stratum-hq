@@ -51,6 +51,7 @@ from .setting import SettingError, compute_setting
 from .texture import TextureError, compute_texture
 from .pose_articulation import PoseArticulationError, compute_pose_articulation
 from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
+from .matting_alpha import MattingAlphaError, compute_matting_alpha
 
 
 class StageBRunError(RuntimeError):
@@ -972,6 +973,82 @@ def _serialize_pointmap_depth(pointmap_depth: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _matting_alpha_evidence() -> dict[str, Any]:
+    """Declared deterministic matting / alpha-fidelity specialist (arm #59)."""
+    module_path = Path(compute_matting_alpha.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-matting-alpha-v1",
+        "specialists": [
+            {
+                "id": "in-memory-matting-alpha-v1",
+                "scope": "Scale-invariant matting/alpha-fidelity facts of the single subject from matting.npy (Sapiens2 per-pixel soft alpha) + seg2.npy DOME-29 (Hair) masks: subject alpha-coverage band (sparse/centered/fills-frame), boundary crispness band (soft/moderate/crisp silhouette edge), and soft-edge character (hair-dominant vs clean skin cutout). Never identity, clothing, or semantic labels beyond what the alpha field supports; never absolute pixel widths in prose.",
+                "inputs": "Frozen selected-item matting.npy (source-matched, (H,W) float16 alpha) + seg2.npy (DOME-29); recomputed in memory during this bounded run with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing scale-invariant alpha-fidelity ratios and bands, or explicit abstention, not semantic ground truth or caption claims; only ratio/band facts are verbalized (absolute pixel areas/widths stay in the machine-readable payload).",
+                "provenance": (
+                    "research_harness.matting_alpha.compute_matting_alpha "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain (emit None with a surfaced reason) when the matte is absent/ill-formed/degenerate (all-one/all-zero), the alpha subject mask is too small, or alpha values leave [0,1]; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Matting edge quality inherits the matting model's accuracy (soft-edged hair may be under- or over-soft); silhouette closedness is near-constant on this cohort (no crops) so it carries NO caption band; band thresholds are calibrated to this frozen cohort and may shift on other cohorts; tight crops or subject-fills-frame degeneracy can compress the coverage band.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_matting_alpha(matting_alpha: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a matting-alpha dict.
+
+    Verbalizes ONLY scale-invariant alpha-fidelity facts: subject coverage band,
+    boundary crispness band, and soft-edge character. Raw pixel areas, band
+    widths, and silhouette structure remain in the machine-readable
+    `evidence_payload` JSON (dossier / compressor input) and are not caption
+    claims — a bare pixel width is camera-frame-dependent and unrenderable.
+    """
+    lines = [
+        "MATTING-ALPHA (deterministic, scale-invariant alpha fidelity from Sapiens2 matting + seg2):"
+    ]
+    if not matting_alpha.get("subject_present"):
+        lines.append("- no subject alpha present -> abstain from matting claims")
+        return "\n".join(lines)
+    if matting_alpha.get("abstained"):
+        reason = matting_alpha.get("abstention_reason") or "matte not measurable"
+        lines.append(f"- matting abstained ({reason})")
+        return "\n".join(lines)
+
+    coverage_band = matting_alpha.get("coverage_band")
+    if coverage_band == "sparse":
+        lines.append("- subject is a small figure occupying a minor part of the frame")
+    elif coverage_band == "fills-frame":
+        lines.append("- subject largely fills the frame")
+    elif coverage_band == "centered":
+        lines.append("- subject occupies the center of the frame")
+
+    crisp_band = matting_alpha.get("boundary_crisp_band")
+    if crisp_band == "crisp":
+        lines.append("- clean sharp silhouette edge (crisp cutout)")
+    elif crisp_band == "soft":
+        lines.append("- very soft feathered silhouette edge")
+    elif crisp_band == "moderate":
+        lines.append("- moderately soft silhouette edge")
+
+    edge_band = matting_alpha.get("soft_edge_band")
+    if edge_band == "hair-dominant":
+        lines.append("- soft detachable hair strands produce a wispy hairline (hair-dominant soft edge)")
+    elif edge_band == "mixed":
+        lines.append("- soft edge is a mix of hair and skin/background transitions")
+    elif edge_band == "skin-clean":
+        lines.append("- clean skin/background cutout with minimal hair flyaway")
+
+    if len(lines) == 1:
+        lines.append("- (no scale-invariant alpha fact cleared a measurement gate)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1050,6 +1127,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "vlm-dense": ("pose2.npy", "seg2.npy", "normal2.npy"),
     "pose-articulation": ("pose2.npy", "seg2.npy"),
     "pointmap-depth": ("pointmap.npy", "seg2.npy"),
+    "matting-alpha": ("matting.npy", "seg2.npy"),
 }
 
 
@@ -1140,7 +1218,7 @@ def build_stage_b_plan(
     """
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
-        "vlm-dense", "pose-articulation", "pointmap-depth",
+        "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1394,6 +1472,33 @@ def build_stage_b_plan(
             "depth ordering (nearest/farthest part), hand depth ordering, hand/arm in front of the torso "
             "plane, and the depth-relief band. Absolute metric Z values, raw spreads, and per-region median Zs "
             "stay in evidence_payload and are never caption claims."
+        )
+    elif evidence_kind == "matting-alpha":
+        evidence = _matting_alpha_evidence()
+        evidence_condition_id = "context-raw-matting-alpha"
+        comparison_plan_id = "stage-b-first500-matting-alpha-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic matting/alpha-fidelity "
+            "measurements (subject alpha-coverage band, boundary crispness band of the silhouette edge, and "
+            "soft-edge character — hair-dominant vs clean skin cutout — all scale-invariant and computed in "
+            "memory from the frozen matting.npy alpha matte + seg2.npy DOME-29 masks) may reduce unsupported "
+            "edge-quality/hair/silhouette claims in captions versus its matched no-evidence baseline when the "
+            "source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The matting evidence condition does not reduce unsupported edge-quality/fine-feature claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the measured alpha structure "
+            "is not distinguishable from seg2 region coverage (redundant axis), or an apparent difference is "
+            "attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "and pose2 are not used as evidence inputs for the matting measurement itself (pose2 stays a "
+            "validation-only read for the exactly-one-subject invariant). Alpha fidelity is computed in memory "
+            "from the frozen selected matting.npy (Sapiens2 per-pixel alpha matte) + seg2 (DOME-29 Hair mask) "
+            "only. Only scale-invariant facts are verbalized: coverage band, boundary crispness band, and "
+            "soft-edge character. Absolute pixel areas/band widths and silhouette structure stay in "
+            "evidence_payload and are never caption claims."
         )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
@@ -1668,6 +1773,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "pose-articulation"
     elif "context-raw-pointmap-depth" in condition_ids:
         rebuild_kind = "pointmap-depth"
+    elif "context-raw-matting-alpha" in condition_ids:
+        rebuild_kind = "matting-alpha"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -1827,6 +1934,19 @@ def _load_selected_item(
         except PointmapDepthError as exc:
             raise StageBRunError(f"pointmap-depth abort for frozen selected item {image_id}: {exc}") from exc
         derived_reads.append("pointmap.npy")
+    matting_alpha = None
+    if "matting.npy" in expected_evidence_hashes:
+        matting = artifact("matting.npy", required=True)
+        assert matting is not None
+        if matting.ndim != 2:
+            raise StageBRunError(f"selected matting.npy must be (H, W) for {image_id}")
+        if matting.shape[0] != seg2.shape[0] or matting.shape[1] != seg2.shape[1]:
+            raise StageBRunError(f"selected matting.npy not pixel-aligned with seg2 for {image_id}")
+        try:
+            matting_alpha = compute_matting_alpha(matting, seg2)
+        except MattingAlphaError as exc:
+            raise StageBRunError(f"matting-alpha abort for frozen selected item {image_id}: {exc}") from exc
+        derived_reads.append("matting.npy")
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -1854,6 +1974,7 @@ def _load_selected_item(
         "texture": texture,
         "articulation": articulation,
         "pointmap_depth": pointmap_depth,
+        "matting_alpha": matting_alpha,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -1904,6 +2025,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         texture=prepared.get("texture"),
         articulation=prepared.get("articulation"),
         pointmap_depth=prepared.get("pointmap_depth"),
+        matting_alpha=prepared.get("matting_alpha"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -1917,6 +2039,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         texture=prepared.get("texture"),
         articulation=prepared.get("articulation"),
         pointmap_depth=prepared.get("pointmap_depth"),
+        matting_alpha=prepared.get("matting_alpha"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -1994,6 +2117,10 @@ def _render_condition(
         pointmap_depth = prepared["pointmap_depth"]
         evidence_text = _serialize_pointmap_depth(pointmap_depth)
         return raw.copy(), _context_prompt(evidence_text), pointmap_depth
+    if condition_id == "context-raw-matting-alpha":
+        matting_alpha = prepared["matting_alpha"]
+        evidence_text = _serialize_matting_alpha(matting_alpha)
+        return raw.copy(), _context_prompt(evidence_text), matting_alpha
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
