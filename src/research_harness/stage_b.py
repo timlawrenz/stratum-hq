@@ -52,6 +52,7 @@ from .texture import TextureError, compute_texture
 from .pose_articulation import PoseArticulationError, compute_pose_articulation
 from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
+from .face_geometry import FaceGeometryError, compute_face_geometry
 
 
 class StageBRunError(RuntimeError):
@@ -1045,7 +1046,79 @@ def _serialize_matting_alpha(matting_alpha: Mapping[str, Any]) -> str:
         lines.append("- clean skin/background cutout with minimal hair flyaway")
 
     if len(lines) == 1:
-        lines.append("- (no scale-invariant alpha fact cleared a measurement gate)")
+        lines.append("- (no scale-invariant matting fact cleared a measurement gate)")
+    return "\n".join(lines)
+
+
+def _face_geometry_evidence() -> dict[str, Any]:
+    """Declared open-weight facial-landmark / geometry specialist (arm #60)."""
+    module_path = Path(compute_face_geometry.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-face-geometry-v1",
+        "specialists": [
+            {
+                "id": "in-memory-face-geometry-v1",
+                "scope": "Scale-invariant facial-geometry facts of the single subject from a local MediaPipe FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck crop (union detection policy): eye-spacing band (interpupillary / face width), mouth-width band, jaw-width band, and (plausibility-gated) mid-face vertical share. Never identity, skin-tone, or makeup semantics; only scale-invariant ratios in prose.",
+                "inputs": "Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the already-decoded source RGB; local open-weight face_landmarker.task model (MediaPipe, CPU, tasks API). Recomputed in memory during this bounded run with no crawlr/stratum write; model run on owned hardware only.",
+                "output_semantics": "Provenance-bearing scale-invariant facial ratios and bands with a surfaced abstention on no-face / degenerate landmark detection, not identity ground truth or caption claims; only ratio/band facts are verbalized (landmark coords + pixel bbox stay in the machine-readable payload).",
+                "provenance": (
+                    "research_harness.face_geometry.compute_face_geometry "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); "
+                    "computed in memory during this bounded run with no crawlr/stratum write, no "
+                    "hosted third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing or detector count is not exactly one; abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop, when the detected mesh bbox is degenerate (face smaller than a floor), or when the mid-face vertical share leaves the human-plausibility band; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "FaceLandmarker is resolution-sensitive (the same face can be found full-frame on some items and only on the seg2 crop on others — the union policy mitigates this and the capability probe measured 21/24 detection); turned heads / extreme DOF / occlusion abstain; band thresholds are calibrated to this frozen cohort and may shift on other cohorts; the mid-face vertical share needs a plausibility gate (extreme tilt can produce an implausible share).",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_face_geometry(face_geometry: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a face-geometry dict.
+
+    Verbalizes ONLY scale-invariant facial-ratio bands (eye spacing, mouth
+    width, jaw width, plausibility-gated mid-face share). Landmark coordinates,
+    pixel bbox, and absolute ratios remain in the machine-readable
+    `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "FACE-GEOMETRY (open-weight facial landmarks, scale-invariant):"
+    ]
+    if face_geometry.get("abstained"):
+        reason = face_geometry.get("abstention_reason") or "face not measurable"
+        lines.append(f"- face abstained ({reason})")
+        return "\n".join(lines)
+
+    def _band_line(name: str, label: str, band: str | None) -> None:
+        if band == "close-set":
+            lines.append(f"- eyes are set close together (close-set) relative to face width")
+        elif band == "wide-set":
+            lines.append(f"- eyes are set wide apart (wide-set) relative to face width")
+        elif band == "narrow" and name != "eye":
+            lines.append(f"- {label} is narrow relative to the face")
+        elif band == "wide" and name != "eye":
+            lines.append(f"- {label} is wide relative to the face")
+        elif band == "short":
+            lines.append(f"- mid-face (nose-to-chin) is short relative to the face")
+        elif band == "tall":
+            lines.append(f"- mid-face (nose-to-chin) is tall relative to the face")
+
+    _band_line("eye", "eye spacing", face_geometry.get("eye_spacing_band"))
+    _band_line("mouth", "mouth", face_geometry.get("mouth_band"))
+    _band_line("jaw", "jawline", face_geometry.get("jaw_band"))
+    _band_line("mid", "mid-face", face_geometry.get("midface_band"))
+
+    if len(lines) == 1:
+        lines.append("- (no distinctive facial ratio outside the typical band)")
     return "\n".join(lines)
 
 
@@ -1114,6 +1187,11 @@ def _candidate_items(candidate: Mapping[str, Any], program: Mapping[str, Any]) -
     return list(raw_items)
 
 
+# Frozen open-weight MediaPipe FaceLandmarker asset (arm #60, new model class).
+FACE_GEOMETRY_MODEL_ASSET = (
+    "/mnt/nas-ai-models/research/stratum/models/face-geometry/face_landmarker.task"
+)
+
 _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "geometry": ("pose2.npy", "seg2.npy"),
     "body-type": ("pose2.npy", "seg2.npy"),
@@ -1128,6 +1206,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "pose-articulation": ("pose2.npy", "seg2.npy"),
     "pointmap-depth": ("pointmap.npy", "seg2.npy"),
     "matting-alpha": ("matting.npy", "seg2.npy"),
+    "face-geometry": ("seg2.npy",),
 }
 
 
@@ -1218,7 +1297,7 @@ def build_stage_b_plan(
     """
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
-        "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha",
+        "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1500,6 +1579,35 @@ def build_stage_b_plan(
             "soft-edge character. Absolute pixel areas/band widths and silhouette structure stay in "
             "evidence_payload and are never caption claims."
         )
+    elif evidence_kind == "face-geometry":
+        evidence = _face_geometry_evidence()
+        evidence_condition_id = "context-raw-face-geometry"
+        comparison_plan_id = "stage-b-first500-face-geometry-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared facial-geometry measurements "
+            "(eye-spacing, mouth-width, jaw-width, and plausibility-gated mid-face bands from a local "
+            "open-weight MediaPipe FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck "
+            "crop, union detection policy, all scale-invariant) may reduce unsupported facial-detail "
+            "claims in captions versus its matched no-evidence baseline when the source item, view, "
+            "prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The face-geometry evidence condition does not reduce unsupported facial-detail claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the landmark model "
+            "fails qualification on real corpus items (high abstention / missing faces), or an apparent "
+            "difference is attributable to an uncontrolled view, prompt, aggregator, generation, or "
+            "evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pose2 are not used as evidence inputs for the face-geometry measurement (pose2 "
+            "stays a validation-only read for the exactly-one-subject invariant). Facial geometry is computed "
+            "in memory from the frozen selected seg2.npy (DOME-29 Face_Neck mask) + the already-decoded "
+            "source RGB via the local open-weight MediaPipe FaceLandmarker (Apache-2.0, owned hardware, "
+            "CPU, tasks API; model face_landmarker.task bound by sha256). Only scale-invariant facts are "
+            "verbalized: eye-spacing / mouth / jaw / mid-face bands. Landmark coordinates and the pixel "
+            "bbox stay in evidence_payload and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -1775,6 +1883,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "pointmap-depth"
     elif "context-raw-matting-alpha" in condition_ids:
         rebuild_kind = "matting-alpha"
+    elif "context-raw-face-geometry" in condition_ids:
+        rebuild_kind = "face-geometry"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -1840,6 +1950,8 @@ def _load_selected_item(
     source_root: Path,
     derived_root: Path,
     expected_evidence_hashes: Mapping[str, str],
+    *,
+    include_face_geometry: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -1947,6 +2059,15 @@ def _load_selected_item(
         except MattingAlphaError as exc:
             raise StageBRunError(f"matting-alpha abort for frozen selected item {image_id}: {exc}") from exc
         derived_reads.append("matting.npy")
+    face_geometry = None
+    if include_face_geometry:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            face_geometry = compute_face_geometry(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except FaceGeometryError as exc:
+            raise StageBRunError(f"face-geometry abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -1975,6 +2096,7 @@ def _load_selected_item(
         "articulation": articulation,
         "pointmap_depth": pointmap_depth,
         "matting_alpha": matting_alpha,
+        "face_geometry": face_geometry,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2026,6 +2148,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         articulation=prepared.get("articulation"),
         pointmap_depth=prepared.get("pointmap_depth"),
         matting_alpha=prepared.get("matting_alpha"),
+        face_geometry=prepared.get("face_geometry"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2040,6 +2163,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         articulation=prepared.get("articulation"),
         pointmap_depth=prepared.get("pointmap_depth"),
         matting_alpha=prepared.get("matting_alpha"),
+        face_geometry=prepared.get("face_geometry"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2121,6 +2245,10 @@ def _render_condition(
         matting_alpha = prepared["matting_alpha"]
         evidence_text = _serialize_matting_alpha(matting_alpha)
         return raw.copy(), _context_prompt(evidence_text), matting_alpha
+    if condition_id == "context-raw-face-geometry":
+        face_geometry = prepared["face_geometry"]
+        evidence_text = _serialize_face_geometry(face_geometry)
+        return raw.copy(), _context_prompt(evidence_text), face_geometry
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -2296,6 +2424,14 @@ def execute_stage_b(
     source_root = _resolved_existing_directory(Path(canonical["path"]), "canonical source root")
     derived_root = _resolved_existing_directory(Path(canonical["derived_tree"]), "derived artifact root")
 
+    # Arm #60: only the face-geometry run invokes the local open-weight
+    # FaceLandmarker (new model class, CPU) — gate on the frozen plan's
+    # conditions so other arms never pay the model cost.
+    include_face_geometry = any(
+        str(condition.get("id")) == "context-raw-face-geometry"
+        for condition in (plan.get("conditions") or [])
+    )
+
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
     prepared = [
@@ -2304,6 +2440,7 @@ def execute_stage_b(
             source_root,
             derived_root,
             evidence_hashes[_safe_output_segment(item.get("image_id"), "candidate item image_id")],
+            include_face_geometry=include_face_geometry,
         )
         for item in items
     ]
