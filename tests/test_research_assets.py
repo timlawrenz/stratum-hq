@@ -398,10 +398,11 @@ def test_resumption_documents_preserve_the_active_state_and_two_stage_boundary()
     research_readme = (ROOT / "research" / "README.md").read_text()
 
     # The resumption documents must reflect the live one-active/two-stage
-    # invariants. As of 2026-08-06 the brainstorm-widen registered 5 NEW arms
-    # (#58–#62) and pose-articulation #62 was selected as the sole active arm
-    # (exploit, EIG 0.45); next action is research-pending on pose-articulation.
-    assert "pose-articulation" in status
+    # invariants. As of 2026-08-07 the scene-category (#69) round-trip
+    # VALIDATED BETTER and gaze-head-orientation #68 was activated as the sole
+    # active arm (explore, EIG 0.65); next action is research-pending on
+    # gaze-head-orientation.
+    assert "gaze-head-orientation" in status
     assert "is the sole `research:active`" in status  # one-active invariant
     assert "brainstorm-widen" in status
     assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
