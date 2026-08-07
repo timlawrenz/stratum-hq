@@ -62,6 +62,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "setting-environment:v1",
     "texture-material:v1",
     "pose-articulation:v1",
+    "pointmap-depth:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -344,6 +345,51 @@ def render_pose_articulation(articulation: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_pointmap_depth(pointmap_depth: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant point-map depth-ordering claims (arm #58).
+
+    Verbalizes ONLY depth-ORDER relations and normalized ratios (region
+    nearest/farthest ordering, hand nearer-than-other hand, hand/arm held in
+    front of the body plane, depth-relief band). Raw CAM-frame metric Z values
+    and absolute spreads stay in the machine-readable payload and are never
+    caption claims (camera-placement dependent, unrenderable as a bare number).
+    """
+    lines: list[str] = []
+    if not pointmap_depth.get("subject_present"):
+        return ["depth ordering: abstain (no subject depth present)"]
+    if pointmap_depth.get("abstained"):
+        reason = pointmap_depth.get("abstention_reason") or "depth not measurable"
+        return [f"depth ordering: abstain ({reason})"]
+
+    relief_band = pointmap_depth.get("relief_band")
+    if relief_band == "pronounced":
+        lines.append("depth ordering: body has pronounced depth relief (limbs clearly nearer than the torso plane)")
+    elif relief_band == "moderate":
+        lines.append("depth ordering: body has moderate depth relief (some limbs offset from the torso plane)")
+    elif relief_band == "compact":
+        lines.append("depth ordering: body largely on one depth plane (compact, limbs near the torso plane)")
+
+    nearest = pointmap_depth.get("nearest_region")
+    farthest = pointmap_depth.get("farthest_region")
+    if nearest and farthest:
+        nearest_label = nearest.replace("_", " ")
+        farthest_label = farthest.replace("_", " ")
+        lines.append(f"depth ordering: {nearest_label} is the part nearest the camera; {farthest_label} the farthest")
+    elif nearest:
+        lines.append(f"depth ordering: {nearest.replace('_', ' ')} is the part nearest the camera")
+
+    hand_ordering = pointmap_depth.get("hand_ordering")
+    if hand_ordering:
+        lines.append(f"depth ordering: {hand_ordering} hand is clearly held nearer the camera than the other")
+    left_front = pointmap_depth.get("left_hand_in_front")
+    right_front = pointmap_depth.get("right_hand_in_front")
+    if left_front:
+        lines.append("depth ordering: left hand/arm is held in front of the torso plane")
+    if right_front:
+        lines.append("depth ordering: right hand/arm is held in front of the torso plane")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -432,6 +478,30 @@ def _pose_articulation_payload(articulation: Mapping[str, Any] | None) -> dict[s
     return payload
 
 
+def _pointmap_depth_payload(pointmap_depth: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not pointmap_depth:
+        return {}
+    payload = {
+        "median_z": pointmap_depth.get("median_z"),
+        "z_p10": pointmap_depth.get("z_p10"),
+        "z_p90": pointmap_depth.get("z_p90"),
+        "depth_relief_ratio": pointmap_depth.get("depth_relief_ratio"),
+        "relief_band": pointmap_depth.get("relief_band"),
+        "region_median_z": pointmap_depth.get("region_median_z"),
+        "depth_ordering": pointmap_depth.get("depth_ordering"),
+        "nearest_region": pointmap_depth.get("nearest_region"),
+        "farthest_region": pointmap_depth.get("farthest_region"),
+        "hand_ordering": pointmap_depth.get("hand_ordering"),
+        "hand_dz_ratio": pointmap_depth.get("hand_dz_ratio"),
+        "left_hand_in_front": pointmap_depth.get("left_hand_in_front"),
+        "right_hand_in_front": pointmap_depth.get("right_hand_in_front"),
+    }
+    ab = pointmap_depth.get("abstention_reason")
+    if pointmap_depth.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -443,6 +513,7 @@ def build_evidence_payload(
     setting: Mapping[str, Any] | None = None,
     texture: Mapping[str, Any] | None = None,
     articulation: Mapping[str, Any] | None = None,
+    pointmap_depth: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -506,6 +577,7 @@ def build_evidence_payload(
             "setting": _setting_payload(setting),
             "texture": _texture_payload(texture),
             "pose_articulation": _pose_articulation_payload(articulation),
+            "pointmap_depth": _pointmap_depth_payload(pointmap_depth),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -534,6 +606,7 @@ def assemble_dossier(
     setting: Mapping[str, Any] | None = None,
     texture: Mapping[str, Any] | None = None,
     articulation: Mapping[str, Any] | None = None,
+    pointmap_depth: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -551,6 +624,7 @@ def assemble_dossier(
         ("setting-environment:v1", "setting", render_setting(setting or {})),
         ("texture-material:v1", "texture", render_texture(texture or {})),
         ("pose-articulation:v1", "pose-articulation", render_pose_articulation(articulation or {})),
+        ("pointmap-depth:v1", "pointmap-depth", render_pointmap_depth(pointmap_depth or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

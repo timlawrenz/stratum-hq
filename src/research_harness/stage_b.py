@@ -50,6 +50,7 @@ from .lighting import LightingError, compute_lighting
 from .setting import SettingError, compute_setting
 from .texture import TextureError, compute_texture
 from .pose_articulation import PoseArticulationError, compute_pose_articulation
+from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 
 
 class StageBRunError(RuntimeError):
@@ -895,6 +896,82 @@ def _serialize_pose_articulation(articulation: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _pointmap_depth_evidence() -> dict[str, Any]:
+    """Declared deterministic point-map / 3D depth-ordering specialist (arm #58)."""
+    module_path = Path(compute_pointmap_depth.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-pointmap-depth-v1",
+        "specialists": [
+            {
+                "id": "in-memory-pointmap-depth-v1",
+                "scope": "Scale-invariant relative-depth ordering of the single subject from pointmap.npy (Sapiens2 per-pixel CAM-frame 3D cloud) + seg2.npy DOME-29 region masks: region depth ranking (nearest/farthest part), left/right hand depth ordering, hand/arm held in front of the torso plane, and a normalized body depth-relief ratio (robust Z spread / median Z). Never identity, clothing, or semantic labels beyond what the point cloud supports; never absolute metric distances in prose.",
+                "inputs": "Frozen selected-item pointmap.npy (source-matched, CAM-frame, background zeroed) + seg2.npy (DOME-29); recomputed in memory during this bounded run with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing scale-invariant depth-order relations and normalized ratios, or explicit abstention, not semantic ground truth or caption claims; only ordering/ratio/band facts are verbalized (absolute metric Z stays in the machine-readable payload).",
+                "provenance": (
+                    "research_harness.pointmap_depth.compute_pointmap_depth "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain (emit None with a surfaced reason) when the point-cloud foreground is degenerate/too sparse, no region clears its depth-support floor, or the subject median Z is outside the human-plausible band; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Monocular pointmap scale ambiguity (no true metric depth); background pixels are zeroed so background-plane depth is unmeasurable; sparse hand/limb regions may abstain; tight crops or subject-fills-frame degeneracy can weaken the relief signal; occlusion ordering is inferred from median-Z ranks, not physical ray casting.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_pointmap_depth(pointmap_depth: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a pointmap-depth dict.
+
+    Verbalizes ONLY scale-invariant depth facts: region nearest/farthest
+    ordering, hand depth ordering (one hand clearly nearer), hand/arm in front
+    of the torso plane, and the normalized depth-relief band. Raw CAM-frame
+    metric Z values, absolute spreads, and per-region median Zs remain in the
+    machine-readable `evidence_payload` JSON (dossier / compressor input) and
+    are not caption claims — a bare meter number is camera-placement dependent
+    and not something a text-to-image model should be asked to render.
+    """
+    lines = [
+        "POINTMAP-DEPTH (deterministic, scale-invariant depth ordering from Sapiens2 pointmap + seg2):"
+    ]
+    if not pointmap_depth.get("subject_present"):
+        lines.append("- no subject depth present -> abstain from depth-ordering claims")
+        return "\n".join(lines)
+    if pointmap_depth.get("abstained"):
+        reason = pointmap_depth.get("abstention_reason") or "depth not measurable"
+        lines.append(f"- depth ordering abstained ({reason})")
+        return "\n".join(lines)
+
+    relief_band = pointmap_depth.get("relief_band")
+    if relief_band == "pronounced":
+        lines.append("- body has pronounced depth relief (limbs clearly nearer than the torso plane)")
+    elif relief_band == "moderate":
+        lines.append("- body has moderate depth relief (some limbs offset from the torso plane)")
+    elif relief_band == "compact":
+        lines.append("- body largely on one depth plane (compact)")
+
+    nearest = pointmap_depth.get("nearest_region")
+    farthest = pointmap_depth.get("farthest_region")
+    if nearest and farthest:
+        lines.append(
+            f"- {nearest.replace('_', ' ')} is the part nearest the camera; {farthest.replace('_', ' ')} the farthest"
+        )
+    elif nearest:
+        lines.append(f"- {nearest.replace('_', ' ')} is the part nearest the camera")
+
+    hand_ordering = pointmap_depth.get("hand_ordering")
+    if hand_ordering:
+        lines.append(f"- {hand_ordering} hand is clearly held nearer the camera than the other")
+    if pointmap_depth.get("left_hand_in_front"):
+        lines.append("- left hand/arm is held in front of the torso plane")
+    if pointmap_depth.get("right_hand_in_front"):
+        lines.append("- right hand/arm is held in front of the torso plane")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -972,6 +1049,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
     "vlm-dense": ("pose2.npy", "seg2.npy", "normal2.npy"),
     "pose-articulation": ("pose2.npy", "seg2.npy"),
+    "pointmap-depth": ("pointmap.npy", "seg2.npy"),
 }
 
 
@@ -1062,7 +1140,7 @@ def build_stage_b_plan(
     """
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
-        "vlm-dense", "pose-articulation",
+        "vlm-dense", "pose-articulation", "pointmap-depth",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1286,6 +1364,36 @@ def build_stage_b_plan(
             "(weight on a leg / centered), contrapposto, torso/pelvis in-plane angles, arm-crossing structure, "
             "and flexion asymmetry. Absolute pixel positions/lengths and raw angles stay in evidence_payload "
             "and are never caption claims."
+        )
+    elif evidence_kind == "pointmap-depth":
+        evidence = _pointmap_depth_evidence()
+        evidence_condition_id = "context-raw-pointmap-depth"
+        comparison_plan_id = "stage-b-first500-pointmap-depth-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic point-map depth-order "
+            "measurements (region nearest/farthest depth ranking, left/right hand depth ordering, hand/arm held "
+            "in front of the torso plane, and the normalized body depth-relief ratio — all scale-invariant and "
+            "computed in memory from the frozen pointmap.npy CAM-frame cloud + seg2.npy DOME-29 masks) may "
+            "reduce unsupported depth/occlusion/foreground-background claims in captions versus its matched "
+            "no-evidence baseline when the source item, view, prompt template, local model, and generation "
+            "settings are controlled."
+        )
+        falsified_if = (
+            "The pointmap-depth evidence condition does not reduce unsupported depth/occlusion/foreground-"
+            "background claims or increase supported claims versus its matched no-evidence baseline, or the "
+            "measured depth ordering is not distinguishable from pose-articulation/body-type's 2D proxies "
+            "(redundant axis), or an apparent difference is attributable to an uncontrolled view, prompt, "
+            "aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "and pose2 are not used as evidence inputs for the depth measurement itself (pose2 stays a "
+            "validation-only read for the exactly-one-subject invariant). Relative depth ordering is computed "
+            "in memory from the frozen selected pointmap (Sapiens2 per-pixel CAM-frame cloud, background "
+            "zeroed) + seg2 (DOME-29 region masks) only. Only scale-invariant facts are verbalized: region "
+            "depth ordering (nearest/farthest part), hand depth ordering, hand/arm in front of the torso "
+            "plane, and the depth-relief band. Absolute metric Z values, raw spreads, and per-region median Zs "
+            "stay in evidence_payload and are never caption claims."
         )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
@@ -1558,6 +1666,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "texture"
     elif "context-raw-pose-articulation" in condition_ids:
         rebuild_kind = "pose-articulation"
+    elif "context-raw-pointmap-depth" in condition_ids:
+        rebuild_kind = "pointmap-depth"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -1704,6 +1814,19 @@ def _load_selected_item(
     except PoseArticulationError as exc:
         raise StageBRunError(f"pose-articulation abort for frozen selected item {image_id}: {exc}") from exc
     derived_reads = ["pose2.npy", "seg2.npy"]
+    pointmap_depth = None
+    if "pointmap.npy" in expected_evidence_hashes:
+        pointmap2 = artifact("pointmap.npy", required=True)
+        assert pointmap2 is not None
+        if pointmap2.ndim != 3 or pointmap2.shape[2] != 3:
+            raise StageBRunError(f"selected pointmap.npy must be (H, W, 3) for {image_id}")
+        if pointmap2.shape[0] != seg2.shape[0] or pointmap2.shape[1] != seg2.shape[1]:
+            raise StageBRunError(f"selected pointmap.npy not pixel-aligned with seg2 for {image_id}")
+        try:
+            pointmap_depth = compute_pointmap_depth(pointmap2, seg2)
+        except PointmapDepthError as exc:
+            raise StageBRunError(f"pointmap-depth abort for frozen selected item {image_id}: {exc}") from exc
+        derived_reads.append("pointmap.npy")
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -1730,6 +1853,7 @@ def _load_selected_item(
         "setting": setting,
         "texture": texture,
         "articulation": articulation,
+        "pointmap_depth": pointmap_depth,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -1779,6 +1903,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         setting=prepared.get("setting"),
         texture=prepared.get("texture"),
         articulation=prepared.get("articulation"),
+        pointmap_depth=prepared.get("pointmap_depth"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -1791,6 +1916,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         setting=prepared.get("setting"),
         texture=prepared.get("texture"),
         articulation=prepared.get("articulation"),
+        pointmap_depth=prepared.get("pointmap_depth"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -1864,6 +1990,10 @@ def _render_condition(
         articulation = prepared["articulation"]
         evidence_text = _serialize_pose_articulation(articulation)
         return raw.copy(), _context_prompt(evidence_text), articulation
+    if condition_id == "context-raw-pointmap-depth":
+        pointmap_depth = prepared["pointmap_depth"]
+        evidence_text = _serialize_pointmap_depth(pointmap_depth)
+        return raw.copy(), _context_prompt(evidence_text), pointmap_depth
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
