@@ -66,6 +66,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "matting-alpha:v1",
     "face-geometry:v1",
     "object-relations:v1",
+    "scene-category:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -509,6 +510,23 @@ def render_object_relations(objrel: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_scene_category(scene: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant semantic scene-category claim (arm #69).
+
+    Verbalizes ONLY the scale-invariant semantic category label (or a surfaced
+    abstention). CLIP similarity logits / probabilities stay in the
+    machine-readable payload and are never caption claims.
+    """
+    if scene.get("abstained"):
+        reason = scene.get("abstention_reason") or "scene classification not confident"
+        return [f"scene-category: abstain ({reason})"]
+    if not scene or not scene.get("category"):
+        # Dimension not measured for this item (e.g. non-scene-category
+        # runs) — emit no claim, never a fabricated label.
+        return []
+    return [f"scene-category: the setting is a {scene['category']}"]
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -691,6 +709,21 @@ def _object_relations_payload(objrel: Mapping[str, Any] | None) -> dict[str, Any
     return payload
 
 
+def _scene_category_payload(scene: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not scene:
+        return {}
+    payload = {
+        "category": scene.get("category"),
+        "confidence": scene.get("confidence"),
+        "probabilities": scene.get("probabilities"),
+        "abstain_confidence": scene.get("abstain_confidence"),
+    }
+    ab = scene.get("abstention_reason")
+    if scene.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -706,6 +739,7 @@ def build_evidence_payload(
     matting_alpha: Mapping[str, Any] | None = None,
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
+    scene_category: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -773,6 +807,7 @@ def build_evidence_payload(
             "matting_alpha": _matting_alpha_payload(matting_alpha),
             "face_geometry": _face_geometry_payload(face_geometry),
             "object_relations": _object_relations_payload(object_relations),
+            "scene_category": _scene_category_payload(scene_category),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -805,6 +840,7 @@ def assemble_dossier(
     matting_alpha: Mapping[str, Any] | None = None,
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
+    scene_category: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -826,6 +862,7 @@ def assemble_dossier(
         ("matting-alpha:v1", "matting-alpha", render_matting_alpha(matting_alpha or {})),
         ("face-geometry:v1", "face-geometry", render_face_geometry(face_geometry or {})),
         ("object-relations:v1", "object-relations", render_object_relations(object_relations or {})),
+        ("scene-category:v1", "scene-category", render_scene_category(scene_category or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

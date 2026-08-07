@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #61 object-relations round-trip COMPLETE → BETTER; sweep exhausted 15/15 → brainstorm-widen; next active arm scene-category #69)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 15/15 prior+new arms validated; object-relations validated BETTER; BRAINSTORM-WIDEN registered #68/#69; scene-category is the single active arm.**
+**Last updated:** 2026-08-07 (arm #69 scene-category CLIP round-trip COMPLETE → BETTER; gaze-head-orientation #68 activated as the sole active arm)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 16/17 arms validated (all 15 feeders + dossier-context4k + reconstruction); scene-category validated BETTER; gaze-head-orientation #68 is the sole `research:active` arm; 0 blocked.**
+
+**Arm #69 scene-category ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-scene-category-arm69-20260807`).** NEW-MODEL-CLASS open-weight CLIP ViT-L/14 zero-shot scene classifier (`openai/clip-vit-large-patch14`, MIT, local CPU on owned hardware, staged at `/mnt/nas-ai-models/research/stratum/models/scene-category`, model.safetensors sha256 a2bf730a...): semantic scene category (what-kind-of-place) over the full-frame source against a frozen closed 10-category set (indoor studio / plain wall backdrop / bedroom / living room / outdoor beach / outdoor garden / outdoor field / body of water / urban street / poolside), cohort-derived from the arm-#47 VLM scene vocabulary. Abstention floor 0.25 calibrated on the frozen cohort (probe: 24/24 classified, 8 distinct categories, max top-1 share 25%, p50 confidence 0.526, min confidence 0.270, 0 abstentions). Scale-invariant label only verbalized; similarity logits/probabilities stay in evidence_payload. Support ratio 0.3219 → 0.9310 (Δ +0.6091), supported 47 → 189, unsupported 99 → 14, paired positive 20/24, sign-test p=0.000772. Registry: scene-category → validated; **gaze-head-orientation #68 → active** (selected_via explore, ε-greedy slot, selection_progress 12). One-active invariant holds (16 validated, 0 proposals — #68 active). Note: scene-category binds NO derived evidence artifact (CLIP consumes only the decoded source RGB, evidence-input hashes honestly empty; seg2/pose2 stay validation-only reads).
 
 **Arm #61 object-relations ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-object-relations-arm61-20260807`).** NEW-MODEL-CLASS open-weight Grounding DINO (`IDEA-Research/grounding-dino-base`, Apache-2.0, text-grounded open-vocabulary detector, HF Transformers path, local CPU on owned hardware; model.safetensors sha256 5548f844...): scale-invariant object-presence count band (none/sparse/moderate/dense) + placement band (foreground/background/mix from seg2-subject overlap) + canonical class list over the frozen cohort-derived closed vocabulary (water/field/concrete/mirror/window + accessories — the furniture-centric first try was DEGENERATE 9/24); box_threshold 0.25 calibrated on the cohort (21/24 ≥1 detection). Bands calibrated (count none=8/sparse=7/moderate=5/dense=4, max 33%; placement fg=4/bg=4/mix=8/none=8, max 33%); subject-self guard excludes 'body'/person' boxes (exact-standalone-word, keeping 'body of water'). Support ratio 0.3219 → 0.8783 (Δ +0.5564), supported 47 → 166, unsupported 99 → 23, paired positive 18/21, sign-test p=0.000745. Registry: object-relations → validated; **the sweep is now EXHAUSTED (15/15 terminal)**.
 
@@ -153,19 +155,19 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Scene-category (#69, `research:active`, CLIP zero-shot) is now the sole active arm; sweep
-`exhausted: false`, next action research-pending.** Object-relations (#61) is VALIDATED BETTER (this
-cycle) and the registry menu was EXHAUSTED (15/15) — this cycle's brainstorm-widen registered two
-genuinely-new candidates (#68 gaze-head-orientation, #69 scene-category) after data-source candidacy
-probes on the frozen cohort (EXIF weak, framing and focus-gap DEGENERATE and dropped); the selector
-picked scene-category (exploit, EIG 0.65, novelty 0.15). Per the round-trip recipe, the next arm's
-first step is the deterministic measurement: build the `research_harness` scene-category module
-(openai/clip-vit-large-patch14 zero-shot, NEW model class per the sourcing scan, model already local
-from arm #37) — a capability + band-calibration probe on the frozen 24-item cohort first
-(max top-1 share already measured 29% — no band ≥75%), then freeze the plan (no new GPU model — CPU
-CLIP classification), then run the standard 96-caption generation + independent review round-trip and
-`autonomous-tick`. One proposal (gaze-head-orientation #68, mediapipe mesh reuse) sits in the menu
-for the selector's future picks (exploit / ε-greedy explore slot).
+**Gaze-head-orientation (#68, `research:active`, MediaPipe FaceLandmarker mesh reuse) is now the sole
+active arm; sweep `exhausted: false`, next action research-pending.** Scene-category (#69) is VALIDATED
+BETTER (this cycle, CLIP zero-shot round-trip) and the registry menu was EXHAUSTED (15/15) before this
+cycle's brainstorm-widen registered two genuinely-new candidates (#68 gaze-head-orientation, #69
+scene-category). Per the round-trip recipe, the next arm's first step is the deterministic measurement:
+build the `research_harness` gaze-head-orientation module reusing the proven MediaPipe FaceLandmarker
+478-point mesh from arm #60 (union detection policy, scale-invariant yaw/pitch bands with a
+plausibility/abstention gate — camera-frame-relative direction is scale-invariant but absolute coords
+stay payload-only), capability + band-calibration probe on the frozen 24-item cohort first, then freeze
+the plan (CPU MediaPipe — no new GPU model), run the standard 96-caption generation + independent review
+round-trip and `autonomous-tick`. 0 proposals remain in the menu (all feeders + #36/#37 now validated),
+so the selector's ε-greedy explore slot has no lower-prior arm to force until new proposals are
+registered.
 
 ## Live research tree
 

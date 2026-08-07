@@ -54,6 +54,7 @@ from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
+from .scene_category import SceneCategoryError, compute_scene_category
 
 
 class StageBRunError(RuntimeError):
@@ -1178,6 +1179,65 @@ def _object_relations_evidence() -> dict[str, Any]:
     return evidence
 
 
+def _scene_category_evidence() -> dict[str, Any]:
+    """Declared open-weight CLIP ViT-L/14 zero-shot scene classifier (arm #69)."""
+    module_path = Path(compute_scene_category.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_dir = Path(SCENE_CATEGORY_MODEL_ASSET)
+    model_sha = (
+        _sha256((model_dir / "model.safetensors").read_bytes())
+        if (model_dir / "model.safetensors").exists() else "MISSING"
+    )
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-scene-category-v1",
+        "specialists": [
+            {
+                "id": "in-memory-scene-category-v1",
+                "scope": "Semantic scene category (what-kind-of-place) from a locally-run open-weight CLIP ViT-L/14 "
+                         "zero-shot classifier over the full-frame source with a frozen closed scene-category set "
+                         "(indoor studio / plain wall backdrop / bedroom / living room / outdoor beach / outdoor "
+                         "garden / outdoor field / body of water / urban street / poolside) at a calibrated "
+                         "confidence floor. Emits the argmax category label (or a surfaced abstention below the "
+                         "floor); never identity, skin-tone, or aesthetic claims; only the scale-invariant label.",
+                "inputs": ("Frozen selected-item already-decoded full-frame source RGB (SHA-bound via the item's "
+                           "source_sha256); local open-weight openai/clip-vit-large-patch14 (MIT, CPU, "
+                           "model.safetensors sha256 {model_sha}). Recomputed in memory during this bounded run "
+                           "with no crawlr/stratum write; model run on owned hardware only. seg2/pose2 stay "
+                           "validation-only reads.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant scene-category label with a surfaced "
+                                     "abstention on low confidence or model/input failure, not semantic ground "
+                                     "truth or caption claims; only the label is verbalized (similarity "
+                                     "logits/probabilities stay in the machine-readable payload)."),
+                "provenance": (
+                    "research_harness.scene_category.compute_scene_category "
+                    f"SHA-256 {code_hash}; model openai/clip-vit-large-patch14 (MIT, "
+                    f"HF Transformers path) sha256 {model_sha}, run locally on owned hardware (CPU, "
+                    "no VRAM contention with the caption model); computed in memory during this "
+                    "bounded run with no crawlr/stratum write, no hosted third-party inference of "
+                    "the sensitive corpus."
+                ).format(model_sha=model_sha),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing or detector count is not exactly one; abstain "
+                                      "(emit None/label with a surfaced reason) when the argmax softmax "
+                                      "confidence falls below the calibrated floor. Never overwrite an "
+                                      "ambiguous scene with a confident-looking guess. Classifier "
+                                      "disagreement remains a quality anomaly, never prompt content."),
+                "known_failure_modes": ("CLIP zero-shot is a closed-set classifier: labels outside the frozen "
+                                        "scene vocabulary are forced onto the nearest class (addressed by "
+                                        "cohort-deriving the closed set from the arm-#47 VLM scene vocabulary); "
+                                        "confidence is not calibrated across domains (floor 0.25 calibrated on "
+                                        "this frozen cohort: 24/24 classified, max top-1 share 29%); object-level "
+                                        "detail that CLIP cannot distinguish from the scene is out of scope."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
 def _serialize_object_relations(objrel: Mapping[str, Any]) -> str:
     """Deterministic natural-language rendering of an object-relations dict.
 
@@ -1218,6 +1278,27 @@ def _serialize_object_relations(objrel: Mapping[str, Any]) -> str:
         lines.append("- objects sit behind the subject in the background")
     elif placement == "mix":
         lines.append("- objects are a mix of foreground and background")
+    return "\n".join(lines)
+
+
+def _serialize_scene_category(scene: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a scene-category dict.
+
+    Verbalizes ONLY the scale-invariant semantic category label (or a surfaced
+    abstention). Similarity logits / probabilities remain in the machine-
+    readable `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "SCENE-CATEGORY (CLIP ViT-L/14 zero-shot, closed set, scale-invariant):"
+    ]
+    if scene.get("abstained"):
+        reason = scene.get("abstention_reason") or "scene classification not confident"
+        lines.append(f"- scene-category abstained ({reason})")
+        return "\n".join(lines)
+    if not scene or not scene.get("category"):
+        lines.append("- scene-category not measured for this item")
+        return "\n".join(lines)
+    lines.append(f"- the setting is a {scene['category']}")
     return "\n".join(lines)
 
 
@@ -1297,6 +1378,12 @@ OBJECT_RELATIONS_MODEL_ASSET = (
     "/mnt/nas-ai-models/research/stratum/models/object-relations"
 )
 
+# Frozen open-weight CLIP ViT-L/14 asset directory (arm #69, new model class).
+# model.safetensors sha256 a2bf730a0c7debf160f7a6b50b3aaf3703e7e88ac73de7a314903141db026dcb
+SCENE_CATEGORY_MODEL_ASSET = (
+    "/mnt/nas-ai-models/research/stratum/models/scene-category"
+)
+
 _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "geometry": ("pose2.npy", "seg2.npy"),
     "body-type": ("pose2.npy", "seg2.npy"),
@@ -1313,6 +1400,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "matting-alpha": ("matting.npy", "seg2.npy"),
     "face-geometry": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
+    # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
+    # full-frame source RGB (SHA-bound via the item's source_sha256). No
+    # derived artifact is an evidence input; seg2/pose2 stay validation-only
+    # reads for the exactly-one-subject invariant.
+    "scene-category": (),
 }
 
 
@@ -1404,7 +1496,7 @@ def build_stage_b_plan(
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
-        "object-relations",
+        "object-relations", "scene-category",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1747,6 +1839,36 @@ def build_stage_b_plan(
             "detections ('body') are excluded, and normalized boxes/scores stay in evidence_payload and are "
             "never caption claims."
         )
+    elif evidence_kind == "scene-category":
+        evidence = _scene_category_evidence()
+        evidence_condition_id = "context-raw-scene-category"
+        comparison_plan_id = "stage-b-first500-scene-category-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared semantic scene-category "
+            "determinations (one closed-set label — indoor studio / plain wall backdrop / bedroom / living "
+            "room / outdoor beach / outdoor garden / outdoor field / body of water / urban street / poolside — "
+            "from a locally-run open-weight CLIP ViT-L/14 zero-shot classifier over the full-frame source at a "
+            "calibrated confidence floor, scale-invariant label only) may reduce unsupported "
+            "background/scene claims (what-kind-of-place the setting actually is) or increase supported "
+            "scene claims in captions versus its matched no-evidence baseline when the source item, view, "
+            "prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The scene-category evidence condition does not reduce unsupported background/scene claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the CLIP classifier fails "
+            "qualification on real corpus items (high abstention / random labels), or an apparent difference "
+            "is attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs; seg2/pose2 stay validation-only reads for "
+            "the exactly-one-subject invariant. Scene category is computed in memory from the already-decoded "
+            "full-frame source RGB via the local open-weight CLIP ViT-L/14 zero-shot classifier "
+            "(openai/clip-vit-large-patch14, MIT, owned hardware, CPU; model.safetensors bound by sha256) "
+            "over a frozen closed scene-category set (cohort-derived from the arm-#47 VLM dense-description "
+            "scene vocabulary) at the calibrated confidence floor (0.25). Only the scale-invariant label is "
+            "verbalized; similarity logits/probabilities stay in evidence_payload and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2026,6 +2148,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "face-geometry"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
+    elif "context-raw-scene-category" in condition_ids:
+        rebuild_kind = "scene-category"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2094,6 +2218,7 @@ def _load_selected_item(
     *,
     include_face_geometry: bool = False,
     include_object_relations: bool = False,
+    include_scene_category: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2219,6 +2344,13 @@ def _load_selected_item(
             )
         except ObjectRelationsError as exc:
             raise StageBRunError(f"object-relations abort for frozen selected item {image_id}: {exc}") from exc
+    scene_category = None
+    if include_scene_category:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
+        try:
+            scene_category = compute_scene_category(rgb, model_asset_dir=SCENE_CATEGORY_MODEL_ASSET)
+        except SceneCategoryError as exc:
+            raise StageBRunError(f"scene-category abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2249,6 +2381,7 @@ def _load_selected_item(
         "matting_alpha": matting_alpha,
         "face_geometry": face_geometry,
         "object_relations": object_relations,
+        "scene_category": scene_category,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2302,6 +2435,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         matting_alpha=prepared.get("matting_alpha"),
         face_geometry=prepared.get("face_geometry"),
         object_relations=prepared.get("object_relations"),
+        scene_category=prepared.get("scene_category"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2318,6 +2452,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         matting_alpha=prepared.get("matting_alpha"),
         face_geometry=prepared.get("face_geometry"),
         object_relations=prepared.get("object_relations"),
+        scene_category=prepared.get("scene_category"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2407,6 +2542,10 @@ def _render_condition(
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
         return raw.copy(), _context_prompt(evidence_text), object_relations
+    if condition_id == "context-raw-scene-category":
+        scene_category = prepared["scene_category"]
+        evidence_text = _serialize_scene_category(scene_category)
+        return raw.copy(), _context_prompt(evidence_text), scene_category
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -2593,6 +2732,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #69: only the scene-category run invokes the local open-weight CLIP
+    # classifier (new model class, CPU) — gate on the frozen plan's conditions
+    # so other arms never pay the CLIP cost.
+    include_scene_category = any(
+        str(condition.get("id")) == "context-raw-scene-category"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -2604,6 +2750,7 @@ def execute_stage_b(
             evidence_hashes[_safe_output_segment(item.get("image_id"), "candidate item image_id")],
             include_face_geometry=include_face_geometry,
             include_object_relations=include_object_relations,
+            include_scene_category=include_scene_category,
         )
         for item in items
     ]
