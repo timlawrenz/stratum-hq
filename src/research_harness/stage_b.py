@@ -60,6 +60,10 @@ from .camera_viewing_angle import (
     CameraViewingAngleError,
     compute_camera_viewing_angle,
 )
+from .image_focus import (
+    ImageFocusError,
+    compute_image_focus,
+)
 
 
 class StageBRunError(RuntimeError):
@@ -1470,6 +1474,90 @@ def _serialize_camera_viewing_angle(framing: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _image_focus_evidence() -> dict[str, Any]:
+    """Declared deterministic image-focus / depth-of-field specialist (arm #75)."""
+    module_path = Path(compute_image_focus.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-image-focus-v1",
+        "specialists": [
+            {
+                "id": "in-memory-image-focus-v1",
+                "scope": "Scale-invariant optical focus / depth-of-field quality with no new model: subject-region vs full-frame interior acutance band (subject softer / comparable / crispest part of the frame) and background-vs-subject interior acutance ratio band (background blurred / soft / sharp — the depth-of-field axis), both measured on the region INTERIOR of the canonical-512 luminance gradient (silhouette halo excluded). Never identity, skin-tone, facial, or aesthetic claims; only the scale-invariant focus/DOF bands in prose.",
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 subject mask, "
+                           "already read for the exactly-one-subject invariant) + the already-decoded "
+                           "full-frame source RGB (SHA-bound via source_sha256), resampled to a canonical "
+                           "512 long side; computed in memory with no crawlr/stratum write; no new model "
+                           "(CPU)."),
+                "output_semantics": ("Provenance-bearing scale-invariant focus bands with a surfaced "
+                                     "abstention on too-small regions or untextured backgrounds, not "
+                                     "semantic ground truth or caption claims; raw acutance numbers and "
+                                     "canonical dims stay in the machine-readable payload, never prose."),
+                "provenance": (
+                    "research_harness.image_focus.compute_image_focus "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no new model invoked."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if required artifacts "
+                                      "are missing, unreadable, or detector count is not exactly one; abstain "
+                                      "(emit band None with a surfaced reason) when the eroded subject or "
+                                      "background region is too small, or the background is untextured (no "
+                                      "detail to resolve as sharp or blurred). Detector disagreement remains a "
+                                      "quality anomaly, never prompt content."),
+                "known_failure_modes": ("Focus bands are relative-acutance measurements at a canonical "
+                                        "resolution; extreme compression artifacts or heavy downsampling can "
+                                        "flatten all gradients. A flat/plain background honestly abstains on "
+                                        "the DOF axis rather than guessing. The subject-vs-frame band is "
+                                        "meaningless on a full-bleed subject with no background and abandons "
+                                        "the DOF axis, keeping the subject band."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_image_focus(focus: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a focus dict.
+
+    Verbalizes ONLY the scale-invariant focus/DOF bands. Raw acutance
+    numbers / canonical dims stay in the machine-readable evidence_payload
+    JSON and are not caption claims.
+    """
+    lines = [
+        "IMAGE-FOCUS (focus quality / depth of field, scale-invariant):"
+    ]
+    if focus.get("abstained"):
+        reason = focus.get("abstention_reason") or "focus not measurable"
+        lines.append(f"- focus abstained ({reason})")
+        return "\n".join(lines)
+    if not focus or (not focus.get("subject_focus_band") and not focus.get("dof_band")):
+        lines.append("- focus not measured for this item")
+        return "\n".join(lines)
+    sb = focus.get("subject_focus_band")
+    if sb == "subject-crisp":
+        lines.append("- subject is the crispest in-focus part of the frame")
+    elif sb == "subject-softer":
+        lines.append("- subject looks softer than the rest of the frame")
+    elif sb == "subject-comparable":
+        lines.append("- subject and frame are in similar focus")
+    db = focus.get("dof_band")
+    if db == "background-blurred":
+        lines.append("- background is clearly softer than the subject (shallow depth-of-field look)")
+    elif db == "background-sharp":
+        lines.append("- background is about as sharp as the subject (deep-focus look)")
+    elif db == "background-soft":
+        lines.append("- background is somewhat softer than the subject")
+    elif focus.get("dof_abstained"):
+        lines.append(
+            f"- depth-of-field not assessed ({focus.get('dof_abstention_reason')})"
+        )
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1582,6 +1670,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # mask + full-frame dims only; seg2 is read-only validation data, never
     # mutated; no new model.
     "camera-viewing-angle": ("seg2.npy",),
+    # Arm #75 image-focus: deterministic focus / depth-of-field quality from
+    # the already-decoded source RGB (SHA-bound via source_sha256) + the seg2
+    # DOME-29 class mask for the subject/background region split. seg2 is the
+    # only derived evidence input; no new model.
+    "image-focus": ("seg2.npy",),
 }
 
 
@@ -1674,6 +1767,7 @@ def build_stage_b_plan(
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
+        "image-focus",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2106,6 +2200,34 @@ def build_stage_b_plan(
             "camera-height); raw bbox extents and frame shares stay in evidence_payload and are never "
             "caption claims."
         )
+    elif evidence_kind == "image-focus":
+        evidence = _image_focus_evidence()
+        evidence_condition_id = "context-raw-image-focus"
+        comparison_plan_id = "stage-b-first500-image-focus-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic image-focus / "
+            "depth-of-field determinations (subject-region vs full-frame interior acutance band and "
+            "background-vs-subject interior acutance ratio band — blurred / soft / sharp background, "
+            "the DOF axis; all scale-invariant, measured on the region INTERIOR of the canonical-512 "
+            "luminance gradient, no new model) may reduce unsupported focus/DOF claims ('in sharp focus', "
+            "'blurred background') or increase supported focus claims in captions versus its matched "
+            "no-evidence baseline when the source item, view, prompt template, local model, and generation "
+            "settings are controlled."
+        )
+        falsified_if = (
+            "The image-focus evidence condition does not reduce unsupported focus/DOF claims or increase "
+            "supported claims versus its matched no-evidence baseline, or the focus bands fail on real "
+            "corpus items (high abstention / degenerate acutance distributions), or an apparent difference "
+            "is attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs; pose2 stays a validation-only read for "
+            "the exactly-one-subject invariant. Focus is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 subject mask) + the already-decoded full-frame source RGB — no new model, "
+            "CPU only. Only scale-invariant focus/DOF bands are verbalized; raw acutance numbers and "
+            "canonical dims stay in evidence_payload and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2391,6 +2513,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "gaze-head-orientation"
     elif "context-raw-camera-viewing-angle" in condition_ids:
         rebuild_kind = "camera-viewing-angle"
+    elif "context-raw-image-focus" in condition_ids:
+        rebuild_kind = "image-focus"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2462,6 +2586,7 @@ def _load_selected_item(
     include_scene_category: bool = False,
     include_gaze_head: bool = False,
     include_camera_viewing_angle: bool = False,
+    include_image_focus: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2610,6 +2735,13 @@ def _load_selected_item(
             camera_viewing_angle = compute_camera_viewing_angle(seg2, img_h, img_w)
         except CameraViewingAngleError as exc:
             raise StageBRunError(f"camera-viewing-angle abort for frozen selected item {image_id}: {exc}") from exc
+    image_focus = None
+    if include_image_focus:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8))
+        try:
+            image_focus = compute_image_focus(rgb, seg2)
+        except ImageFocusError as exc:
+            raise StageBRunError(f"image-focus abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2643,6 +2775,7 @@ def _load_selected_item(
         "scene_category": scene_category,
         "gaze_head": gaze_head,
         "camera_viewing_angle": camera_viewing_angle,
+        "image_focus": image_focus,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2699,6 +2832,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         scene_category=prepared.get("scene_category"),
         gaze_head=prepared.get("gaze_head"),
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
+        image_focus=prepared.get("image_focus"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2718,6 +2852,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         scene_category=prepared.get("scene_category"),
         gaze_head=prepared.get("gaze_head"),
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
+        image_focus=prepared.get("image_focus"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2819,6 +2954,10 @@ def _render_condition(
         framing = prepared["camera_viewing_angle"]
         evidence_text = _serialize_camera_viewing_angle(framing)
         return raw.copy(), _context_prompt(evidence_text), framing
+    if condition_id == "context-raw-image-focus":
+        focus = prepared["image_focus"]
+        evidence_text = _serialize_image_focus(focus)
+        return raw.copy(), _context_prompt(evidence_text), focus
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3025,6 +3164,12 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-camera-viewing-angle"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #75: only the image-focus run computes deterministic focus/DOF
+    # bands (CPU, no new model) — gate on the frozen plan's conditions.
+    include_image_focus = any(
+        str(condition.get("id")) == "context-raw-image-focus"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3039,6 +3184,7 @@ def execute_stage_b(
             include_scene_category=include_scene_category,
             include_gaze_head=include_gaze_head,
             include_camera_viewing_angle=include_camera_viewing_angle,
+            include_image_focus=include_image_focus,
         )
         for item in items
     ]
