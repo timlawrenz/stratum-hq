@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #69 scene-category CLIP round-trip COMPLETE → BETTER; gaze-head-orientation #68 activated as the sole active arm)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 16/17 arms validated (all 15 feeders + dossier-context4k + reconstruction); scene-category validated BETTER; gaze-head-orientation #68 is the sole `research:active` arm; 0 blocked.**
+**Last updated:** 2026-08-07 (arm #68 gaze/head-orientation ROUND-TRIP COMPLETE → BETTER; sweep EXHAUSTED 17/17; brainstorm-widen queued NEW candidates → next arm TBD)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 17/17 arms validated (all 15 feeders + dossier-context4k + reconstruction); gaze-head-orientation #68 validated BETTER; sweep EXHAUSTED (0 active, 0 proposals) → next action brainstorm-new-data; 0 blocked.**
+
+**Arm #68 gaze/head-orientation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-gaze-head-arm68-20260807`).** NEW-EVIDENCE-PART camera-interaction axis reusing the SAME validated open-weight MediaPipe FaceLandmarker 478-point mesh as arm #60 (owned hardware, local CPU, `face_landmarker.task` sha256 64184e229b...): scale-invariant head-orientation bands — yaw (facing camera / partially turned / profile or turned away), pitch (level / tilted down / tilted up, cohort-centered calibration), and in-plane roll from the stable eye-line angle — via the canonical six-point PnP head-pose fit (classic OpenCV model, y-flip measured on this cohort to fix a degenerate out-of-plane fit; Euler via the classic OpenCV decomposition; plausibility gates |pitch|≤85° / |yaw|≤90°). Band calibration probe on the frozen 24-item cohort: 21/24 detected (union policy, 3 honest abstains matching arm #60), yaw 4/5/12 (max 57%), pitch 7/6/8 (max 38%), roll 10/11 (max 52%) — all bands under the 75% degeneracy line; two independent estimators (PnP and landmark-projection) agree the corpus genuinely has many turned heads. Support ratio 0.3219 → 0.9673 (Δ +0.6454), supported 47 → 207, unsupported 99 → 7, paired positive 20/20, sign-test p=1e-06. Registry: gaze-head-orientation → **validated** → sweep EXHAUSTED (17/17) → **next_action brainstorm-new-data**. One-active invariant holds (17 validated, 0 active, 0 proposals).
 
 **Arm #69 scene-category ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-scene-category-arm69-20260807`).** NEW-MODEL-CLASS open-weight CLIP ViT-L/14 zero-shot scene classifier (`openai/clip-vit-large-patch14`, MIT, local CPU on owned hardware, staged at `/mnt/nas-ai-models/research/stratum/models/scene-category`, model.safetensors sha256 a2bf730a...): semantic scene category (what-kind-of-place) over the full-frame source against a frozen closed 10-category set (indoor studio / plain wall backdrop / bedroom / living room / outdoor beach / outdoor garden / outdoor field / body of water / urban street / poolside), cohort-derived from the arm-#47 VLM scene vocabulary. Abstention floor 0.25 calibrated on the frozen cohort (probe: 24/24 classified, 8 distinct categories, max top-1 share 25%, p50 confidence 0.526, min confidence 0.270, 0 abstentions). Scale-invariant label only verbalized; similarity logits/probabilities stay in evidence_payload. Support ratio 0.3219 → 0.9310 (Δ +0.6091), supported 47 → 189, unsupported 99 → 14, paired positive 20/24, sign-test p=0.000772. Registry: scene-category → validated; **gaze-head-orientation #68 → active** (selected_via explore, ε-greedy slot, selection_progress 12). One-active invariant holds (16 validated, 0 proposals — #68 active). Note: scene-category binds NO derived evidence artifact (CLIP consumes only the decoded source RGB, evidence-input hashes honestly empty; seg2/pose2 stay validation-only reads).
 
@@ -140,14 +142,14 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **15 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **17 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
   reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
-  **matting-alpha #59**, **face-geometry #60**, **object-relations #61**),
-  **1 proposal** (gaze-head-orientation #68), **1 active** (scene-category #69, CLIP zero-shot),
-  0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none` (research-pending on the
-  active arm), `goal_unreachable: false` (floor 4001, gap 512; the VLM evidence part + deterministic
-  record together clear it).
+  **matting-alpha #59**, **face-geometry #60**, **object-relations #61**, **scene-category #69**,
+  **gaze-head-orientation #68**),
+  **0 proposals, 0 active**, 0 blocked. `dimension-sweep-status`: `exhausted: true`, `next_action:
+  brainstorm-new-data` (menu fully validated 17/17, goal inputs 100%), `goal_unreachable: false`
+  (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
@@ -155,19 +157,21 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Gaze-head-orientation (#68, `research:active`, MediaPipe FaceLandmarker mesh reuse) is now the sole
-active arm; sweep `exhausted: false`, next action research-pending.** Scene-category (#69) is VALIDATED
-BETTER (this cycle, CLIP zero-shot round-trip) and the registry menu was EXHAUSTED (15/15) before this
-cycle's brainstorm-widen registered two genuinely-new candidates (#68 gaze-head-orientation, #69
-scene-category). Per the round-trip recipe, the next arm's first step is the deterministic measurement:
-build the `research_harness` gaze-head-orientation module reusing the proven MediaPipe FaceLandmarker
-478-point mesh from arm #60 (union detection policy, scale-invariant yaw/pitch bands with a
-plausibility/abstention gate — camera-frame-relative direction is scale-invariant but absolute coords
-stay payload-only), capability + band-calibration probe on the frozen 24-item cohort first, then freeze
-the plan (CPU MediaPipe — no new GPU model), run the standard 96-caption generation + independent review
-round-trip and `autonomous-tick`. 0 proposals remain in the menu (all feeders + #36/#37 now validated),
-so the selector's ε-greedy explore slot has no lower-prior arm to force until new proposals are
-registered.
+**Gaze-head-orientation (#68) is now VALIDATED BETTER and the registry menu is EXHAUSTED (17/17
+validated, 0 proposals, 0 active) — `dimension-sweep-status` reports `next_action: brainstorm-new-data`.
+Per the exhausted-menu recipe: WIDEN, do not re-run a familiar arm pattern.** Register genuinely-new
+candidate dimensions through the gated `propose-dimensions --require-new-evidence-part` channel (each
+must name a NEW evidence part or NEW model class; redundant attribute-taggers over validated axes are
+rejected). Candidate lines for the next brainstorm-widen (to be validated on the frozen cohort before
+freezing): (a) a compositional/framing axis (subject scale + placement in frame from seg2 — NEW
+deterministic part); (b) a temporal/dynamic axis is out of scope for single stills, but a lens/
+depth-of-field axis (relative background sharpness from source gradients + seg2 focus plane — NEW
+detectable part); (c) an open-world NEW-model-class scan for a materially better task model or an
+entirely new part (e.g. learned hair/lip/eye color fine-tune vs the current deterministic taggers), per
+the sourcing directive — including literature/arXiv scan. Keep exactly one active arm and one open
+program root; every new candidate needs the full declaration (scope/inputs/output semantics/
+provenance/abstention/known failure modes/qualification gate) + a capability probe on the frozen
+24-item cohort before any plan freeze.
 
 ## Live research tree
 
@@ -179,12 +183,14 @@ registered.
 - #29–#47 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, #37, **#47 vlm-dense-description**,
   **#62 pose-articulation**, and **#58 pointmap-depth** are ALL validated (all BETTER);
   **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**.
-- **Post-exhaustion brainstorm-widen (2026-08-06):** proposal arms **#58 point-map depth**, **#59 matting/alpha**,
+- **Post-exhaustion brainstorm-widen (2026-08-06/07):** proposal arms **#58 point-map depth**, **#59 matting/alpha**,
   **#60 face-geometry**, **#61 object-relations**, **#62 pose-articulation** registered via the gated
   `propose-dimensions --require-new-evidence-part` channel (all name a NEW evidence part; #60/#61 also name
   a NEW model class). **#62 pose-articulation VALIDATED (2026-08-07, PR #64); #58 pointmap-depth VALIDATED
-  (2026-08-07); matting-alpha #59 is the sole `research:active` arm** (selected_via explore, ε-greedy slot,
-  selection_progress 8). Face-geometry #60 and object-relations #61 remain proposals in the menu.
+  (2026-08-07); matting-alpha #59, face-geometry #60, object-relations #61 ALL VALIDATED (2026-08-07)**.
+  **Second widen (2026-08-07): #68 gaze-head-orientation + #69 scene-category registered; BOTH now
+  VALIDATED (2026-08-07).** Registry menu is **EXHAUSTED (17/17 validated, 0 proposals, 0 active)** —
+  `next_action: brainstorm-new-data` (third widen pending this cycle).
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -202,7 +208,8 @@ of the sensitive canonical corpus requires a hold.
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
 Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER;
 Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER; Arm #59 (matting-alpha): BETTER;
-Arm #60 (face-geometry): BETTER; Arm #61 (object-relations): BETTER.**
+Arm #60 (face-geometry): BETTER; Arm #61 (object-relations): BETTER; Arm #69 (scene-category): BETTER;
+Arm #68 (gaze-head-orientation): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
@@ -213,5 +220,8 @@ check is BETTER too** (non-LLM validation of the same compact context): context4
 +0.0679 mean CLIP ViT-L/14 similarity over the degraded-baseline generations (22/24 paired positives).
 The **VLM dense-description marginal is BETTER** (0.7376→0.9581 support ratio, p=0.013302). After the
 10/10 sweep was exhausted, the **brainstorm-widen registered 5 new candidate arms (#58–#62)**, and
-**pose-articulation (#62) and pointmap-depth (#58) are both VALIDATED (2026-08-07)**.
-**Matting-alpha (#59) is the new sole `research:active` arm** awaiting its round-trip research cycle.
+**pose-articulation (#62), pointmap-depth (#58), matting-alpha (#59), face-geometry (#60), and
+object-relations (#61) ALL VALIDATED (2026-08-07)**. A **second widen registered #68 gaze-head-orientation
+and #69 scene-category — ALL 17/17 VALIDATED (2026-08-07)**; the menu is **EXHAUSTED → third
+brainstorm-widen (next_action: brainstorm-new-data)**. The **gaze/head-orientation round-trip is BETTER**
+(support ratio 0.3219→0.9673, p=1e-06, Δ +0.6454) — the strongest single-arm delta yet.
