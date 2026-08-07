@@ -398,13 +398,15 @@ def test_resumption_documents_preserve_the_active_state_and_two_stage_boundary()
     research_readme = (ROOT / "research" / "README.md").read_text()
 
     # The resumption documents must reflect the live one-active/two-stage
-    # invariants. As of 2026-08-07 the scene-category (#69) round-trip
-    # VALIDATED BETTER and gaze-head-orientation #68 was activated as the sole
-    # active arm (explore, EIG 0.65); next action is research-pending on
-    # gaze-head-orientation.
+    # invariants. As of 2026-08-07 the gaze-head-orientation (#68) and
+    # camera-viewing-angle (#74) round-trips each VALIDATED BETTER, and
+    # image-focus-depth-of-field #75 was activated as the sole active arm;
+    # next action is research-pending on image-focus-depth-of-field.
     assert "gaze-head-orientation" in status
+    assert "image-focus-depth-of-field" in status
     assert "is the sole `research:active`" in status  # one-active invariant
     assert "brainstorm-widen" in status
+    assert "camera-viewing-angle" in status
     assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
     assert "The `stratum-ffhq` strategist is paused" not in status
     assert "#33 lighting" in status
