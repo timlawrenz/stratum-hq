@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #60 face-geometry round-trip COMPLETE → BETTER; next active arm object-relations #61)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 14/14 prior+new arms validated; face-geometry validated BETTER; object-relations is the single active arm.**
+**Last updated:** 2026-08-07 (arm #61 object-relations round-trip COMPLETE → BETTER; sweep exhausted 15/15 → brainstorm-widen; next active arm scene-category #69)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 15/15 prior+new arms validated; object-relations validated BETTER; BRAINSTORM-WIDEN registered #68/#69; scene-category is the single active arm.**
+
+**Arm #61 object-relations ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-object-relations-arm61-20260807`).** NEW-MODEL-CLASS open-weight Grounding DINO (`IDEA-Research/grounding-dino-base`, Apache-2.0, text-grounded open-vocabulary detector, HF Transformers path, local CPU on owned hardware; model.safetensors sha256 5548f844...): scale-invariant object-presence count band (none/sparse/moderate/dense) + placement band (foreground/background/mix from seg2-subject overlap) + canonical class list over the frozen cohort-derived closed vocabulary (water/field/concrete/mirror/window + accessories — the furniture-centric first try was DEGENERATE 9/24); box_threshold 0.25 calibrated on the cohort (21/24 ≥1 detection). Bands calibrated (count none=8/sparse=7/moderate=5/dense=4, max 33%; placement fg=4/bg=4/mix=8/none=8, max 33%); subject-self guard excludes 'body'/person' boxes (exact-standalone-word, keeping 'body of water'). Support ratio 0.3219 → 0.8783 (Δ +0.5564), supported 47 → 166, unsupported 99 → 23, paired positive 18/21, sign-test p=0.000745. Registry: object-relations → validated; **the sweep is now EXHAUSTED (15/15 terminal)**.
 
 **Arm #60 face-geometry ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #67 on `exp/stage-b-face-geometry-arm60-20260807`).** NEW-MODEL-CLASS open-weight MediaPipe FaceLandmarker (478-point mesh, Apache-2.0, local CPU via the tasks API, model `face_landmarker.task` sha256 64184e229b...): scale-invariant facial-geometry bands (eye-spacing / face-width, mouth / face-width, jaw / face-width, and plausibility-gated mid-face vertical share) over the full frame + seg2 Face_Neck crop (UNION detection policy, measured 21/24 frozen items detected, 3 honest abstains: 2 turned-head/no-face, 1 zero Face_Neck region). Bands calibrated from the measured cohort (eye 0.445/0.475 → 6/11/4, max 52%; mouth 0.333/0.400 → 6/10/5; jaw 0.783/0.830 → 7/11/3; midface 0.48/0.56 → 4/12/4). Support ratio 0.3219 → 0.8115 (Δ +0.4896), supported 47 → 155, unsupported 99 → 36, paired positive 17/21, sign-test p=0.003599. Registry: face-geometry → validated; **object-relations #61 → active** (selected_via exploit, selection_progress 10). One-active invariant holds (14 validated, 0 proposals — #61 is active). Capability-probe findings folded into the module: MediaPipe is resolution-sensitive and non-monotonic on this cohort (same face found full-frame on some items, only on the seg2 crop on others) so crop-only (20/24) or full-frame-only (12/24) both under-detect — the UNION is the honest policy; crop slices must be `ascontiguousarray` (MediaPipe silently drops non-contiguous views).
 
@@ -136,11 +138,11 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **13 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **15 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
   reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
-  **matting-alpha #59**),
-  **1 proposal** (object-relations #61), **1 active** (face-geometry #60),
+  **matting-alpha #59**, **face-geometry #60**, **object-relations #61**),
+  **1 proposal** (gaze-head-orientation #68), **1 active** (scene-category #69, CLIP zero-shot),
   0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none` (research-pending on the
   active arm), `goal_unreachable: false` (floor 4001, gap 512; the VLM evidence part + deterministic
   record together clear it).
@@ -151,16 +153,19 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Face-geometry (#60, `research:active`) is now the sole active arm; sweep `exhausted: false`, next action
-research-pending.** Matting-alpha (#59) is now VALIDATED BETTER (this cycle). Per the round-trip recipe, the
-next arm's first step is the deterministic measurement: build the `research_harness` face-geometry module
-(mediapipe-facemesh-3d 478-point on-device mesh on owned hardware, NEW model class per the sourcing scan,
-declared in issue #60) — a capability probe on the local stack first (the 2026-08-06 open-world sourcing
-discipline: "downloadable" ≠ "usable on these GPUs"; MediaPipe FaceMesh runs CPU/on-device so confidence is
-high, but qualify before trusting), then band-calibrate on the frozen 24-item cohort (no band ≥75%) BEFORE
-freezing the plan, then run the standard 96-caption generation + independent review round-trip and
-`autonomous-tick`. One proposal (object-relations #61, grounding-dino-open-vocab) sits in the menu for the
-selector's future picks (exploit / ε-greedy explore slot).
+**Scene-category (#69, `research:active`, CLIP zero-shot) is now the sole active arm; sweep
+`exhausted: false`, next action research-pending.** Object-relations (#61) is VALIDATED BETTER (this
+cycle) and the registry menu was EXHAUSTED (15/15) — this cycle's brainstorm-widen registered two
+genuinely-new candidates (#68 gaze-head-orientation, #69 scene-category) after data-source candidacy
+probes on the frozen cohort (EXIF weak, framing and focus-gap DEGENERATE and dropped); the selector
+picked scene-category (exploit, EIG 0.65, novelty 0.15). Per the round-trip recipe, the next arm's
+first step is the deterministic measurement: build the `research_harness` scene-category module
+(openai/clip-vit-large-patch14 zero-shot, NEW model class per the sourcing scan, model already local
+from arm #37) — a capability + band-calibration probe on the frozen 24-item cohort first
+(max top-1 share already measured 29% — no band ≥75%), then freeze the plan (no new GPU model — CPU
+CLIP classification), then run the standard 96-caption generation + independent review round-trip and
+`autonomous-tick`. One proposal (gaze-head-orientation #68, mediapipe mesh reuse) sits in the menu
+for the selector's future picks (exploit / ε-greedy explore slot).
 
 ## Live research tree
 
@@ -194,7 +199,8 @@ of the sensitive canonical corpus requires a hold.
 
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
 Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER;
-Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER.**
+Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER; Arm #59 (matting-alpha): BETTER;
+Arm #60 (face-geometry): BETTER; Arm #61 (object-relations): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
