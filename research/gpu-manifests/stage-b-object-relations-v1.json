@@ -23,12 +23,12 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "914881df70ac30a3ea68a787938a9f79159355df",
+    "git_commit": "c178d6ebda6d47f7205609b9309624fcf1bb7ec9",
     "launcher_source_sha256": "a05b0ea273cab2dffee66cb1072a88c6f336119dfe8caf003b4753cd5400cbd5",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
     "runner_module": "research_harness.stage_b",
-    "runner_source_sha256": "7063425a829944874b1afd2ef38482b6e4734bcf2a7fb173249b66fdc1f65ad1"
+    "runner_source_sha256": "f1025788572136c9b3623eabfe9d7d4330df2cd246018c8fe6ac5ab6b6372427"
   },
   "host_route": "local",
   "job_id": "stratum-stage-b-object-relations-v1",
