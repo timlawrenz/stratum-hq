@@ -2,6 +2,21 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## Post-exhaustion brainstorm-widen (2026-08-06) — `[BRAINSTORM — 5 NEW PROPOSALS REGISTERED; POSE-ARTICULATION SELECTED ACTIVE]`
+
+**Date:** 2026-08-06 (after arm #47 vlm-dense-description validated → sweep EXHAUSTED → gate returned `next_action: brainstorm-new-data`)
+**Gate:** `dimension-sweep-status` → `exhausted: true` (10/10 terminal), `goal_unreachable: false` (floor 4001, VLM part + deterministic record clear it), 0 proposals.
+**Brainstorm-widen (data-source + evidence-part + model-candidate sourcing):**
+- Data-source candidacy **verified on the frozen cohort**: `pointmap.npy` (source-dimension-matched, float16, (H,W,3)) and `matting.npy` (alpha, (H,W)) are present on **24/24** frozen items, and are `core`-chain artifacts **NOT bound as evidence input by any validated arm** — genuinely-new deterministic surfaces (relative 3D depth/occlusion ordering; alpha-fidelity/soft-edge/silhouette).
+- Model sourcing scan (2026-08-06): **MediaPipe Face Mesh** (Apache-2.0, 478-point on-device 3D face mesh — open, standard, local-first) and **Grounding DINO** (Apache-2.0, text-grounded open-vocabulary detection, HF Transformers path) as the new-model-class candidates for the two learned axes.
+- Registered via the gated channel `propose-dimensions --require-new-evidence-part --write` (5/5 accepted, 0 rejected): **#58 `pointmap-depth`** (NEW part), **#59 `matting-alpha`** (NEW part), **#60 `face-geometry`** (NEW part `face-geometry` + NEW model class `mediapipe-facemesh-3d`), **#61 `object-relations`** (NEW part + NEW model class `grounding-dino-open-vocab`), **#62 `pose-articulation`** (NEW part; deterministic from pose2+seg2).
+**Selector (`autonomous-select`):** all 5 scored with novelty bonus +0.15; **#62 pose-articulation** EIG **0.45**, exploit, ties broken by id (over pointmap-depth 0.45). Scores: pointmap-depth 0.45, matting-alpha 0.39, face-geometry 0.30, object-relations 0.24.
+**Tick (`autonomous-tick --write`, nothing-active activate path):** `next_action: activate`, next_arm **pose-articulation**, selected_via exploit, **selection_progress 6**.
+**Validation:** pytest **525 passed**; `validate-program` valid; `validate-dimension-registry` valid.
+**Label-sync (`sync-issue-labels --apply`):** 2 ops applied — issue #62 +`research:active`, −`research:proposal`; #58–#61 keep `research:proposal`.
+**Registry now:** 10 validated + 5 proposals + 1 active (pose-articulation), 0 blocked, `exhausted: false`, `next_action: none` (research-pending on the active arm).
+**Next (measurement, not yet executed):** pose-articulation deterministic measurement (joint angles, torso/pelvis orientation, contrapposto/weight-bearing, limb-overlap, symmetry) → band-calibration probe on frozen cohort → freeze → 96-caption round-trip → review → tick. The other four proposals await the selector.
+
 ## Arm #47 — open-weight VLM dense-description round-trip — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-06 (harness surface landed; block batch complete; round-trip complete)

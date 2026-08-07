@@ -1,7 +1,17 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (arm #47 vlm-dense-description round-trip COMPLETE → **BETTER**; registry advanced; sweep now EXHAUSTED → brainstorm-new-data)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; ALL 10 registered arms now validated; next action brainstorm-new-data (widen the menu).**
+**Last updated:** 2026-08-06 (sweep re-opened after brainstorm-widen: 5 NEW proposals registered #58–#62; pose-articulation selected as sole `research:active`; next action research-pending on pose-articulation)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 10/10 prior arms validated; brainstorm-widen registered 5 genuinely-new candidate arms; pose-articulation is the single active arm.**
+
+**Arm #47 vlm-dense-description round-trip COMPLETE → BETTER (2026-08-06, harness-computed, draft PR #57).** VLM marginal support ratio 0.7376 → 0.9581 (Δ +0.2206), supported 163→206, unsupported 58→9, sign-test p=0.013302, paired 21/24. Registry: vlm-dense-description → validated. **The sweep then reported EXHAUSTED (10/10 terminal) → next_action brainstorm-new-data.**
+
+**Brainstorm-widen (2026-08-06, this cycle):** the exhausted menu was widened with **5 genuinely-new candidate dimensions**, each with a NEW evidence part or NEW model class (redundant attribute-taggers over validated axes rejected by the gate), registered through the gated `propose-dimensions --require-new-evidence-part` channel and persisted:
+- **#58 point-map/3D depth-ordering** (`pointmap-depth`, NEW part; deterministic from existing source-matched `pointmap.npy` present 24/24 on the frozen cohort but unbound by any validated arm).
+- **#59 matting/alpha-fidelity** (`matting-alpha`, NEW part; deterministic from existing source-matched `matting.npy`, 24/24).
+- **#60 facial detail/face-shape geometry** (`face-geometry` NEW part + `mediapipe-facemesh-3d` NEW model class; open-weight 478-point on-device mesh; local-first).
+- **#61 object/accessory presence + spatial relations** (`object-relations` NEW part + `grounding-dino-open-vocab` NEW model class; Apache-2.0 open-vocabulary detection).
+- **#62 pose-articulation/kinematic constraints** (`pose-articulation` NEW part; deterministic from existing pose2 GOLIATH-308 + seg2; per-joint angles, contrapposto/weight-bearing, limb-overlap, symmetry).
+Selector (`autonomous-select`) computed all 5 with novelty bonus +0.15; **pose-articulation (EIG 0.45, exploit, ties broken by id) won**. `autonomous-tick` (no review root needed for the nothing-active activate path) advanced the registry: **pose-articulation → active** (selection_progress 6). Validation: 525 passed, `validate-program` valid, `validate-dimension-registry` valid. Label-sync applied (issue #62 → research:active). Data-source candidacy for #58/#59 verified on the frozen cohort (pointmap.npy/matting.npy present and source-dimension-matched on 24/24 items).
 
 **Arm #37 RECONSTRUCTION ROUND-TRIP BETTER (2026-08-06, harness-computed, draft PR on
 `exp/stage-b-reconstruction-arm37-20260806`).** The generative reconstruction arm
@@ -118,11 +128,13 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **10/10 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **10 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
-  reconstruction #37, **vlm-dense-description #47**), 0 active, 0 blocked, 0 proposals.
-  `dimension-sweep-status`: `exhausted: true`, `next_action: brainstorm-new-data`, `goal_unreachable:
-  false` (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
+  reconstruction #37, **vlm-dense-description #47**), **5 proposals** (point-map depth #58, matting/alpha #59,
+  face-geometry #60, object-relations #61, pose-articulation #62), **1 active** (pose-articulation),
+  0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none` (research-pending on the
+  active arm), `goal_unreachable: false` (floor 4001, gap 512; the VLM evidence part + deterministic
+  record together clear it).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
@@ -130,17 +142,14 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**The sweep is EXHAUSTED: all 10 registered arms are validated (last: vlm-dense-description #47
-BETTER). `dimension-sweep-status` returns `next_action: brainstorm-new-data`.** Per the loop contract,
-DO NOT re-run the same arm patterns — WIDEN: draft N genuinely-new candidate dimensions (new evidence
-parts / new model classes / new data sources, e.g. relational/interaction, temporal/sequence,
-generative/reconstruction extensions, new-model dense-describer candidates from a fresh literature
-scan), each with the full declaration (scope/inputs/output_semantics/provenance/abstention_policy/
-qualification_gate) and a NEW evidence part or model class, and register through the gated command:
-`research_harness.cli propose-dimensions research/dimensions/evidence-dimension-registry-v1.json
---candidates <json> --count N --require-new-evidence-part --write`. The goal arm dossier-context4k is
-validated (round-trip BETTER), goal_unreachable false; the VLM evidence part (validated) plus the
-deterministic record honestly clear the 4001 structural floor.
+**Pose-articulation (#62, `research:active`) is the sole active arm; sweep `exhausted: false`, next action
+research-pending.** Per the round-trip recipe, execute the deterministic measurement first: build
+`research_harness` pose-articulation module (per-joint angles, torso/pelvis orientation from keypoint
+triangles, contrapposto/weight-bearing, limb-overlap, symmetry ratios) from the frozen pose2 GOLIATH-308 +
+seg2, band-calibrate on the frozen 24-item cohort (no band ≥75%) BEFORE freezing the plan, then run the
+standard 96-caption generation + independent review round-trip and `autonomous-tick`. The four remaining
+proposals (pointmap-depth #58, matting-alpha #59, face-geometry #60, object-relations #61) sit in the
+menu for the selector's future picks (exploit / ε-greedy explore slot at selection 8).
 
 ## Live research tree
 
@@ -151,7 +160,11 @@ deterministic record honestly clear the 4001 structural floor.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
 - #29–#47 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, #37, and **#47 vlm-dense-description**
   are ALL validated (all BETTER); **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**.
-  **Sweep EXHAUSTED — no active arm remains; next action brainstorm-new-data (0 proposals).**
+- **Post-exhaustion brainstorm-widen (2026-08-06):** new proposal arms **#58 point-map depth**, **#59 matting/alpha**,
+  **#60 face-geometry**, **#61 object-relations**, **#62 pose-articulation** registered via the gated
+  `propose-dimensions --require-new-evidence-part` channel (all name a NEW evidence part; #60/#61 also name
+  a NEW model class). **#62 pose-articulation is the sole `research:active` arm** (exploit, EIG 0.45,
+  selection_progress 6). The other four remain proposals in the menu.
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -167,7 +180,7 @@ of the sensitive canonical corpus requires a hold.
 ## Headline result so far
 
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
-Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER.**
+Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
@@ -176,4 +189,6 @@ BETTER**: captions generated FROM the evidence-linked ≤4K compact context (sup
 ratio 0.322→0.777, p=0.000244) beat the plain-4K summarization baseline. **The generative reconstruction
 check is BETTER too** (non-LLM validation of the same compact context): context4k-generated images score
 +0.0679 mean CLIP ViT-L/14 similarity over the degraded-baseline generations (22/24 paired positives).
-**Next: arm #47 vlm-dense-description (sole `research:active`, exploit slot, EIG 0.10).**
+The **VLM dense-description marginal is BETTER** (0.7376→0.9581 support ratio, p=0.013302). After the
+10/10 sweep was exhausted, the **brainstorm-widen registered 5 new candidate arms (#58–#62)**, and
+**pose-articulation (#62) is the new sole `research:active` arm** awaiting its round-trip research cycle.
