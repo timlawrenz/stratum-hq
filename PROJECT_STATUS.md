@@ -1,9 +1,11 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #58 pointmap-depth round-trip COMPLETE → BETTER; next active arm matting-alpha #59)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 12/12 prior+new arms validated; pointmap-depth validated BETTER; matting-alpha is the single active arm.**
+**Last updated:** 2026-08-07 (arm #59 matting-alpha round-trip COMPLETE → BETTER; next active arm face-geometry #60)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 13/13 prior+new arms validated; matting-alpha validated BETTER; face-geometry is the single active arm.**
 
-**Arm #58 pointmap-depth ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-pointmap-depth-arm58-20260807`).** Deterministic point-map / 3D depth-ordering evidence from `pointmap.npy` (Sapiens2 CAM-frame per-pixel cloud, background zeroed) + `seg2` DOME-29 masks: region nearest/farthest depth ranking, left/right hand depth ordering, hand/arm held in front of the torso plane, normalized body depth-relief band — all scale-invariant. Bands calibrated on the frozen 24-item cohort (relief compact/moderate/pronounced = 6/12/6, max 50%; hand_ordering fires 5/24, hand_in_front 11/24). Support ratio 0.3219 → 0.7488 (Δ +0.4269), supported 47 → 158, unsupported 99 → 53, paired positive 19/22, sign-test p=0.000428. Registry: pointmap-depth → validated; **matting-alpha #59 → active** (selected_via explore, ε-greedy slot, selection_progress 8). One-active invariant holds (12 validated, 2 proposals).
+**Arm #59 matting-alpha ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-matting-alpha-arm59-20260807`).** Deterministic matting / alpha-fidelity evidence from `matting.npy` (Sapiens2 per-pixel soft alpha matte, source-matched, present 24/24 frozen items but unbound by any validated arm) + `seg2` DOME-29 masks: subject alpha-coverage band (sparse/centered/fills-frame), boundary crispness band of the silhouette edge (soft/moderate/crisp from ring alpha-gradient), and soft-edge character (hair-dominant vs mixed vs skin-clean cutout) — all scale-invariant. Bands calibrated from the frozen 24-item probe after the first on-paper thresholds proved DEGENERATE (soft-edge 21/24 "sharp", detail 23/24 "fine-detail", silhouette 24/24 "closed"): the real discriminator is boundary sharpness + hair-edge character — final max share 70.8% (crisp 11/moderate 10/soft 3; hair-dominant 4/mixed 14/skin-clean 6; coverage sparse 5/centered 17/fills-frame 2). Silhouette closedness is honestly non-discriminating on this cohort (24/24 closed, no crops) and stays payload-only. Support ratio 0.3219 → 0.8657 (Δ +0.5438), supported 47 → 187, unsupported 99 → 29, paired positive 18/22, sign-test p=0.002172. Registry: matting-alpha → validated; **face-geometry #60 → active** (selected_via exploit, selection_progress 9). One-active invariant holds (13 validated, 1 proposal).
+
+**Arm #58 pointmap-depth ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-pointmap-depth-arm58-20260807`).** Deterministic point-map / 3D depth-ordering evidence from `pointmap.npy` (Sapiens2 CAM-frame per-pixel cloud, background zeroed) + `seg2` DOME-29 masks: region nearest/farthest depth ranking, left/right hand depth ordering, hand/arm held in front of the torso plane, normalized body depth-relief band — all scale-invariant. Bands calibrated on the frozen 24-item cohort (relief compact/moderate/pronounced = 6/12/6, max 50%; hand_ordering fires 5/24, hand_in_front 11/24). Support ratio 0.3219 → 0.7488 (Δ +0.4269), supported 47 → 158, unsupported 99 → 53, paired positive 19/22, sign-test p=0.000428. Registry: pointmap-depth → validated; **matting-alpha #59 → active** (selected_via explore, ε-greedy slot, selection_progress 8). One-active invariant holds (13 validated, 1 proposal).
 
 **Arm #62 pose-articulation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #64).** Deterministic kinematic articulation (per-joint elbow/knee flexion, torso/pelvis in-plane orientation, weight-bearing stance + contrapposto, limb-overlap/crossing, flexion asymmetry — all scale-invariant, from pose2 GOLIATH-308 + seg2 DOME-29). Support ratio 0.4225 → 0.8195 (Δ +0.397), supported 60 → 168, unsupported 82 → 37, paired positive 18/22, sign-test p=0.002172. Registry: pose-articulation → validated; **pointmap-depth #58 → active** (exploit, EIG 0.45, tie-broken by id, selection_progress 7). Calibration probe on the frozen cohort confirmed a discriminating elbow band (21 bent / 17 extended) and honest sparse signals for arm-crossing (2/24), contrapposto (4/24), legs-crossed (1/24).
 
@@ -132,10 +134,11 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **12 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **13 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
-  reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**),
-  **2 proposals** (face-geometry #60, object-relations #61), **1 active** (matting-alpha #59),
+  reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
+  **matting-alpha #59**),
+  **1 proposal** (object-relations #61), **1 active** (face-geometry #60),
   0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none` (research-pending on the
   active arm), `goal_unreachable: false` (floor 4001, gap 512; the VLM evidence part + deterministic
   record together clear it).
@@ -146,14 +149,16 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Matting-alpha (#59, `research:active`) is the sole active arm; sweep `exhausted: false`, next action
-research-pending.** Per the round-trip recipe, execute the deterministic measurement first: build
-`research_harness` matting-alpha module (alpha-fidelity / soft-edge / silhouette statistics from the
-source-matched `matting.npy`, present 24/24 on the frozen cohort) declared in issue #59, band-calibrate
-on the frozen 24-item cohort (no band ≥75%) BEFORE freezing the plan, then run the standard 96-caption
-generation + independent review round-trip and `autonomous-tick`. The two remaining proposals
-(face-geometry #60, object-relations #61) sit in the menu for the selector's future picks
-(exploit / ε-greedy explore slot).
+**Face-geometry (#60, `research:active`) is now the sole active arm; sweep `exhausted: false`, next action
+research-pending.** Matting-alpha (#59) is now VALIDATED BETTER (this cycle). Per the round-trip recipe, the
+next arm's first step is the deterministic measurement: build the `research_harness` face-geometry module
+(mediapipe-facemesh-3d 478-point on-device mesh on owned hardware, NEW model class per the sourcing scan,
+declared in issue #60) — a capability probe on the local stack first (the 2026-08-06 open-world sourcing
+discipline: "downloadable" ≠ "usable on these GPUs"; MediaPipe FaceMesh runs CPU/on-device so confidence is
+high, but qualify before trusting), then band-calibrate on the frozen 24-item cohort (no band ≥75%) BEFORE
+freezing the plan, then run the standard 96-caption generation + independent review round-trip and
+`autonomous-tick`. One proposal (object-relations #61, grounding-dino-open-vocab) sits in the menu for the
+selector's future picks (exploit / ε-greedy explore slot).
 
 ## Live research tree
 

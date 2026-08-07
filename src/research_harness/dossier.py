@@ -63,6 +63,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "texture-material:v1",
     "pose-articulation:v1",
     "pointmap-depth:v1",
+    "matting-alpha:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -390,6 +391,48 @@ def render_pointmap_depth(pointmap_depth: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_matting_alpha(matting: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant matting / alpha-fidelity claims (arm #59).
+
+    Verbalizes ONLY scale-invariant alpha facts: subject coverage band, boundary
+    crispness band (sharp/soft silhouette edge), and soft-edge character
+    (hair-dominant vs clean skin cutout). Raw pixel areas and band widths stay
+    in the machine-readable payload and are never caption claims (pixel widths
+    are camera-frame-dependent and unrenderable as bare numbers).
+    """
+    lines: list[str] = []
+    if not matting.get("subject_present"):
+        return ["matting: abstain (no subject alpha present)"]
+    if matting.get("abstained"):
+        reason = matting.get("abstention_reason") or "matte not measurable"
+        return [f"matting: abstain ({reason})"]
+
+    coverage_band = matting.get("coverage_band")
+    if coverage_band == "sparse":
+        lines.append("matting: subject is a small figure occupying a minor part of the frame")
+    elif coverage_band == "fills-frame":
+        lines.append("matting: subject largely fills the frame")
+    elif coverage_band == "centered":
+        lines.append("matting: subject occupies the center of the frame")
+
+    crisp_band = matting.get("boundary_crisp_band")
+    if crisp_band == "crisp":
+        lines.append("matting: clean sharp silhouette edge (crisp cutout)")
+    elif crisp_band == "soft":
+        lines.append("matting: very soft feathered silhouette edge")
+    elif crisp_band == "moderate":
+        lines.append("matting: moderately soft silhouette edge")
+
+    edge_band = matting.get("soft_edge_band")
+    if edge_band == "hair-dominant":
+        lines.append("matting: soft detachable hair strands produce a wispy hairline (hair-dominant soft edge)")
+    elif edge_band == "mixed":
+        lines.append("matting: soft edge is a mix of hair and skin/background transitions")
+    elif edge_band == "skin-clean":
+        lines.append("matting: clean skin/background cutout with minimal hair flyaway")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -502,6 +545,29 @@ def _pointmap_depth_payload(pointmap_depth: Mapping[str, Any] | None) -> dict[st
     return payload
 
 
+def _matting_alpha_payload(matting: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not matting:
+        return {}
+    payload = {
+        "coverage_ratio": matting.get("coverage_ratio"),
+        "coverage_band": matting.get("coverage_band"),
+        "subject_px": matting.get("subject_px"),
+        "frame_px": matting.get("frame_px"),
+        "subject_height_px": matting.get("subject_height_px"),
+        "boundary_crispness": matting.get("boundary_crispness"),
+        "boundary_crisp_band": matting.get("boundary_crisp_band"),
+        "hair_soft_share": matting.get("hair_soft_share"),
+        "soft_edge_band": matting.get("soft_edge_band"),
+        "silhouette_closed": matting.get("silhouette_closed"),
+        "silhouette_closedness": matting.get("silhouette_closedness"),
+        "border_open_fraction": matting.get("border_open_fraction"),
+    }
+    ab = matting.get("abstention_reason")
+    if matting.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -514,6 +580,7 @@ def build_evidence_payload(
     texture: Mapping[str, Any] | None = None,
     articulation: Mapping[str, Any] | None = None,
     pointmap_depth: Mapping[str, Any] | None = None,
+    matting_alpha: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -578,6 +645,7 @@ def build_evidence_payload(
             "texture": _texture_payload(texture),
             "pose_articulation": _pose_articulation_payload(articulation),
             "pointmap_depth": _pointmap_depth_payload(pointmap_depth),
+            "matting_alpha": _matting_alpha_payload(matting_alpha),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -607,6 +675,7 @@ def assemble_dossier(
     texture: Mapping[str, Any] | None = None,
     articulation: Mapping[str, Any] | None = None,
     pointmap_depth: Mapping[str, Any] | None = None,
+    matting_alpha: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -625,6 +694,7 @@ def assemble_dossier(
         ("texture-material:v1", "texture", render_texture(texture or {})),
         ("pose-articulation:v1", "pose-articulation", render_pose_articulation(articulation or {})),
         ("pointmap-depth:v1", "pointmap-depth", render_pointmap_depth(pointmap_depth or {})),
+        ("matting-alpha:v1", "matting-alpha", render_matting_alpha(matting_alpha or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
