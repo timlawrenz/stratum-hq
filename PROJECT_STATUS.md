@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #68 gaze/head-orientation ROUND-TRIP COMPLETE → BETTER; sweep was EXHAUSTED 17/17 → brainstorm-widen registered 4 new arms; camera-viewing-angle #74 activated as the sole active arm)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 17 validated (all 15 feeders + dossier-context4k + reconstruction) + 1 active (camera-viewing-angle #74) + 3 proposals (apparent-age #73, image-focus-dof #75, affordance-contact #76); 0 blocked.**
+**Last updated:** 2026-08-07 (arm #74 camera-viewing-angle ROUND-TRIP COMPLETE → BETTER; arm #68 gaze-head BETTER too; image-focus-depth-of-field #75 activated as the sole active arm)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 18 validated (all 15 feeders + dossier-context4k + reconstruction + gaze-head #68 + camera-viewing-angle #74) + 1 active (image-focus-dof #75) + 2 proposals (apparent-age #73, affordance-contact #76); 0 blocked.**
+
+**Arm #74 camera-viewing-angle ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, on `exp/stage-b-gaze-head-arm68-20260807` / PR #72 branch).** NEW-EVIDENCE-PART camera-relative framing (deterministic, no new model). Calibration probe on the frozen 24-item cohort produced an **honest re-scope** per the band-degeneracy rule: 24/24 measured, but this portrait-centric corpus is homogeneous — shot-scale 88% full-body and camera-height 100% eye-level (degenerate uniform axes) → both silenced to payload-only; **only the headroom band (tight 16 / normal 3 / wide 5, max 67%) is verbalized**. Round-trip: baseline 47 supported / 99 unsupported (ratio 0.3219) → evidence **192 supported / 4 unsupported (ratio 0.9796)**, Δ +0.6577, paired 24/24, **sign-test p=0.000772** → **BETTER** (registry validated, cycle 13). Runs: `stage-b-camera-viewing-angle-v1` (96) + `-review` (96). Tick advanced: **image-focus-depth-of-field #75 → active** (exploit, selection_progress 14).
 
 **Arm #68 gaze/head-orientation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #72 on `exp/stage-b-gaze-head-arm68-20260807`).** NEW-EVIDENCE-PART camera-interaction axis reusing the SAME validated open-weight MediaPipe FaceLandmarker 478-point mesh as arm #60 (owned hardware, local CPU, `face_landmarker.task` sha256 64184e229b...): scale-invariant head-orientation bands — yaw (facing camera / partially turned / profile or turned away), pitch (level / tilted down / tilted up, cohort-centered calibration), and in-plane roll from the stable eye-line angle — via the canonical six-point PnP head-pose fit (classic OpenCV model, y-flip measured on this cohort to fix a degenerate out-of-plane fit; Euler via the classic OpenCV decomposition; plausibility gates |pitch|≤85° / |yaw|≤90°). Band calibration probe on the frozen 24-item cohort: 21/24 detected (union policy, 3 honest abstains matching arm #60), yaw 4/5/12 (max 57%), pitch 7/6/8 (max 38%), roll 10/11 (max 52%) — all bands under the 75% degeneracy line; two independent estimators (PnP and landmark-projection) agree the corpus genuinely has many turned heads. Support ratio 0.3219 → 0.9673 (Δ +0.6454), supported 47 → 207, unsupported 99 → 7, paired positive 20/20, sign-test p=1e-06. Registry: gaze-head-orientation → **validated** → sweep EXHAUSTED (17/17) → brainstorm-widen (below).**
 
@@ -144,14 +146,14 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **17 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **18 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
   reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
   **matting-alpha #59**, **face-geometry #60**, **object-relations #61**, **scene-category #69**,
-  **gaze-head-orientation #68**),
-  **1 active (camera-viewing-angle #74), 3 proposals (apparent-age #73, image-focus-depth-of-field #75,
-  affordance-contact #76)**, 0 blocked. `dimension-sweep-status`: `exhausted: false`,
-  `next_action: none` (research-pending on the active arm), `goal_unreachable: false`
+  **gaze-head-orientation #68**, **camera-viewing-angle #74**),
+  **1 active (image-focus-depth-of-field #75), 2 proposals (apparent-age #73, affordance-contact #76)**,
+  0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none`
+  (research-pending on the active arm), `goal_unreachable: false`
   (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
@@ -160,17 +162,18 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Camera-viewing-angle (#74, `research:active`, deterministic camera-relative framing) is the sole
-active arm; sweep `exhausted: false`, next action research-pending.** Gaze-head-orientation (#68) is
-VALIDATED BETTER (this cycle) and the exhausted menu (17/17) was widened with 4 genuinely-new proposals
-(#73 apparent-age, #74 camera-viewing-angle, #75 image-focus-dof, #76 affordance-contact); the selector
-chose camera-viewing-angle #74 (exploit, EIG 0.65, novelty +0.15). Per the round-trip recipe, the next
-arm's first step is the deterministic measurement: build the `research_harness` camera-viewing-angle
-module (scale-invariant camera-height band from the subject's eye-line vertical position, vertical
-headroom band, and shot-scale band from subject frame-share — all from seg2 subject bbox + full-frame),
-capability + band-calibration probe on the frozen 24-item cohort first (no band >= 75%), then freeze
-the plan (CPU-only evidence — no new GPU model), run the standard 96-caption generation + independent
-review round-trip and `autonomous-tick`. 3 proposals remain in the menu for the ε-greedy explore slot.
+**Image-focus-depth-of-field (#75, `research:active`, deterministic seg2-split acutance/focus — CPU,
+no new model) is the sole active arm; sweep `exhausted: false`, next action research-pending.**
+Camera-viewing-angle (#74) is VALIDATED BETTER (this cycle) and gaze-head (#68) was validated earlier
+this cycle too; the exhausted menu was widened with 4 proposals (#73 apparent-age, #74 camera-viewing-
+angle, #75 image-focus-dof, #76 affordance-contact). Per the round-trip recipe, the next arm's first
+step is the deterministic measurement: build the `research_harness` image-focus module (global +
+subject/background-region sharpness / acutance from source pixels + seg2 region split → focus-quality
+and depth-of-field bands, scale-invariant), capability + band-calibration probe on the frozen 24-item
+cohort first (no band >= 75%; watch for the same portrait-cohort homogeneity that forced the
+camera-viewing-angle re-scope), then freeze the plan, run the standard 96-caption generation +
+independent review round-trip and `autonomous-tick`. 2 proposals remain in the menu (apparent-age #73
+needs MiVOLO-V2 sourcing + qualification; affordance-contact #76 is deterministic).
 
 ## Live research tree
 
@@ -187,11 +190,12 @@ review round-trip and `autonomous-tick`. 3 proposals remain in the menu for the 
   `propose-dimensions --require-new-evidence-part` channel (all name a NEW evidence part; #60/#61 also name
   a NEW model class). **#62 pose-articulation VALIDATED (2026-08-07, PR #64); #58 pointmap-depth VALIDATED
   (2026-08-07); matting-alpha #59, face-geometry #60, object-relations #61 ALL VALIDATED (2026-08-07)**.
-  **Second widen (2026-08-07): #68 gaze-head-orientation + #69 scene-category registered; BOTH now
-  VALIDATED (2026-08-07).** Registry menu hit EXHAUSTED (17/17) → **Third widen (2026-08-07) registered
-  #73 apparent-age, #74 camera-viewing-angle, #75 image-focus-dof, #76 affordance-contact** (all name a
-  NEW evidence part / model class); **camera-viewing-angle #74 is the sole `research:active` arm**
-  (selected_via exploit, EIG 0.65, novelty +0.15, selection_progress 13); #73/#75/#76 remain proposals.
+  **Second widen (2026-08-07): #68 gaze-head-orientation + #69 scene-category registered; scene-category
+  VALIDATED BETTER + **#68 gaze-head-orientation VALIDATED BETTER** (2026-08-07). Registry menu hit
+  EXHAUSTED (17/17) → **Third widen (2026-08-07) registered #73 apparent-age, #74 camera-viewing-angle,
+  #75 image-focus-dof, #76 affordance-contact** (all name a NEW evidence part / model class).
+  **#74 camera-viewing-angle VALIDATED BETTER (2026-08-07); image-focus-depth-of-field #75 is the sole
+  `research:active` arm** (selected_via exploit, selection_progress 14); #73/#76 remain proposals.
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -210,7 +214,7 @@ of the sensitive canonical corpus requires a hold.
 Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER;
 Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER; Arm #59 (matting-alpha): BETTER;
 Arm #60 (face-geometry): BETTER; Arm #61 (object-relations): BETTER; Arm #69 (scene-category): BETTER;
-Arm #68 (gaze-head-orientation): BETTER.**
+Arm #68 (gaze-head-orientation): BETTER; Arm #74 (camera-viewing-angle): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
@@ -223,6 +227,7 @@ The **VLM dense-description marginal is BETTER** (0.7376→0.9581 support ratio,
 10/10 sweep was exhausted, the **brainstorm-widen registered 5 new candidate arms (#58–#62)**, and
 **pose-articulation (#62), pointmap-depth (#58), matting-alpha (#59), face-geometry (#60), and
 object-relations (#61) ALL VALIDATED (2026-08-07)**. A **second widen registered #68 gaze-head-orientation
-and #69 scene-category — ALL 17/17 VALIDATED (2026-08-07)**; the menu is **EXHAUSTED → third
-brainstorm-widen (next_action: brainstorm-new-data)**. The **gaze/head-orientation round-trip is BETTER**
-(support ratio 0.3219→0.9673, p=1e-06, Δ +0.6454) — the strongest single-arm delta yet.
+and #69 scene-category — both ALL 17 validated, then a THIRD widen registered #73/#74/#75/#76**; **Arm #68
+gaze-head-orientation VALIDATED BETTER (p=1e-06, ratio 0.3219→0.9673) and Arm #74 camera-viewing-angle
+VALIDATED BETTER (p=0.000772, ratio 0.3219→0.9796)** — two more arms completed this session. Menu now
+18 validated + 1 active (#75 image-focus-dof) + 2 proposals.
