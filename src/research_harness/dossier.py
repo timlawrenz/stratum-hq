@@ -71,6 +71,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "camera-viewing-angle:v1",
     "image-focus:v1",
     "apparent-age:v1",
+    "affordance-contact:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -557,6 +558,42 @@ def render_apparent_age(age: Mapping[str, Any]) -> list[str]:
     return [f"apparent-age: {text} (coarse scale-invariant band, not an exact age)"]
 
 
+def render_affordance_contact(contact: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant subject self-contact / affordance claim (arm #76).
+
+    Verbalizes ONLY scale-invariant self-contact facts: hand-own-body contact
+    count, hand-elevation/gesture count, and the grounded binary. Raw
+    normalized wrist distances and pixel values stay in the machine-readable
+    payload and are never caption claims.
+    """
+    if contact.get("abstained"):
+        reason = contact.get("abstention_reason") or "affordance not measurable"
+        return [f"affordance-contact: abstain ({reason})"]
+    if not contact or (
+        not contact.get("shoulder_width_norm_ok")
+        and "grounded" not in contact
+    ):
+        # Dimension not measured for this item (e.g. non-affordance runs) —
+        # emit no claim, never a fabricated self-contact statement.
+        return []
+    lines: list[str] = []
+    n_contact = int(contact.get("hand_contact_count") or 0)
+    if n_contact >= 2:
+        lines.append("affordance-contact: both hands rest against her own body")
+    elif n_contact == 1:
+        lines.append("affordance-contact: one hand rests against her own body")
+    n_raised = int(contact.get("hand_elevation_count") or 0)
+    if n_raised >= 2:
+        lines.append("affordance-contact: both hands are raised (gesturing)")
+    elif n_raised == 1:
+        lines.append("affordance-contact: one hand is raised (gesturing)")
+    if contact.get("grounded"):
+        lines.append("affordance-contact: subject is grounded (in contact with the lower frame)")
+    if not lines:
+        lines.append("affordance-contact: measured (no distinctive self-contact band)")
+    return lines
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -937,6 +974,31 @@ def _apparent_age_payload(age: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _affordance_contact_payload(contact: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not contact:
+        return {}
+    payload = {
+        "hand_contact_count": contact.get("hand_contact_count"),
+        "hand_elevation_count": contact.get("hand_elevation_count"),
+        "left_hand_visible": contact.get("left_hand_visible"),
+        "right_hand_visible": contact.get("right_hand_visible"),
+        "left_hand_contact": contact.get("left_hand_contact"),
+        "right_hand_contact": contact.get("right_hand_contact"),
+        "left_hand_raised": contact.get("left_hand_raised"),
+        "right_hand_raised": contact.get("right_hand_raised"),
+        "grounded": contact.get("grounded"),
+        "shoulder_width_px": contact.get("shoulder_width_px"),
+        "left_wrist_trunk_dist_norm": contact.get("left_wrist_trunk_dist_norm"),
+        "right_wrist_trunk_dist_norm": contact.get("right_wrist_trunk_dist_norm"),
+        "left_wrist_hip_offset_norm": contact.get("left_wrist_hip_offset_norm"),
+        "right_wrist_hip_offset_norm": contact.get("right_wrist_hip_offset_norm"),
+    }
+    ab = contact.get("abstention_reason")
+    if contact.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -957,6 +1019,7 @@ def build_evidence_payload(
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
     apparent_age: Mapping[str, Any] | None = None,
+    affordance_contact: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1029,6 +1092,7 @@ def build_evidence_payload(
             "camera_viewing_angle": _camera_viewing_angle_payload(camera_viewing_angle),
             "image_focus": _image_focus_payload(image_focus),
             "apparent_age": _apparent_age_payload(apparent_age),
+            "affordance_contact": _affordance_contact_payload(affordance_contact),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1066,6 +1130,7 @@ def assemble_dossier(
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
     apparent_age: Mapping[str, Any] | None = None,
+    affordance_contact: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1092,6 +1157,7 @@ def assemble_dossier(
         ("camera-viewing-angle:v1", "camera-viewing-angle", render_camera_viewing_angle(camera_viewing_angle or {})),
         ("image-focus:v1", "image-focus", render_image_focus(image_focus or {})),
         ("apparent-age:v1", "apparent-age", render_apparent_age(apparent_age or {})),
+        ("affordance-contact:v1", "affordance-contact", render_affordance_contact(affordance_contact or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
