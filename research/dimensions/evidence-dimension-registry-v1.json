@@ -457,7 +457,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -558,6 +558,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 9
+    },
+    {
+      "arm_id": "object-relations",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 10
     }
   ]
 }
