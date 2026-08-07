@@ -70,6 +70,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "gaze-head-orientation:v1",
     "camera-viewing-angle:v1",
     "image-focus:v1",
+    "apparent-age:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -530,6 +531,32 @@ def render_scene_category(scene: Mapping[str, Any]) -> list[str]:
     return [f"scene-category: the setting is a {scene['category']}"]
 
 
+def render_apparent_age(age: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant apparent-age band claim (arm #73).
+
+    Verbalizes ONLY the coarse scale-invariant age band (or a surfaced
+    abstention). The raw floating age estimate and the gender probe stay in
+    the machine-readable payload and are never caption claims.
+    """
+    if age.get("abstained"):
+        reason = age.get("abstention_reason") or "apparent age not measurable"
+        return [f"apparent-age: abstain ({reason})"]
+    if not age or not age.get("age_band"):
+        # Dimension not measured for this item (e.g. non-apparent-age runs) —
+        # emit no claim, never a fabricated age statement.
+        return []
+    band = age["age_band"]
+    text = {
+        "late-teens-to-early-twenties": "looks late teens to early twenties",
+        "early-twenties": "looks early twenties",
+        "mid-twenties": "looks mid-twenties",
+        "late-twenties-to-thirties": "looks late twenties or older",
+    }.get(band)
+    if not text:
+        return []
+    return [f"apparent-age: {text} (coarse scale-invariant band, not an exact age)"]
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -893,6 +920,23 @@ def _image_focus_payload(focus: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _apparent_age_payload(age: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not age:
+        return {}
+    payload = {
+        "age_years": age.get("age_years"),
+        "age_band": age.get("age_band"),
+        "gender_probe": age.get("gender_probe"),
+        "via": age.get("via"),
+        "seg2_face_neck_px": age.get("seg2_face_neck_px"),
+        "seg2_subject_px": age.get("seg2_subject_px"),
+    }
+    ab = age.get("abstention_reason")
+    if age.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -912,6 +956,7 @@ def build_evidence_payload(
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
+    apparent_age: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -983,6 +1028,7 @@ def build_evidence_payload(
             "gaze_head": _gaze_head_payload(gaze_head),
             "camera_viewing_angle": _camera_viewing_angle_payload(camera_viewing_angle),
             "image_focus": _image_focus_payload(image_focus),
+            "apparent_age": _apparent_age_payload(apparent_age),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1019,6 +1065,7 @@ def assemble_dossier(
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
+    apparent_age: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1044,6 +1091,7 @@ def assemble_dossier(
         ("gaze-head-orientation:v1", "gaze-head-orientation", render_gaze_head(gaze_head or {})),
         ("camera-viewing-angle:v1", "camera-viewing-angle", render_camera_viewing_angle(camera_viewing_angle or {})),
         ("image-focus:v1", "image-focus", render_image_focus(image_focus or {})),
+        ("apparent-age:v1", "apparent-age", render_apparent_age(apparent_age or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
