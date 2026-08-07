@@ -56,6 +56,10 @@ from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
+from .camera_viewing_angle import (
+    CameraViewingAngleError,
+    compute_camera_viewing_angle,
+)
 
 
 class StageBRunError(RuntimeError):
@@ -1395,6 +1399,77 @@ def _serialize_gaze_head(gaze: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _camera_viewing_angle_evidence() -> dict[str, Any]:
+    """Declared deterministic camera-viewing-angle / framing specialist (arm #74)."""
+    module_path = Path(compute_camera_viewing_angle.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-camera-viewing-angle-v1",
+        "specialists": [
+            {
+                "id": "in-memory-camera-viewing-angle-v1",
+                "scope": "Scale-invariant camera-relative framing with no new model: shot-scale band (close-up / mid-shot / full-body), vertical headroom band (tight / normal / wide), and camera-height band (eye-level / low-angle / high-angle) from the seg2 subject bbox + full-frame geometry. Never identity, skin-tone, facial, or aesthetic claims; only the scale-invariant framing bands in prose.",
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 subject mask, already read for the "
+                           "exactly-one-subject invariant) + the full-frame decoded source image dims; computed "
+                           "in memory with no crawlr/stratum write; no new model (CPU)."),
+                "output_semantics": ("Provenance-bearing scale-invariant framing bands with a surfaced "
+                                     "abstention on degenerate/cropped subject bbox, not semantic ground truth "
+                                     "or caption claims; raw bbox extents and frame shares stay in the "
+                                     "machine-readable payload, never prose."),
+                "provenance": (
+                    "research_harness.camera_viewing_angle.compute_camera_viewing_angle "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no new model invoked."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if required artifacts "
+                                      "are missing, unreadable, or detector count is not exactly one; abstain "
+                                      "(emit None/band with a surfaced reason) when the seg2 subject mask is "
+                                      "empty, the subject bbox is degenerate, or the subject is cropped at a "
+                                      "frame edge (framing over a cropped subject would be misleading). "
+                                      "Detector disagreement remains a quality anomaly, never prompt content."),
+                "known_failure_modes": ("Framing bands are camera-relative and assume a single standing/posed "
+                                        "subject; a subject cropped at frame edges abstains honestly. The "
+                                        "subject mask uses the seg2 non-background union (corpus invariant: "
+                                        "exactly one woman). Shot-scale and headroom bands depend on framing "
+                                        "intent, not absolute size."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_camera_viewing_angle(framing: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a framing dict.
+
+    Verbalizes ONLY the scale-invariant camera-relative framing bands. Raw
+    bbox extents / frame shares remain in the machine-readable
+    `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "CAMERA-VIEWING-ANGLE (framing, scale-invariant):"
+    ]
+    if framing.get("abstained"):
+        reason = framing.get("abstention_reason") or "framing not measurable"
+        lines.append(f"- camera framing abstained ({reason})")
+        return "\n".join(lines)
+    if not framing or not framing.get("headroom_band"):
+        lines.append("- camera framing not measured for this item")
+        return "\n".join(lines)
+    hroom = framing.get("headroom_band")
+    # shot_scale_band + camera_height_band are payload-only (88% full-body /
+    # 100% eye-level on the probe cohort — degenerate uniform axes, never
+    # verbalized).
+    if hroom == "tight":
+        lines.append("- headroom is tight (head near the frame top)")
+    elif hroom == "wide":
+        lines.append("- headroom is wide (ample space above the head)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1503,6 +1578,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # union crop fallback, as in face-geometry); seg2 is read-only validation
     # data, never mutated.
     "gaze-head-orientation": ("seg2.npy",),
+    # Arm #74 camera-viewing-angle: deterministic framing from the seg2 subject
+    # mask + full-frame dims only; seg2 is read-only validation data, never
+    # mutated; no new model.
+    "camera-viewing-angle": ("seg2.npy",),
 }
 
 
@@ -1594,7 +1673,7 @@ def build_stage_b_plan(
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
-        "object-relations", "scene-category", "gaze-head-orientation",
+        "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1999,6 +2078,34 @@ def build_stage_b_plan(
             "scale-invariant direction bands are verbalized (yaw/pitch/roll bands); raw yaw/pitch/roll "
             "degrees and landmark coordinates stay in evidence_payload and are never caption claims."
         )
+    elif evidence_kind == "camera-viewing-angle":
+        evidence = _camera_viewing_angle_evidence()
+        evidence_condition_id = "context-raw-camera-viewing-angle"
+        comparison_plan_id = "stage-b-first500-camera-viewing-angle-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic camera-viewing-angle "
+            "determinations (shot-scale band close-up / mid-shot / full-body, headroom band, and "
+            "camera-height band eye-level / low-angle / high-angle — all scale-invariant framing from the "
+            "seg2 subject bbox + full-frame geometry, no new model) may reduce unsupported "
+            "camera-perspective/framing claims ('close-up portrait', 'shot from above') or increase "
+            "supported framing claims in captions versus its matched no-evidence baseline when the source "
+            "item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The camera-viewing-angle evidence condition does not reduce unsupported camera/framing claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the framing bands "
+            "fail on real corpus items (high abstention / degenerate bbox), or an apparent difference is "
+            "attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs; pose2 stays a validation-only read for "
+            "the exactly-one-subject invariant. Framing is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 subject mask) + the full-frame decoded source image dims — no new model, "
+            "CPU only. Only scale-invariant framing bands are verbalized (shot-scale / headroom / "
+            "camera-height); raw bbox extents and frame shares stay in evidence_payload and are never "
+            "caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2282,6 +2389,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "scene-category"
     elif "context-raw-gaze-head-orientation" in condition_ids:
         rebuild_kind = "gaze-head-orientation"
+    elif "context-raw-camera-viewing-angle" in condition_ids:
+        rebuild_kind = "camera-viewing-angle"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2352,6 +2461,7 @@ def _load_selected_item(
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_gaze_head: bool = False,
+    include_camera_viewing_angle: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2493,6 +2603,13 @@ def _load_selected_item(
             )
         except GazeHeadError as exc:
             raise StageBRunError(f"gaze-head-orientation abort for frozen selected item {image_id}: {exc}") from exc
+    camera_viewing_angle = None
+    if include_camera_viewing_angle:
+        img_h, img_w = seg2.shape[0], seg2.shape[1]
+        try:
+            camera_viewing_angle = compute_camera_viewing_angle(seg2, img_h, img_w)
+        except CameraViewingAngleError as exc:
+            raise StageBRunError(f"camera-viewing-angle abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2525,6 +2642,7 @@ def _load_selected_item(
         "object_relations": object_relations,
         "scene_category": scene_category,
         "gaze_head": gaze_head,
+        "camera_viewing_angle": camera_viewing_angle,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2580,6 +2698,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         object_relations=prepared.get("object_relations"),
         scene_category=prepared.get("scene_category"),
         gaze_head=prepared.get("gaze_head"),
+        camera_viewing_angle=prepared.get("camera_viewing_angle"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2598,6 +2717,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         object_relations=prepared.get("object_relations"),
         scene_category=prepared.get("scene_category"),
         gaze_head=prepared.get("gaze_head"),
+        camera_viewing_angle=prepared.get("camera_viewing_angle"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2695,6 +2815,10 @@ def _render_condition(
         gaze_head = prepared["gaze_head"]
         evidence_text = _serialize_gaze_head(gaze_head)
         return raw.copy(), _context_prompt(evidence_text), gaze_head
+    if condition_id == "context-raw-camera-viewing-angle":
+        framing = prepared["camera_viewing_angle"]
+        evidence_text = _serialize_camera_viewing_angle(framing)
+        return raw.copy(), _context_prompt(evidence_text), framing
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -2895,6 +3019,12 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-gaze-head-orientation"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #74: only the camera-viewing-angle run computes deterministic
+    # framing (CPU, no new model) — gate on the frozen plan's conditions.
+    include_camera_viewing_angle = any(
+        str(condition.get("id")) == "context-raw-camera-viewing-angle"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -2908,6 +3038,7 @@ def execute_stage_b(
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_gaze_head=include_gaze_head,
+            include_camera_viewing_angle=include_camera_viewing_angle,
         )
         for item in items
     ]

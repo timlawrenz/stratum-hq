@@ -68,6 +68,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "object-relations:v1",
     "scene-category:v1",
     "gaze-head-orientation:v1",
+    "camera-viewing-angle:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -563,6 +564,34 @@ def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_camera_viewing_angle(framing: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant camera-relative framing claim (arm #74).
+
+    Verbalizes ONLY the scale-invariant framing bands (shot-scale / headroom /
+    camera-height); raw bbox extents and frame shares stay in the machine-
+    readable payload and are never caption claims.
+    """
+    if framing.get("abstained"):
+        reason = framing.get("abstention_reason") or "framing not measurable"
+        return [f"camera-viewing-angle: abstain ({reason})"]
+    if not framing or not framing.get("shot_scale_band"):
+        # Dimension not measured for this item (e.g. non-camera-viewing-angle
+        # runs) — emit no claim, never a fabricated framing statement.
+        return []
+    lines: list[str] = []
+    hroom = framing.get("headroom_band")
+    # shot_scale_band + camera_height_band are payload-only (88% full-body /
+    # 100% eye-level on the probe cohort — degenerate uniform axes, never
+    # verbalized).
+    if hroom == "tight":
+        lines.append("camera-viewing-angle: headroom is tight (head near the frame top)")
+    elif hroom == "wide":
+        lines.append("camera-viewing-angle: headroom is wide (ample space above the head)")
+    if not lines:
+        lines.append("camera-viewing-angle: framing measured (no distinctive band)")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -778,6 +807,24 @@ def _gaze_head_payload(gaze: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _camera_viewing_angle_payload(framing: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not framing:
+        return {}
+    payload = {
+        "shot_scale_band": framing.get("shot_scale_band"),
+        "headroom_band": framing.get("headroom_band"),
+        "camera_height_band": framing.get("camera_height_band"),
+        "subject_bbox_px": framing.get("subject_bbox_px"),
+        "subject_frame_height_share": framing.get("subject_frame_height_share"),
+        "headroom_frame_share": framing.get("headroom_frame_share"),
+        "subject_center_of_mass_roi": framing.get("subject_center_of_mass_roi"),
+    }
+    ab = framing.get("abstention_reason")
+    if framing.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -795,6 +842,7 @@ def build_evidence_payload(
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
+    camera_viewing_angle: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -864,6 +912,7 @@ def build_evidence_payload(
             "object_relations": _object_relations_payload(object_relations),
             "scene_category": _scene_category_payload(scene_category),
             "gaze_head": _gaze_head_payload(gaze_head),
+            "camera_viewing_angle": _camera_viewing_angle_payload(camera_viewing_angle),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -898,6 +947,7 @@ def assemble_dossier(
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
+    camera_viewing_angle: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -921,6 +971,7 @@ def assemble_dossier(
         ("object-relations:v1", "object-relations", render_object_relations(object_relations or {})),
         ("scene-category:v1", "scene-category", render_scene_category(scene_category or {})),
         ("gaze-head-orientation:v1", "gaze-head-orientation", render_gaze_head(gaze_head or {})),
+        ("camera-viewing-angle:v1", "camera-viewing-angle", render_camera_viewing_angle(camera_viewing_angle or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
