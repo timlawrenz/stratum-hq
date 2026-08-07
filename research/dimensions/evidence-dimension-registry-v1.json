@@ -457,7 +457,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -489,6 +489,68 @@
       ],
       "state": "validated",
       "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "gaze-head-orientation",
+      "name": "gaze / head-orientation (camera-interaction)",
+      "arm_issue": 68,
+      "hypothesis": "A locally-run estimator over the already-installed MediaPipe FaceLandmarker 478-point mesh emitting scale-invariant gaze/head-orientation bands (facing camera, turned away, head up/down, profile) reduces unsupported camera-interaction claims and increases supported relational claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The gaze/head-orientation evidence condition does not reduce unsupported camera-interaction claims or increase supported claims versus its matched no-evidence baseline, or the face mesh fails qualification on real corpus items (high abstention / degenerate orientation), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "reuses the validated MediaPipe FaceLandmarker mesh (owned hardware, local CPU, already installed from arm #60); scale-invariant head-orientation bands computed from 3D landmark geometry, never absolute pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB + seg2; local 4090 (MediaPipe tasks API)",
+      "selection_rationale": "No validated arm measures gaze/head orientation relative to the camera (face-geometry #60 measures shape bands only). Camera interaction ('looking directly at the camera', 'head turned away') is a recurring caption claim with no deterministic support. This is the relational/interaction axis the brainstorm demands (a NEW evidence part, not an attribute-tagger over a validated axis).",
+      "scope": "Scale-invariant head-orientation bands from the existing MediaPipe FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck crop (union policy, arm #60): head yaw band (facing camera / partially turned / profile or turned away), head pitch band (level / down / up), with a plausibility/abstention gate.",
+      "inputs": "full-frame decoded source RGB + seg2.npy (DOME-29 Face_Neck mask); already-installed MediaPipe FaceLandmarker 'face_landmarker.task' (owned hardware, local CPU, tasks API)",
+      "output_semantics": "scale-invariant gaze/head-orientation bands, each tagged detected/abstained; raw yaw/pitch angles and mesh z-coords stay in evidence_payload JSON, never prose (camera-frame-relative but direction is invariant under scale)",
+      "provenance": "research_harness.face_geometry MediaPipe FaceLandmarker mesh (Apache-2.0, local CPU, owned hardware; model face_landmarker.task sha256 64184e229b...) — same asset validated in arm #60; computed in memory with no corpus write; no hosted third-party inference",
+      "abstention_policy": "frozen thresholds + human-plausibility gate; abstain with surfaced reason on no-face / degenerate mesh (arm #60 union policy: 21/24 detected, 3 honest abstains); never fabricate a gaze direction; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "gaze-head-orientation"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "scene-category",
+      "name": "semantic scene category (CLIP zero-shot)",
+      "arm_issue": 69,
+      "hypothesis": "A locally-run open-weight CLIP ViT-L/14 zero-shot classifier over a frozen closed scene-category set (indoor studio, plain wall backdrop, bedroom, living room, outdoor beach, outdoor garden, outdoor field, body of water, urban street, poolside) emitting a confident semantic scene label reduces unsupported background/scene claims and increases supported scene claims versus its matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The scene-category evidence condition does not reduce unsupported background/scene claims or increase supported claims versus its matched no-evidence baseline, or the classifier fails qualification on real corpus items (low confidence, random labels), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "open-weight zero-shot classification (openai/clip-vit-large-patch14, already in the local HF cache via arm #37; MIT/open weight, owned hardware). Frozen closed label set + prompt prefix + temperature; scale-invariant label only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB; local CPU (harness venv + cached CLIP ViT-L/14)",
+      "selection_rationale": "Setting #34 measures background coverage/palette/bands but never the semantic WHAT-KIND-OF-PLACE (indoor studio vs outdoor beach vs poolside). Scene category is a genuinely-new SEMANTIC axis and a NEW model class. Candidacy verified on the frozen cohort (2026-08-07): 24/24 classified, 8 categories across 10, top-1 max share 29% (no band >= 75%), moderate p50 confidence 0.543.",
+      "scope": "CLIP ViT-L/14 zero-shot text-image similarity over full-frame source against a frozen closed set of scene categories (cohort-derived from the arm-#47 VLM scene vocabulary); emit the argmax category only when above a calibrated confidence threshold.",
+      "inputs": "full-frame decoded source RGB; frozen closed scene-label set; local CLIP ViT-L/14 inference on owned hardware (CPU)",
+      "output_semantics": "one scene-category label per item (or abstain below threshold), scale-invariant; CLIP similarity logits stay in evidence_payload JSON, never prose",
+      "provenance": "openai/clip-vit-large-patch14 (open weight, MIT, already in the local HF cache at /mnt/nas-ai-models/huggingface-cache — downloaded for arm #37, sha256-pinnable); run on owned hardware via the harness venv; no hosted third-party inference of the sensitive corpus; no corpus write",
+      "abstention_policy": "frozen label set + confidence threshold; [ABSTAIN] below threshold; never overwrite an ambiguous scene with a confident-looking guess; classifier disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen label set/prompt prefix/temperature pinned; (b) capability + calibration probe on the frozen cohort (24/24 classified, max top-1 share 29% measured 2026-08-07); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "scene-semantic-category"
+      ],
+      "model_candidates": [
+        "clip-zero-shot-scene"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "active",
+      "valid_non_improving_experiments": 0
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -503,7 +565,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 10,
+  "selection_progress": 11,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -558,6 +620,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 9
+    },
+    {
+      "arm_id": "object-relations",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 10
     }
   ]
 }

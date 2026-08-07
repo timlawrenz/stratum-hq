@@ -65,6 +65,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "pointmap-depth:v1",
     "matting-alpha:v1",
     "face-geometry:v1",
+    "object-relations:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -470,6 +471,44 @@ def render_face_geometry(face: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_object_relations(objrel: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant object-presence / placement claims (arm #61).
+
+    Verbalizes ONLY scale-invariant facts: count band, placement band, and the
+    canonical class list. Normalized boxes, scores, and raw phrases stay in the
+    machine-readable payload and are never caption claims.
+    """
+    if objrel.get("abstained"):
+        reason = objrel.get("abstention_reason") or "object detection not measurable"
+        return [f"object-relations: abstain ({reason})"]
+    if not objrel or not objrel.get("count_band"):
+        # Dimension not measured for this item (e.g. non-object-relations
+        # runs) — emit no claim, never a fabricated "no objects" one.
+        return []
+    lines: list[str] = []
+    band = objrel.get("count_band")
+    count = objrel.get("count", 0)
+    classes = objrel.get("classes") or []
+    cls_txt = ", ".join(classes[:5])
+    if band == "none" or count == 0:
+        lines.append("object-relations: no scene objects detected above the calibrated threshold")
+        return lines
+    if band == "sparse":
+        lines.append(f"object-relations: a single scene object is present ({cls_txt})")
+    elif band == "moderate":
+        lines.append(f"object-relations: several scene objects are present ({cls_txt})")
+    else:
+        lines.append(f"object-relations: the scene contains multiple distinct objects ({cls_txt})")
+    placement = objrel.get("placement_band")
+    if placement == "foreground":
+        lines.append("object-relations: objects overlap the subject (held / on-person)")
+    elif placement == "background":
+        lines.append("object-relations: objects sit behind the subject in the background")
+    elif placement == "mix":
+        lines.append("object-relations: objects are a mix of foreground and background")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -630,6 +669,28 @@ def _face_geometry_payload(face: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _object_relations_payload(objrel: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not objrel:
+        return {}
+    payload = {
+        "count": objrel.get("count"),
+        "count_band": objrel.get("count_band"),
+        "placement_band": objrel.get("placement_band"),
+        "classes": objrel.get("classes"),
+        "class_counts": objrel.get("class_counts"),
+        "n_front": objrel.get("n_front"),
+        "n_behind": objrel.get("n_behind"),
+        "n_mixed": objrel.get("n_mixed"),
+        "box_threshold": objrel.get("box_threshold"),
+        "text_threshold": objrel.get("text_threshold"),
+        "detections": objrel.get("detections"),
+    }
+    ab = objrel.get("abstention_reason")
+    if objrel.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -644,6 +705,7 @@ def build_evidence_payload(
     pointmap_depth: Mapping[str, Any] | None = None,
     matting_alpha: Mapping[str, Any] | None = None,
     face_geometry: Mapping[str, Any] | None = None,
+    object_relations: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -710,6 +772,7 @@ def build_evidence_payload(
             "pointmap_depth": _pointmap_depth_payload(pointmap_depth),
             "matting_alpha": _matting_alpha_payload(matting_alpha),
             "face_geometry": _face_geometry_payload(face_geometry),
+            "object_relations": _object_relations_payload(object_relations),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -741,6 +804,7 @@ def assemble_dossier(
     pointmap_depth: Mapping[str, Any] | None = None,
     matting_alpha: Mapping[str, Any] | None = None,
     face_geometry: Mapping[str, Any] | None = None,
+    object_relations: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -761,6 +825,7 @@ def assemble_dossier(
         ("pointmap-depth:v1", "pointmap-depth", render_pointmap_depth(pointmap_depth or {})),
         ("matting-alpha:v1", "matting-alpha", render_matting_alpha(matting_alpha or {})),
         ("face-geometry:v1", "face-geometry", render_face_geometry(face_geometry or {})),
+        ("object-relations:v1", "object-relations", render_object_relations(object_relations or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
