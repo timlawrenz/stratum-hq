@@ -551,6 +551,124 @@
       ],
       "state": "validated",
       "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "apparent-age",
+      "name": "apparent age estimation",
+      "arm_issue": 73,
+      "hypothesis": "A locally-run open-weight apparent-age estimator (MiVOLO-V2, Apache-2.0) emitting a scale-invariant age-band (e.g. late-teens / twenties / thirties-and-up) reduces unsupported age-related claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The apparent-age evidence condition does not reduce unsupported age claims or increase supported claims versus its matched no-evidence baseline, or the age model fails qualification on real corpus items (high abstention / degenerate ages), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW MODEL CLASS: open-weight MiVOLO-V2 age+gender transformer (Apache-2.0, face+body input, arXiv 2307.04616) run on owned hardware; scale-invariant apparent-age band only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Face_Neck crop + full-frame subject region; local GPU/CPU on owned hardware",
+      "selection_rationale": "No validated arm measures apparent age (face-geometry #60 measures shape bands; hair #30 color/region; skin #31 tone). 'She looks young/twenties' is a recurring caption claim with no deterministic support. Genuinely NEW semantic axis + NEW model class per the open-world sourcing directive.",
+      "scope": "Open-weight apparent-age estimation (MiVOLO-V2, face+body multi-input transformer) over the seg2 Face_Neck crop + full-frame subject; emit a scale-invariant age-band (coarse, e.g. late-teens/twenties/thirties+) with a calibrated confidence/abstention gate; never a precise numeric age claim in prose.",
+      "inputs": "seg2 Face_Neck crop (margin-expanded) + full-frame subject region from seg2 source RGB; local MiVOLO-V2 on owned hardware (GPU via scheduler or CPU)",
+      "output_semantics": "one coarse scale-invariant age band per item (or abstain when the face is small/occluded/atypical); the raw floating age estimate stays in evidence_payload JSON, never prose",
+      "provenance": "MiVOLO-V2 open weights (Apache-2.0, iitolstykh/mivolo_v2, arXiv 2307.04616; model.safetensors sha256 to be pinned at installation); run on owned hardware only; no hosted third-party inference of the sensitive corpus; no corpus write",
+      "abstention_policy": "calibrated abstention floor on model confidence; abstain on small/turned/occluded faces with a surfaced reason; detector disagreement is a quality anomaly, never content; never verbalize a precise age, only a coarse band",
+      "qualification_gate": "PASS only after: (a) model + crop/prompt policy pinned with sha256; (b) capability + band-calibration probe on the frozen cohort (spread across bands, no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "apparent-age-band"
+      ],
+      "model_candidates": [
+        "mivolo-v2-age-gender"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "camera-viewing-angle",
+      "name": "camera viewing-angle / framing",
+      "arm_issue": 74,
+      "hypothesis": "Deterministic camera-relative framing measurements (camera height vs subject eye-line, vertical headroom, subject frame-share — all scale-invariant, from seg2 subject bbox + full-frame) reduce unsupported camera-perspective / framing claims and support shot-scale claims on the frozen 24-item cohort.",
+      "falsified_if": "The camera-viewing-angle evidence condition does not reduce unsupported camera/perspective/framing claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic camera-relative framing from seg2 subject bbox + image geometry (eye-line vertical position, headroom ratio, subject frame-share); scale-invariant only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 subject bbox + full-frame dimensions; local in-memory",
+      "selection_rationale": "gaze-head #68 measures subject→camera head direction but NO arm measures camera→subject framing (eye-level vs high/low camera, headroom, shot scale — 'close-up/mid/full'). Camera viewing-angle is a genuinely NEW relational/framing axis, deterministic from existing artifacts, no new model needed.",
+      "scope": "Camera-relative viewing-angle and framing from seg2 subject bbox + full-frame geometry: camera-height band (eye-level / high angle / low angle from the subject's eye-line vertical position), vertical headroom band, and shot-scale band (close-up / mid / full from subject frame-share). Scale-invariant ratios only in prose.",
+      "inputs": "seg2.npy subject mask (already read for the exactly-one-subject invariant) + full-frame decoded source RGB dims; no new model",
+      "output_semantics": "scale-invariant camera-relative framing bands, each tagged measured/abstained; raw pixel positions and frame-share stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness camera-viewing-angle deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + source dims with no corpus write",
+      "abstention_policy": "abstain when the subject bbox is degenerate (subject not fully in frame) or the eye-line is unmeasurable; framing claims only surfaced when the band is calibrated; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "camera-viewing-angle"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "active",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "image-focus-depth-of-field",
+      "name": "image focus / depth-of-field quality",
+      "arm_issue": 75,
+      "hypothesis": "Deterministic focus-quality measurements (global sharpness, subject-vs-background acutance split, depth-of-field band — all scale-invariant, from source pixels + seg2 region split) reduce unsupported focus/blur/DOF claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The image-focus evidence condition does not reduce unsupported focus/blur/depth-of-field claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic focus/DOF from source-pixel gradient/edge energy in the subject vs non-subject (seg2-split) regions; scale-invariant acutance bands",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; source RGB pixels + seg2 region masks; local in-memory",
+      "selection_rationale": "texture #35 measures per-region surface/pattern bands but NOT optical focus quality ('sharp', 'soft-focus background', 'bokeh'); no validated arm covers DOF/focus. Fast, deterministic, genuinely NEW evidence part from existing artifacts, no new model needed.",
+      "scope": "Image focus quality from source-pixel gradient/edge energy within the seg2 subject region vs the non-subject (background) region: global-sharpness band, background-defocus (DOF) band, subject-vs-background acutance contrast. Scale-invariant bands only.",
+      "inputs": "seg2.npy subject/background masks + the already-decoded source RGB pixels; computed in memory; no new model",
+      "output_semantics": "scale-invariant focus/DOF bands (crisp / soft-focus / defocused-background), each tagged measured/abstained; raw edge-energy statistics stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness image-focus deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + source pixels with no corpus write",
+      "abstention_policy": "abstain when the subject/background region lacks a raw-pixel floor or the edge-energy statistics are dominated by texture (so DOF is not isolable); detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "image-focus-dof"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "affordance-contact",
+      "name": "subject-object affordance / contact interaction",
+      "arm_issue": 76,
+      "hypothesis": "Deterministic subject-to-object contact relations (held-in-hand / sitting-on / leaning-on / adjacent from seg2 region adjacency + pose2 hand keypoints, scale-invariant) reduce unsupported interaction claims and support relational camera-interaction claims on the frozen 24-item cohort.",
+      "falsified_if": "The affordance-contact evidence condition does not reduce unsupported interaction/contact claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic contact/affordance relations from seg2 region adjacency + pose2 hand keypoints; scale-invariant contact bands",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 region masks + pose2 keypoints; local in-memory",
+      "selection_rationale": "object-relations #61 measures object presence/placement but NOT subject↔object CONTACT ('holding a glass', 'leaning on the wall'); gaze #68 head direction only. Contact/affordance is a genuinely NEW relational/interaction axis — the exact category the seed-diversity gate pushes toward.",
+      "scope": "Subject-to-object contact/affordance relations from seg2 region adjacency + pose2 hand keypoints: held-in-hand, hand-near-torso, sitting-on/contact-with-background-class, leaning. Scale-invariant contact labels/bands only.",
+      "inputs": "seg2.npy (region masks, already read for the exactly-one-subject invariant) + pose2.npy (GOLIATH-308 hand/wrist keypoints); computed in memory; no new model",
+      "output_semantics": "scale-invariant contact/affordance labels (or abstain) tagged observed/abstained; raw keypoint proximity values stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness affordance-contact deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + pose2 with no corpus write",
+      "abstention_policy": "abstain when no object region is adjacent to the subject (no contact possible), when hands are not visible, or when the proximity is ambiguous; never fabricate a contact; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (contact bands spread, no band >= 75%, honest abstains); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "affordance-contact"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -565,7 +683,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 12,
+  "selection_progress": 13,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
