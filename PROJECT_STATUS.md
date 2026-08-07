@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-06 (sweep re-opened after brainstorm-widen: 5 NEW proposals registered #58–#62; pose-articulation selected as sole `research:active`; next action research-pending on pose-articulation)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 10/10 prior arms validated; brainstorm-widen registered 5 genuinely-new candidate arms; pose-articulation is the single active arm.**
+**Last updated:** 2026-08-07 (arm #62 pose-articulation round-trip COMPLETE → BETTER; next active arm pointmap-depth #58)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 11/11 prior+new arms validated; pose-articulation validated BETTER; pointmap-depth is the single active arm.**
+
+**Arm #62 pose-articulation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #64).** Deterministic kinematic articulation (per-joint elbow/knee flexion, torso/pelvis in-plane orientation, weight-bearing stance + contrapposto, limb-overlap/crossing, flexion asymmetry — all scale-invariant, from pose2 GOLIATH-308 + seg2 DOME-29). Support ratio 0.4225 → 0.8195 (Δ +0.397), supported 60 → 168, unsupported 82 → 37, paired positive 18/22, sign-test p=0.002172. Registry: pose-articulation → validated; **pointmap-depth #58 → active** (exploit, EIG 0.45, tie-broken by id, selection_progress 7). Calibration probe on the frozen cohort confirmed a discriminating elbow band (21 bent / 17 extended) and honest sparse signals for arm-crossing (2/24), contrapposto (4/24), legs-crossed (1/24).
 
 **Arm #47 vlm-dense-description round-trip COMPLETE → BETTER (2026-08-06, harness-computed, draft PR #57).** VLM marginal support ratio 0.7376 → 0.9581 (Δ +0.2206), supported 163→206, unsupported 58→9, sign-test p=0.013302, paired 21/24. Registry: vlm-dense-description → validated. **The sweep then reported EXHAUSTED (10/10 terminal) → next_action brainstorm-new-data.**
 
