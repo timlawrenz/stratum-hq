@@ -51,6 +51,22 @@ This ledger records empirical findings and negative results permanently. A green
 **Validation:** 532 pytest passed; `validate-program` valid; `validate-dimension-registry` valid; `validate-gpu-manifest` valid. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check.
 
 
+## Arm #58 — point-map / 3D depth-ordering evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-07
+**Arm:** #58 — pointmap-depth (registered in the 2026-08-06 brainstorm-widen; was sole `research:active` arm, exploit, EIG 0.45, novelty +0.15, selection_progress 7)
+**Code / PR:** `exp/stage-b-pointmap-depth-arm58-20260807` (draft PR, branch from the pose-articulation #64 lineage)
+**Cohort:** frozen 24-item first-500 coverage-balanced subset (same manifest as all prior arms)
+**Deterministic specialist:** `research_harness.pointmap_depth.compute_pointmap_depth` — scale-invariant depth-ordering from `pointmap.npy` (Sapiens2 per-pixel CAM-frame 3D cloud, +X right +Y down +Z toward viewer, background zeroed) + seg2 DOME-29 masks: region nearest/farthest depth ranking (head/torso/arms/hands/legs median-Z ranks), left/right hand depth ordering (one hand clearly nearer), hand/arm held in front of the torso plane (per side), normalized body depth-relief ratio (robust Z spread p10–p90 / median Z) banded compact/moderate/pronounced. Evidence inputs bound: `pointmap.npy` + `seg2.npy` (pose2 stays a validation-only read). Only scale-invariant facts are verbalized (ordering relations, normalized ratios, bands); absolute metric Z values and raw spreads stay in the machine-readable `evidence_payload`. Genuinely-new evidence surface: relative depth/occlusion ordering no previously-validated arm binds (arms/pose bind pose2/seg2/normal2 only, not pointmap).
+**Hypothesis:** Declared point-map depth-ordering facts reduce unsupported depth/occlusion/foreground-background claims in captions vs matched no-evidence baseline.
+**Calibration note (band probe on the real frozen cohort, before freeze):** paper thresholds (relief floor 0.30 / pronounced 0.55) were DEGENERATE (24/24 compact); recalibrated to the measured distribution (range 0.051–0.241, p10/p50/p90 0.053/0.124/0.214) → relief floor 0.09 / pronounced 0.16, final split compact 6 / moderate 12 / pronounced 6 (max share 50%, no band ≥ 75%). hand_ordering fires 5/24 (left 2, right 3), hand_in_front 11/24 — sparse-but-precise, reported honestly. nearest_region: hands 12/24, then head/torso/legs/arms.
+**Run:** `/mnt/nas-ai-models/research/stratum/stage-b-pointmap-depth-v1` (96 captions, gemma3:27b A-fingerprint, 4090 via scheduler; 4 conditions × 24) + independent adversarial review `/mnt/nas-ai-models/research/stratum/stage-b-pointmap-depth-v1-review` (96 rows, gemma4:e4b).
+**Verdict (harness-computed `autonomous-tick --review-dir-from <marker> --write`):** **BETTER** — supported 47 → **158**, unsupported 99 → **53**; support ratio 0.3219 → 0.7488 (Δ +0.4269); paired positive 19/22; sign-test p = **0.000428**. `inconclusive: false`, `significant: true`.
+**Registry advance:** pointmap-depth `active → validated` (0 strikes); selector next → **matting-alpha #59** (active, selected_via **explore** — ε-greedy slot at selection 8, selection_progress 8).
+**Boundaries respected:** local models only; outputs only under the approved noncanonical research root; no `crawlr/approved` or `crawlr/stratum` mutation; no backfill; no legacy overwrite; deterministic evidence computed in memory from existing `pointmap.npy`/`seg2.npy` only; scale-invariant verbalization retained (owner px→ratios/meters→payload rule). The pointmap-depth dimension joined the dossier (`pointmap-depth:v1` evidence id + render_pointmap_depth + evidence_payload section) — honest evidence-density growth for the goal arm.
+**Validation:** 539 pytest passed; `validate-program` valid; `validate-dimension-registry` valid; `validate-gpu-manifest` valid. Verdict BETTER is empirical on this 24-item frozen cohort; a formal PASS still awaits the advisory human rubric spot-check.
+
+
 ## Arm #37 — generative reconstruction validation — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-06

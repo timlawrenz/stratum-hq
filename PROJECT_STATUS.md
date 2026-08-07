@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #62 pose-articulation round-trip COMPLETE → BETTER; next active arm pointmap-depth #58)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 11/11 prior+new arms validated; pose-articulation validated BETTER; pointmap-depth is the single active arm.**
+**Last updated:** 2026-08-07 (arm #58 pointmap-depth round-trip COMPLETE → BETTER; next active arm matting-alpha #59)
+**Phase / status:** **ACTIVE — empirical Stage-B loop running; 12/12 prior+new arms validated; pointmap-depth validated BETTER; matting-alpha is the single active arm.**
+
+**Arm #58 pointmap-depth ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR on `exp/stage-b-pointmap-depth-arm58-20260807`).** Deterministic point-map / 3D depth-ordering evidence from `pointmap.npy` (Sapiens2 CAM-frame per-pixel cloud, background zeroed) + `seg2` DOME-29 masks: region nearest/farthest depth ranking, left/right hand depth ordering, hand/arm held in front of the torso plane, normalized body depth-relief band — all scale-invariant. Bands calibrated on the frozen 24-item cohort (relief compact/moderate/pronounced = 6/12/6, max 50%; hand_ordering fires 5/24, hand_in_front 11/24). Support ratio 0.3219 → 0.7488 (Δ +0.4269), supported 47 → 158, unsupported 99 → 53, paired positive 19/22, sign-test p=0.000428. Registry: pointmap-depth → validated; **matting-alpha #59 → active** (selected_via explore, ε-greedy slot, selection_progress 8). One-active invariant holds (12 validated, 2 proposals).
 
 **Arm #62 pose-articulation ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, draft PR #64).** Deterministic kinematic articulation (per-joint elbow/knee flexion, torso/pelvis in-plane orientation, weight-bearing stance + contrapposto, limb-overlap/crossing, flexion asymmetry — all scale-invariant, from pose2 GOLIATH-308 + seg2 DOME-29). Support ratio 0.4225 → 0.8195 (Δ +0.397), supported 60 → 168, unsupported 82 → 37, paired positive 18/22, sign-test p=0.002172. Registry: pose-articulation → validated; **pointmap-depth #58 → active** (exploit, EIG 0.45, tie-broken by id, selection_progress 7). Calibration probe on the frozen cohort confirmed a discriminating elbow band (21 bent / 17 extended) and honest sparse signals for arm-crossing (2/24), contrapposto (4/24), legs-crossed (1/24).
 
@@ -130,10 +132,10 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **10 validated**
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **12 validated**
   (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
-  reconstruction #37, **vlm-dense-description #47**), **5 proposals** (point-map depth #58, matting/alpha #59,
-  face-geometry #60, object-relations #61, pose-articulation #62), **1 active** (pose-articulation),
+  reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**),
+  **2 proposals** (face-geometry #60, object-relations #61), **1 active** (matting-alpha #59),
   0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none` (research-pending on the
   active arm), `goal_unreachable: false` (floor 4001, gap 512; the VLM evidence part + deterministic
   record together clear it).
@@ -144,14 +146,14 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Pose-articulation (#62, `research:active`) is the sole active arm; sweep `exhausted: false`, next action
+**Matting-alpha (#59, `research:active`) is the sole active arm; sweep `exhausted: false`, next action
 research-pending.** Per the round-trip recipe, execute the deterministic measurement first: build
-`research_harness` pose-articulation module (per-joint angles, torso/pelvis orientation from keypoint
-triangles, contrapposto/weight-bearing, limb-overlap, symmetry ratios) from the frozen pose2 GOLIATH-308 +
-seg2, band-calibrate on the frozen 24-item cohort (no band ≥75%) BEFORE freezing the plan, then run the
-standard 96-caption generation + independent review round-trip and `autonomous-tick`. The four remaining
-proposals (pointmap-depth #58, matting-alpha #59, face-geometry #60, object-relations #61) sit in the
-menu for the selector's future picks (exploit / ε-greedy explore slot at selection 8).
+`research_harness` matting-alpha module (alpha-fidelity / soft-edge / silhouette statistics from the
+source-matched `matting.npy`, present 24/24 on the frozen cohort) declared in issue #59, band-calibrate
+on the frozen 24-item cohort (no band ≥75%) BEFORE freezing the plan, then run the standard 96-caption
+generation + independent review round-trip and `autonomous-tick`. The two remaining proposals
+(face-geometry #60, object-relations #61) sit in the menu for the selector's future picks
+(exploit / ε-greedy explore slot).
 
 ## Live research tree
 
@@ -160,13 +162,15 @@ menu for the selector's future picks (exploit / ε-greedy explore slot at select
 - #4 is the baseline/comparison-parity arm (empirically complete, verdict BETTER, human spot-check advisory).
 - #5 is the preserved geometry-grounded-captioning prototype.
 - #9 closed (comparison-plan provenance gate resolved). #18 CLOSED/released (owner directive 2026-08-04).
-- #29–#47 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, #37, and **#47 vlm-dense-description**
-  are ALL validated (all BETTER); **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**.
-- **Post-exhaustion brainstorm-widen (2026-08-06):** new proposal arms **#58 point-map depth**, **#59 matting/alpha**,
+- #29–#47 registered proposal arms; #32, #29, #30, #31, #33, #36, #34, #35, #37, **#47 vlm-dense-description**,
+  **#62 pose-articulation**, and **#58 pointmap-depth** are ALL validated (all BETTER);
+  **#36 dossier-context4k is the validated goal arm (round-trip BETTER)**.
+- **Post-exhaustion brainstorm-widen (2026-08-06):** proposal arms **#58 point-map depth**, **#59 matting/alpha**,
   **#60 face-geometry**, **#61 object-relations**, **#62 pose-articulation** registered via the gated
   `propose-dimensions --require-new-evidence-part` channel (all name a NEW evidence part; #60/#61 also name
-  a NEW model class). **#62 pose-articulation is the sole `research:active` arm** (exploit, EIG 0.45,
-  selection_progress 6). The other four remain proposals in the menu.
+  a NEW model class). **#62 pose-articulation VALIDATED (2026-08-07, PR #64); #58 pointmap-depth VALIDATED
+  (2026-08-07); matting-alpha #59 is the sole `research:active` arm** (selected_via explore, ε-greedy slot,
+  selection_progress 8). Face-geometry #60 and object-relations #61 remain proposals in the menu.
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -182,7 +186,8 @@ of the sensitive canonical corpus requires a hold.
 ## Headline result so far
 
 **Arm #4: BETTER; Arm #32: BETTER; Arm #29: BETTER; Arm #30: BETTER; Arm #31: BETTER; Arm #33: BETTER;
-Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER.**
+Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER;
+Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER.**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
@@ -193,4 +198,5 @@ check is BETTER too** (non-LLM validation of the same compact context): context4
 +0.0679 mean CLIP ViT-L/14 similarity over the degraded-baseline generations (22/24 paired positives).
 The **VLM dense-description marginal is BETTER** (0.7376→0.9581 support ratio, p=0.013302). After the
 10/10 sweep was exhausted, the **brainstorm-widen registered 5 new candidate arms (#58–#62)**, and
-**pose-articulation (#62) is the new sole `research:active` arm** awaiting its round-trip research cycle.
+**pose-articulation (#62) and pointmap-depth (#58) are both VALIDATED (2026-08-07)**.
+**Matting-alpha (#59) is the new sole `research:active` arm** awaiting its round-trip research cycle.
