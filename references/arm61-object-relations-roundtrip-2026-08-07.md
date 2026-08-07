@@ -1,7 +1,14 @@
 # Arm #61 object-relations round-trip — Grounding DINO (NEW model class)
 
-**State:** RESEARCH IN PROGRESS (2026-08-07). Plan + manifest frozen, generation
-queued. This reference is updated with the deterministic verdict after the tick.
+**State:** VALIDATED BETTER (2026-08-07, harness-computed, PR #68 draft on
+`exp/stage-b-object-relations-arm61-20260807`). Support ratio 0.3219 → 0.8783
+(Δ +0.5564), supported 47 → 166, unsupported 99 → 23, paired positive 18/21,
+sign-test p=0.000745. Registry: object-relations → validated; the sweep then
+reported EXHAUSTED (15/15 terminal) → next_action brainstorm-new-data, which
+closed this cycle by registering #68 gaze-head-orientation and #69
+scene-category (CLIP) and activating scene-category (exploit, EIG 0.65,
+selection_progress 11). Run roots:
+`/mnt/nas-ai-models/research/stratum/stage-b-object-relations-v1` + `-review`.
 
 ## What this arm is
 NEW-MODEL-CLASS evidence specialist: **Grounding DINO** (`IDEA-Research/
