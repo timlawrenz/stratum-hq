@@ -53,6 +53,7 @@ from .pose_articulation import PoseArticulationError, compute_pose_articulation
 from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
+from .object_relations import ObjectRelationsError, compute_object_relations
 
 
 class StageBRunError(RuntimeError):
@@ -1122,6 +1123,104 @@ def _serialize_face_geometry(face_geometry: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _object_relations_evidence() -> dict[str, Any]:
+    """Declared open-weight text-grounded object/accessory specialist (arm #61)."""
+    module_path = Path(compute_object_relations.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_dir = Path(OBJECT_RELATIONS_MODEL_ASSET)
+    model_sha = (
+        _sha256((model_dir / "model.safetensors").read_bytes())
+        if (model_dir / "model.safetensors").exists() else "MISSING"
+    )
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-object-relations-v1",
+        "specialists": [
+            {
+                "id": "in-memory-object-relations-v1",
+                "scope": "Object / accessory presence + coarse spatial placement of the single subject from a locally-run open-weight text-grounded detector (Grounding DINO) over the full frame with a frozen closed vocabulary: count band (none/sparse/moderate/dense), placement band (foreground/background/mix from seg2-subject overlap), canonical class list. Never identity, skin-tone, or aesthetic claims; only scale-invariant names/counts/relative placement in prose.",
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 subject mask) + the already-decoded "
+                           "source RGB; local open-weight grounding-dino-base (HF Transformers path, "
+                           "CPU, model.safetensors sha256 {model_sha}). Recomputed in memory during this "
+                           "bounded run with no crawlr/stratum write; model run on owned hardware only.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant object-presence/placement facts "
+                                     "with a surfaced abstention on model/input failure, not semantic ground "
+                                     "truth or caption claims; only band/name facts are verbalized (normalized "
+                                     "boxes, scores, raw phrases stay in the machine-readable payload)."),
+                "provenance": (
+                    "research_harness.object_relations.compute_object_relations "
+                    f"SHA-256 {code_hash}; model grounding-dino-base (IDEA-Research, Apache-2.0, "
+                    "HF Transformers path) sha256 {model_sha}, run locally on owned hardware (CPU, "
+                    "no VRAM contention with the caption model); computed in memory during this "
+                    "bounded run with no crawlr/stratum write, no hosted third-party inference of "
+                    "the sensitive corpus."
+                ).format(model_sha=model_sha),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing or detector count is not exactly one; abstain "
+                                      "(emit thresholds/None with a surfaced reason) on detector invocation "
+                                      "failure. Subject-self detections (the detector firing 'body' on the "
+                                      "subject herself) are excluded from count and prose — they are the "
+                                      "subject, not objects. Detector disagreement remains a quality "
+                                      "anomaly, never prompt content."),
+                "known_failure_modes": ("Grounding DINO is a text-grounded open-vocab detector: closed-"
+                                        "vocabulary recall depends on the frozen class list (a furniture-"
+                                        "centric list was degenerate on this scene-dominant cohort — the "
+                                        "cohort-derived list is used); scores are not calibrated across "
+                                        "domains (threshold 0.25 calibrated on this frozen cohort); subject-"
+                                        "self detections ('body') must be excluded; box coords are frame-"
+                                        "dependent (normalized only in payload)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_object_relations(objrel: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of an object-relations dict.
+
+    Verbalizes ONLY scale-invariant facts: count band, placement band, and the
+    canonical class list. Normalized boxes, scores, and raw phrases remain in
+    the machine-readable `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "OBJECT-RELATIONS (open-weight text-grounded detection, scale-invariant):"
+    ]
+    if not objrel or not objrel.get("count_band"):
+        lines.append("- object-relations not measured for this item")
+        return "\n".join(lines)
+    if objrel.get("abstained"):
+        reason = objrel.get("abstention_reason") or "object detection not measurable"
+        lines.append(f"- object detection abstained ({reason})")
+        return "\n".join(lines)
+
+    count = objrel.get("count", 0)
+    band = objrel.get("count_band", "none")
+    if band == "none" or count == 0:
+        lines.append("- no scene objects detected above the calibrated threshold")
+        return "\n".join(lines)
+
+    classes = objrel.get("classes") or []
+    cls_txt = ", ".join(classes[:5])
+    if band == "sparse":
+        lines.append(f"- a single scene object is present: {cls_txt}")
+    elif band == "moderate":
+        lines.append(f"- several scene objects are present: {cls_txt}")
+    else:
+        lines.append(f"- the scene contains multiple distinct objects: {cls_txt}")
+
+    placement = objrel.get("placement_band")
+    if placement == "foreground":
+        lines.append("- objects overlap the subject (held / on-person)")
+    elif placement == "background":
+        lines.append("- objects sit behind the subject in the background")
+    elif placement == "mix":
+        lines.append("- objects are a mix of foreground and background")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1192,6 +1291,12 @@ FACE_GEOMETRY_MODEL_ASSET = (
     "/mnt/nas-ai-models/research/stratum/models/face-geometry/face_landmarker.task"
 )
 
+# Frozen open-weight Grounding DINO asset directory (arm #61, new model class).
+# model.safetensors sha256 5548f844c928c4b6f411fa8cbcc2bfa8dbbba437cb1d513975519f93c2a9ed21
+OBJECT_RELATIONS_MODEL_ASSET = (
+    "/mnt/nas-ai-models/research/stratum/models/object-relations"
+)
+
 _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "geometry": ("pose2.npy", "seg2.npy"),
     "body-type": ("pose2.npy", "seg2.npy"),
@@ -1207,6 +1312,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "pointmap-depth": ("pointmap.npy", "seg2.npy"),
     "matting-alpha": ("matting.npy", "seg2.npy"),
     "face-geometry": ("seg2.npy",),
+    "object-relations": ("seg2.npy",),
 }
 
 
@@ -1298,6 +1404,7 @@ def build_stage_b_plan(
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
+        "object-relations",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1608,6 +1715,38 @@ def build_stage_b_plan(
             "verbalized: eye-spacing / mouth / jaw / mid-face bands. Landmark coordinates and the pixel "
             "bbox stay in evidence_payload and are never caption claims."
         )
+    elif evidence_kind == "object-relations":
+        evidence = _object_relations_evidence()
+        evidence_condition_id = "context-raw-object-relations"
+        comparison_plan_id = "stage-b-first500-object-relations-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared object/accessory-presence and "
+            "spatial-placement measurements (count band none/sparse/moderate/dense, placement band "
+            "foreground/background/mix, canonical class list from a locally-run open-weight Grounding DINO "
+            "text-grounded detector over a frozen closed vocabulary, all scale-invariant) may reduce "
+            "unsupported object claims (hallucinated objects) or increase supported object/background claims "
+            "in captions versus its matched no-evidence baseline when the source item, view, prompt template, "
+            "local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The object-relations evidence condition does not reduce unsupported object claims or increase "
+            "supported claims versus its matched no-evidence baseline, or the grounding-dino model fails "
+            "qualification on real corpus items (high abstention / subject-self confusion), or an apparent "
+            "difference is attributable to an uncontrolled view, prompt, aggregator, generation, or "
+            "evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pose2 are not used as evidence inputs for the object-relations measurement (pose2 "
+            "stays a validation-only read for the exactly-one-subject invariant). Object presence is computed "
+            "in memory from the frozen selected seg2.npy (DOME-29 subject mask) + the already-decoded source "
+            "RGB via the local open-weight Grounding DINO (IDEA-Research grounding-dino-base, Apache-2.0, "
+            "owned hardware, CPU via HF Transformers; model.safetensors bound by sha256) over a frozen "
+            "cohort-derived closed vocabulary at the calibrated box threshold (0.25). Only scale-invariant "
+            "facts are verbalized: count band, placement band, and the canonical class list. Subject-self "
+            "detections ('body') are excluded, and normalized boxes/scores stay in evidence_payload and are "
+            "never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -1885,6 +2024,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "matting-alpha"
     elif "context-raw-face-geometry" in condition_ids:
         rebuild_kind = "face-geometry"
+    elif "context-raw-object-relations" in condition_ids:
+        rebuild_kind = "object-relations"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -1952,6 +2093,7 @@ def _load_selected_item(
     expected_evidence_hashes: Mapping[str, str],
     *,
     include_face_geometry: bool = False,
+    include_object_relations: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2068,6 +2210,15 @@ def _load_selected_item(
             )
         except FaceGeometryError as exc:
             raise StageBRunError(f"face-geometry abort for frozen selected item {image_id}: {exc}") from exc
+    object_relations = None
+    if include_object_relations:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
+        try:
+            object_relations = compute_object_relations(
+                seg2, rgb, model_asset_dir=OBJECT_RELATIONS_MODEL_ASSET
+            )
+        except ObjectRelationsError as exc:
+            raise StageBRunError(f"object-relations abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2097,6 +2248,7 @@ def _load_selected_item(
         "pointmap_depth": pointmap_depth,
         "matting_alpha": matting_alpha,
         "face_geometry": face_geometry,
+        "object_relations": object_relations,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2149,6 +2301,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         pointmap_depth=prepared.get("pointmap_depth"),
         matting_alpha=prepared.get("matting_alpha"),
         face_geometry=prepared.get("face_geometry"),
+        object_relations=prepared.get("object_relations"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2164,6 +2317,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         pointmap_depth=prepared.get("pointmap_depth"),
         matting_alpha=prepared.get("matting_alpha"),
         face_geometry=prepared.get("face_geometry"),
+        object_relations=prepared.get("object_relations"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2249,6 +2403,10 @@ def _render_condition(
         face_geometry = prepared["face_geometry"]
         evidence_text = _serialize_face_geometry(face_geometry)
         return raw.copy(), _context_prompt(evidence_text), face_geometry
+    if condition_id == "context-raw-object-relations":
+        object_relations = prepared["object_relations"]
+        evidence_text = _serialize_object_relations(object_relations)
+        return raw.copy(), _context_prompt(evidence_text), object_relations
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -2431,6 +2589,10 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-face-geometry"
         for condition in (plan.get("conditions") or [])
     )
+    include_object_relations = any(
+        str(condition.get("id")) == "context-raw-object-relations"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -2441,6 +2603,7 @@ def execute_stage_b(
             derived_root,
             evidence_hashes[_safe_output_segment(item.get("image_id"), "candidate item image_id")],
             include_face_geometry=include_face_geometry,
+            include_object_relations=include_object_relations,
         )
         for item in items
     ]
