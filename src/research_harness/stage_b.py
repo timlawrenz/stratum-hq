@@ -55,6 +55,7 @@ from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .scene_category import SceneCategoryError, compute_scene_category
+from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 
 
 class StageBRunError(RuntimeError):
@@ -1302,6 +1303,98 @@ def _serialize_scene_category(scene: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+# Frozen open-weight MediaPipe FaceLandmarker asset (arm #68, same mesh as
+# arm #60 face-geometry, new evidence part: camera-relative head orientation).
+# face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+GAZE_HEAD_MODEL_ASSET = (
+    "/mnt/nas-ai-models/research/stratum/models/face-geometry/face_landmarker.task"
+)
+
+
+def _gaze_head_evidence() -> dict[str, Any]:
+    """Declared head-orientation specialist (arm #68, reuses arm #60 mesh)."""
+    module_path = Path(compute_gaze_head.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(GAZE_HEAD_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-gaze-head-orientation-v1",
+        "specialists": [
+            {
+                "id": "in-memory-gaze-head-orientation-v1",
+                "scope": "Scale-invariant camera-relative head orientation (yaw: facing camera / partially turned / profile or turned away; pitch: level / tilted down / tilted up; roll: level / tilted in-plane) from a locally-run open-weight MediaPipe FaceLandmarker 478-point mesh (same mesh asset as arm #60) over the full frame / seg2 Face_Neck crop (union policy). Never identity, skin-tone, facial-shape, or aesthetic claims; only the scale-invariant direction bands in prose.",
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the already-decoded "
+                           "source RGB; local open-weight face_landmarker.task (owned hardware, local CPU, "
+                           "tasks API, model sha256 {model_sha}). Recomputed in memory during this bounded run "
+                           "with no crawlr/stratum write; same frozen mesh asset as the validated arm #60.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant head-orientation bands with a surfaced "
+                                     "abstention on no-face / degenerate landmark fit, not semantic ground truth "
+                                     "or caption claims; only direction bands are verbalized (raw yaw/pitch/roll "
+                                     "degrees and landmark coords stay in the machine-readable payload)."),
+                "provenance": (
+                    "research_harness.gaze_head.compute_gaze_head "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); "
+                    "computed in memory during this bounded run with no crawlr/stratum write, "
+                    "no hosted third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if required artifacts are "
+                                      "missing, unreadable, or detector count is not exactly one; abstain (emit "
+                                      "None/band with a surfaced reason) when no face is found on the full frame "
+                                      "or the seg2 Face_Neck crop (arm #60 union policy), or when the 6-point PnP "
+                                      "fit is degenerate (landmark bbox below the pixel floor). Detector "
+                                      "disagreement remains a quality anomaly, never prompt content."),
+                "known_failure_modes": ("PnP head pose is best for frontal-to-3/4 views; at near-profile the "
+                                        "nose/eye/mouth skeleton can project onto a thin footprint and the fit can "
+                                        "unstable — the pixel-span floor gates that. Camera-relative direction is "
+                                        "scale-invariant but not depth-absolute; roll is in-plane and only "
+                                        "roughly camera-relative. Resolution-sensitive (same asset, arm #60 "
+                                        "measured UNION is the honest policy)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_gaze_head(gaze: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a gaze/head-orientation dict.
+
+    Verbalizes ONLY the scale-invariant camera-relative direction bands (yaw /
+    pitch / roll). Raw yaw/pitch/roll degrees and landmark coordinates remain
+    in the machine-readable `evidence_payload` JSON and are not caption claims.
+    """
+    lines = [
+        "GAZE/HEAD-ORIENTATION (open-weight facial landmarks, camera-relative, scale-invariant):"
+    ]
+    if gaze.get("abstained"):
+        reason = gaze.get("abstention_reason") or "face not measurable"
+        lines.append(f"- head orientation abstained ({reason})")
+        return "\n".join(lines)
+    if not gaze or not gaze.get("yaw_band"):
+        lines.append("- head orientation not measured for this item")
+        return "\n".join(lines)
+    yb = gaze.get("yaw_band")
+    pb = gaze.get("pitch_band")
+    rb = gaze.get("roll_band")
+    if yb == "facing camera":
+        lines.append("- head is facing the camera")
+    elif yb == "partially turned":
+        lines.append("- head is partially turned from the camera")
+    elif yb == "profile or turned away":
+        lines.append("- head is turned toward profile / away from the camera")
+    if pb == "tilted down":
+        lines.append("- head is tilted down (pitch)")
+    elif pb == "tilted up":
+        lines.append("- head is tilted up (pitch)")
+    if rb == "tilted":
+        lines.append("- head is tilted to one side (in-plane roll)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1405,6 +1498,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # derived artifact is an evidence input; seg2/pose2 stay validation-only
     # reads for the exactly-one-subject invariant.
     "scene-category": (),
+    # Arm #68 gaze-head-orientation: MediaPipe FaceLandmarker consumes the
+    # already-decoded full-frame source RGB + the seg2 Face_Neck mask (for the
+    # union crop fallback, as in face-geometry); seg2 is read-only validation
+    # data, never mutated.
+    "gaze-head-orientation": ("seg2.npy",),
 }
 
 
@@ -1496,7 +1594,7 @@ def build_stage_b_plan(
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
-        "object-relations", "scene-category",
+        "object-relations", "scene-category", "gaze-head-orientation",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1869,6 +1967,38 @@ def build_stage_b_plan(
             "scene vocabulary) at the calibrated confidence floor (0.25). Only the scale-invariant label is "
             "verbalized; similarity logits/probabilities stay in evidence_payload and are never caption claims."
         )
+    elif evidence_kind == "gaze-head-orientation":
+        evidence = _gaze_head_evidence()
+        evidence_condition_id = "context-raw-gaze-head-orientation"
+        comparison_plan_id = "stage-b-first500-gaze-head-orientation-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared camera-interaction "
+            "head-orientation determinations (scale-invariant yaw band — facing camera / partially turned / "
+            "profile or turned away; pitch band — level / tilted down / tilted up; roll band — level / "
+            "tilted in-plane — from a locally-run open-weight MediaPipe FaceLandmarker 478-point mesh over "
+            "the full frame / seg2 Face_Neck crop via the union policy, camera-relative direction only) may "
+            "reduce unsupported camera-interaction claims ('looking at the camera', 'head turned away') or "
+            "increase supported relational claims in captions versus its matched no-evidence baseline when "
+            "the source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The gaze/head-orientation evidence condition does not reduce unsupported camera-interaction "
+            "claims or increase supported claims versus its matched no-evidence baseline, or the face mesh "
+            "fails qualification on real corpus items (high abstention / degenerate orientation), or an "
+            "apparent difference is attributable to an uncontrolled view, prompt, aggregator, generation, "
+            "or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs for the orientation measurement (pose2 "
+            "stays a validation-only read for the exactly-one-subject invariant). Head orientation is "
+            "computed in memory from the frozen selected seg2.npy (DOME-29 Face_Neck mask) + the "
+            "already-decoded source RGB via the local open-weight MediaPipe FaceLandmarker (Apache-2.0, "
+            "owned hardware, CPU, tasks API; model face_landmarker.task bound by sha256 — the SAME "
+            "validated asset as arm #60 face-geometry) with a six-point PnP camera-relative fit. Only "
+            "scale-invariant direction bands are verbalized (yaw/pitch/roll bands); raw yaw/pitch/roll "
+            "degrees and landmark coordinates stay in evidence_payload and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2150,6 +2280,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
         rebuild_kind = "scene-category"
+    elif "context-raw-gaze-head-orientation" in condition_ids:
+        rebuild_kind = "gaze-head-orientation"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2219,6 +2351,7 @@ def _load_selected_item(
     include_face_geometry: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
+    include_gaze_head: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2351,6 +2484,15 @@ def _load_selected_item(
             scene_category = compute_scene_category(rgb, model_asset_dir=SCENE_CATEGORY_MODEL_ASSET)
         except SceneCategoryError as exc:
             raise StageBRunError(f"scene-category abort for frozen selected item {image_id}: {exc}") from exc
+    gaze_head = None
+    if include_gaze_head:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
+        try:
+            gaze_head = compute_gaze_head(
+                seg2, rgb, model_asset_path=GAZE_HEAD_MODEL_ASSET
+            )
+        except GazeHeadError as exc:
+            raise StageBRunError(f"gaze-head-orientation abort for frozen selected item {image_id}: {exc}") from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2382,6 +2524,7 @@ def _load_selected_item(
         "face_geometry": face_geometry,
         "object_relations": object_relations,
         "scene_category": scene_category,
+        "gaze_head": gaze_head,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2436,6 +2579,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         face_geometry=prepared.get("face_geometry"),
         object_relations=prepared.get("object_relations"),
         scene_category=prepared.get("scene_category"),
+        gaze_head=prepared.get("gaze_head"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2453,6 +2597,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         face_geometry=prepared.get("face_geometry"),
         object_relations=prepared.get("object_relations"),
         scene_category=prepared.get("scene_category"),
+        gaze_head=prepared.get("gaze_head"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -2546,6 +2691,10 @@ def _render_condition(
         scene_category = prepared["scene_category"]
         evidence_text = _serialize_scene_category(scene_category)
         return raw.copy(), _context_prompt(evidence_text), scene_category
+    if condition_id == "context-raw-gaze-head-orientation":
+        gaze_head = prepared["gaze_head"]
+        evidence_text = _serialize_gaze_head(gaze_head)
+        return raw.copy(), _context_prompt(evidence_text), gaze_head
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -2739,6 +2888,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-scene-category"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #68: only the gaze-head-orientation run invokes the locally-run
+    # MediaPipe FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen
+    # plan's conditions so other arms never pay the mesh cost.
+    include_gaze_head = any(
+        str(condition.get("id")) == "context-raw-gaze-head-orientation"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -2751,6 +2907,7 @@ def execute_stage_b(
             include_face_geometry=include_face_geometry,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
+            include_gaze_head=include_gaze_head,
         )
         for item in items
     ]

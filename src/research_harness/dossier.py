@@ -67,6 +67,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "face-geometry:v1",
     "object-relations:v1",
     "scene-category:v1",
+    "gaze-head-orientation:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -527,6 +528,41 @@ def render_scene_category(scene: Mapping[str, Any]) -> list[str]:
     return [f"scene-category: the setting is a {scene['category']}"]
 
 
+def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant camera-relative head-orientation claim (arm #68).
+
+    Verbalizes ONLY the scale-invariant direction bands (yaw/pitch/roll); raw
+    yaw/pitch/roll degrees and landmark coordinates stay in the machine-
+    readable payload and are never caption claims.
+    """
+    if gaze.get("abstained"):
+        reason = gaze.get("abstention_reason") or "face not measurable"
+        return [f"gaze-head-orientation: abstain ({reason})"]
+    if not gaze or not gaze.get("yaw_band"):
+        # Dimension not measured for this item (e.g. non-gaze runs) — emit no
+        # claim, never a fabricated camera-interaction statement.
+        return []
+    lines: list[str] = []
+    yb = gaze.get("yaw_band")
+    pb = gaze.get("pitch_band")
+    rb = gaze.get("roll_band")
+    if yb == "facing camera":
+        lines.append("gaze-head-orientation: head is facing the camera")
+    elif yb == "partially turned":
+        lines.append("gaze-head-orientation: head is partially turned from the camera")
+    elif yb == "profile or turned away":
+        lines.append("gaze-head-orientation: head is turned toward profile / away from the camera")
+    if pb == "tilted down":
+        lines.append("gaze-head-orientation: head is tilted down (pitch)")
+    elif pb == "tilted up":
+        lines.append("gaze-head-orientation: head is tilted up (pitch)")
+    if rb == "tilted":
+        lines.append("gaze-head-orientation: head is tilted to one side (in-plane roll)")
+    if not lines:
+        lines.append("gaze-head-orientation: head is level and facing the camera")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -724,6 +760,24 @@ def _scene_category_payload(scene: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _gaze_head_payload(gaze: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not gaze:
+        return {}
+    payload = {
+        "yaw_deg": gaze.get("yaw"),
+        "pitch_deg": gaze.get("pitch"),
+        "roll_deg": gaze.get("roll"),
+        "yaw_band": gaze.get("yaw_band"),
+        "pitch_band": gaze.get("pitch_band"),
+        "roll_band": gaze.get("roll_band"),
+        "via": gaze.get("via"),
+    }
+    ab = gaze.get("abstention_reason")
+    if gaze.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -740,6 +794,7 @@ def build_evidence_payload(
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
+    gaze_head: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -808,6 +863,7 @@ def build_evidence_payload(
             "face_geometry": _face_geometry_payload(face_geometry),
             "object_relations": _object_relations_payload(object_relations),
             "scene_category": _scene_category_payload(scene_category),
+            "gaze_head": _gaze_head_payload(gaze_head),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -841,6 +897,7 @@ def assemble_dossier(
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
+    gaze_head: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -863,6 +920,7 @@ def assemble_dossier(
         ("face-geometry:v1", "face-geometry", render_face_geometry(face_geometry or {})),
         ("object-relations:v1", "object-relations", render_object_relations(object_relations or {})),
         ("scene-category:v1", "scene-category", render_scene_category(scene_category or {})),
+        ("gaze-head-orientation:v1", "gaze-head-orientation", render_gaze_head(gaze_head or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
