@@ -15,6 +15,7 @@ ALL_PASSES = [
     "caption", "dinov3", "t5", "pixel",
     "seg2", "pose2", "matting",
     "normal2", "pointmap",
+    "determinations", "caption2", "t52",
 ]
 
 
@@ -38,8 +39,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="all",
         help=(
             "Comma-separated list of passes: "
-            "caption,dinov3,t5,pixel,seg2,pose2,matting,normal2,pointmap "
-            "or 'all' (excludes pixel)"
+            "caption,dinov3,t5,pixel,seg2,pose2,matting,normal2,pointmap,determinations,caption2,t52 "
+            "or 'all' (excludes pixel, determinations, caption2, t52)"
         ),
     )
     proc.add_argument(
