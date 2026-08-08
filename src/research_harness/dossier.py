@@ -61,6 +61,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "lighting:v1",
     "setting-environment:v1",
     "texture-material:v1",
+    "pose-articulation:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -292,6 +293,57 @@ def render_texture(texture: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_pose_articulation(articulation: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant kinematic articulation claims (arm #62)."""
+    lines: list[str] = []
+    if not articulation.get("subject_present"):
+        return ["pose articulation: abstain (no reliable subject keypoints present)"]
+    for side, key in (("left", "elbow_flexion_left"), ("right", "elbow_flexion_right")):
+        value = articulation.get(key)
+        if value is None:
+            lines.append(f"pose articulation: {side} elbow flexion abstained (joint absent or low confidence)")
+        elif float(value) < 135.0:
+            lines.append(f"pose articulation: {side} arm visibly bent at the elbow")
+        else:
+            lines.append(f"pose articulation: {side} arm extended at the elbow")
+    for side, key in (("left", "knee_flexion_left"), ("right", "knee_flexion_right")):
+        value = articulation.get(key)
+        if value is None:
+            lines.append(f"pose articulation: {side} knee flexion abstained (joint absent or low confidence)")
+        elif float(value) < 135.0:
+            lines.append(f"pose articulation: {side} leg visibly bent at the knee")
+        else:
+            lines.append(f"pose articulation: {side} leg extended at the knee")
+    stance = articulation.get("stance_class")
+    if stance and stance != "centered":
+        leg = "left" if stance == "weight-left" else "right"
+        lines.append(f"pose articulation: weight carried on the {leg} leg")
+    elif stance == "centered":
+        lines.append("pose articulation: stance centered (no single weight-bearing leg)")
+    else:
+        lines.append("pose articulation: stance abstained (weight-bearing signal ambiguous)")
+    contrapposto = articulation.get("contrapposto")
+    if contrapposto is True:
+        lines.append("pose articulation: contrapposto stance (hips tilted with weight on one leg)")
+    elif contrapposto is False:
+        lines.append("pose articulation: contrapposto stance absent (hips level)")
+    twist = articulation.get("torso_twist_deg")
+    lean = articulation.get("torso_lean_deg")
+    tilt = articulation.get("pelvis_tilt_deg")
+    if twist is not None:
+        lines.append(f"pose articulation: torso/hips in-plane twist {float(twist):.0f} degrees")
+    if lean is not None:
+        lines.append(f"pose articulation: torso lean from vertical {float(lean):.0f} degrees")
+    if tilt is not None:
+        lines.append(f"pose articulation: pelvis tilt from horizontal {float(tilt):.0f} degrees")
+    crossing = articulation.get("arm_crossing_count")
+    if crossing is not None and int(crossing) > 0:
+        lines.append(f"pose articulation: {int(crossing)} arm(s) cross in front of the torso")
+    if articulation.get("legs_crossed") is True:
+        lines.append("pose articulation: legs visually crossed")
+    return lines
+
+
 def render_relational(det: Mapping[str, Any]) -> list[str]:
     """Relational determinations from derive_determinations (relational part)."""
     lines: list[str] = []
@@ -354,6 +406,32 @@ def _texture_payload(texture: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _pose_articulation_payload(articulation: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not articulation:
+        return {}
+    payload = {
+        "elbow_flexion_left": articulation.get("elbow_flexion_left"),
+        "elbow_flexion_right": articulation.get("elbow_flexion_right"),
+        "knee_flexion_left": articulation.get("knee_flexion_left"),
+        "knee_flexion_right": articulation.get("knee_flexion_right"),
+        "torso_twist_deg": articulation.get("torso_twist_deg"),
+        "torso_lean_deg": articulation.get("torso_lean_deg"),
+        "pelvis_tilt_deg": articulation.get("pelvis_tilt_deg"),
+        "stance_class": articulation.get("stance_class"),
+        "contrapposto": articulation.get("contrapposto"),
+        "arm_crossing_count": articulation.get("arm_crossing_count"),
+        "legs_crossed": articulation.get("legs_crossed"),
+        "left_arm_near_torso_fraction": articulation.get("left_arm_near_torso_fraction"),
+        "right_arm_near_torso_fraction": articulation.get("right_arm_near_torso_fraction"),
+        "elbow_flexion_asymmetry_deg": articulation.get("elbow_flexion_asymmetry_deg"),
+        "knee_flexion_asymmetry_deg": articulation.get("knee_flexion_asymmetry_deg"),
+    }
+    ab = articulation.get("abstention_reason")
+    if articulation.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -364,6 +442,7 @@ def build_evidence_payload(
     lighting: Mapping[str, Any],
     setting: Mapping[str, Any] | None = None,
     texture: Mapping[str, Any] | None = None,
+    articulation: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -426,6 +505,7 @@ def build_evidence_payload(
             },
             "setting": _setting_payload(setting),
             "texture": _texture_payload(texture),
+            "pose_articulation": _pose_articulation_payload(articulation),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -453,6 +533,7 @@ def assemble_dossier(
     lighting: Mapping[str, Any],
     setting: Mapping[str, Any] | None = None,
     texture: Mapping[str, Any] | None = None,
+    articulation: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -469,6 +550,7 @@ def assemble_dossier(
         ("lighting:v1", "lighting", render_lighting(lighting)),
         ("setting-environment:v1", "setting", render_setting(setting or {})),
         ("texture-material:v1", "texture", render_texture(texture or {})),
+        ("pose-articulation:v1", "pose-articulation", render_pose_articulation(articulation or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

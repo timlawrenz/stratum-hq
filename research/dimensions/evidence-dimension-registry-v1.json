@@ -340,6 +340,155 @@
       "feeds": [
         "dossier-context4k"
       ]
+    },
+    {
+      "id": "pointmap-depth",
+      "name": "point-map / 3D depth-ordering",
+      "arm_issue": 58,
+      "hypothesis": "Declared point-map relative-depth ordering measurements (foreground/background plane separation, occlusion structure, subject-depth ordering) reduce unsupported depth/occlusion/foreground-background claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The pointmap-depth evidence condition does not reduce unsupported depth/occlusion claims or increase supported claims versus its matched no-evidence baseline under fixed view/prompt/model/settings, or the measured depth-order is not distinguishable from the seg2-background plane (redundant axis).",
+      "deterministic_signal": "pointmap.npy per-pixel 3D points (CAM frame) + seg2 region masks: relative depth ordering, subject-vs-background plane separation ratio, self-occlusion/overlap structure from point-depth discontinuity at region boundaries",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort (24/24 frozen items have source-matched pointmap.npy + seg2.npy); pointmap is a core-chain artifact not bound by any validated arm",
+      "selection_rationale": "Point-map is a genuinely-new evidence surface (relative 3D structure/occlusion) present on 24/24 frozen items yet not bound as an evidence input by any validated arm; deterministic, zero new model, low cost, directly grows the dossier depth/foreground-background evidence axis.",
+      "scope": "deterministic per-item point-map depth-ordering measurement: relative depth order of seg2 regions, subject/background plane separation strength, occlusion structure between subject parts; scale-invariant ratios and depth-order relations only, never absolute metric distances in prose",
+      "inputs": "frozen pointmap.npy (source-matched) + seg2.npy region masks + pose2.npy keypoints; read-only canonical/derived artifacts",
+      "output_semantics": "depth-order relations + scale-invariant separation/overlap ratios, machine-readable in evidence_payload; prose carries only scale-invariant ordering claims (e.g. 'subject clearly separated from background', 'limb occludes torso')",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (pointmap.npy is source-dimension-matched float16 3D point field); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain when pointmap is absent/ill-formed or degenerate (zero extent), when scale is degenerate (subject fills frame such that no plane separation is measurable), or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound pointmap/seg2/pose2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze (no band >=75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pointmap-depth"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "active",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "matting-alpha",
+      "name": "matting / alpha-fidelity",
+      "arm_issue": 59,
+      "hypothesis": "Declared matting/alpha measurements (subject coverage ratio, soft-edge band width, hair/fine-feature delimiter structure, silhouette closedness) reduce unsupported edge-quality/hair/silhouette claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The matting evidence condition does not reduce unsupported edge-quality/fine-feature claims or increase supported claims versus its matched no-evidence baseline, or the measured alpha structure is not distinguishable from seg2 region coverage (redundant axis).",
+      "deterministic_signal": "matting.npy per-pixel soft alpha (source-matched) + seg2 masks + source pixels: subject alpha-integral coverage, soft-edge band width, hair/fine-detail delimiter energy, silhouette closedness",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort (24/24 frozen items have source-matched matting.npy); matting is a core-chain artifact not bound by any validated arm",
+      "selection_rationale": "Matting is a genuinely-new surface (per-pixel alpha fidelity: edge softness, hair/non-silhouette detail) present on 24/24 frozen items yet unbound by validated arms; deterministic, zero new model, low cost, feeds the dossier edge-quality evidence axis.",
+      "scope": "deterministic per-item matting measurement: subject alpha coverage ratio, soft-edge band width, hair/fine-feature delimiter structure, silhouette closedness; scale-invariant ratios/bands only in prose",
+      "inputs": "frozen matting.npy (source-matched) + seg2.npy masks + source pixels for edge color grounding; read-only canonical/derived artifacts",
+      "output_semantics": "subject-coverage ratio, soft-edge band width, edge-structure health bands, machine-readable in evidence_payload; prose carries only scale-invariant fidelity claims (e.g. 'soft detachable hair strands', 'sharp clean silhouette')",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (matting.npy is source-dimension-matched float16 alpha); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain when matting is absent/ill-formed or degenerate (all-one/all-zero alpha), or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound matting/seg2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze (no band >=75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "matting-alpha"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "face-geometry",
+      "name": "facial detail / face-shape geometry",
+      "arm_issue": 60,
+      "hypothesis": "A locally-run open-weight facial-landmark model plus deterministic facial-geometry ratios (eye spacing:face width, facial thirds, mouth-width:face ratio) reduce unsupported facial-detail claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The face-geometry evidence condition does not reduce unsupported facial-detail claims or increase supported claims versus its matched no-evidence baseline, or the landmark model fails qualification on real corpus items (high abstention, missing faces).",
+      "deterministic_signal": "learned 478-point facial landmarks (mediapipe-facemesh-3d-class candidate, Apache-2.0 on-device) + deterministic facial ratios (eye-spacing/face-width, facial-thirds, mouth/face, jawline widths) — scale-invariant only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; face crop derived from seg2 Face_Neck region; local 4090/Strix",
+      "selection_rationale": "Facial DETAIL (eye shape/size/spacing, nose/lip geometry, face shape) is a high-frequency hallucination axis not covered by any validated arm (hair covers region+color, skin-color covers tone); local deterministic options exhausted (pose2 GOLIATH-308 has only coarse facial keypoints), so this is the open-world NEW-model-class path per the sourcing directive.",
+      "scope": "local open-weight facial-landmark/geometry model over the seg2 Face_Neck crop, emitting facial-geometry ratios and landmark-confirmed observable feature claims; scale-invariant only in prose",
+      "inputs": "face crop derived from seg2 Face_Neck region, frozen crop/prompt policy, decoded source RGB; local inference on owned hardware",
+      "output_semantics": "facial geometry ratios + landmark-confirmed observable feature claims, each tagged observed/abstained; no absolute px or raw-coordinate numbers in prose (scale-invariant ratios only)",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: MediaPipe Face Mesh (Apache-2.0, standard on-device 478-point 3D mesh; output x/y normalized, z relative scale); alternatives (DAD-3DHeads, face alignment NN) noted for comparison. No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen crop/prompt policy; emit [ABSTAIN] on insufficient face pixels (turned head, occlusion, extreme DOF, ambiguous makeup); no absolute pixel claim in prose; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen crop/prompt policy with pinned digests; (b) capability probe on local stack (non-sensitive verification) BEFORE trusting the producer; (c) controlled claim-support round-trip on the frozen 24-item cohort vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit (unchecked verbosity is a fail); (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "face-geometry",
+        "seg2-crop-region"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "object-relations",
+      "name": "object / accessory presence + spatial relations",
+      "arm_issue": 61,
+      "hypothesis": "A locally-run open-weight text-grounded object detector over a frozen closed vocabulary (furniture/props/held-objects/accessories) emitting object presence + normalized spatial relations reduces unsupported object-claim and background-object hallucination in captions on the frozen 24-item cohort.",
+      "falsified_if": "The object-relations evidence condition does not reduce unsupported object claims or increase supported claims versus its matched no-evidence baseline, or the detector fails qualification on real corpus items.",
+      "deterministic_signal": "learned open-vocabulary text-grounded detection (grounding-dino-open-vocab class candidate, Apache-2.0) over full-frame source with a frozen closed vocabulary; object presence + coarse bounding-box spatial relations, scale-invariant only in prose",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB; local 4090/Strix (HF Transformers path)",
+      "selection_rationale": "No validated arm measures discrete objects/accessories (setting #34 measures background palette/bands, not objects); this is the relational/interaction axis the brainstorm explicitly widens toward; local deterministic options exhausted (DOME_29 has no fine object classes), so it is the open-world NEW-model-class arm.",
+      "scope": "local open-weight text-grounded object detector over full-frame source, frozen closed vocabulary (furniture/props/held-objects/accessory classes), emitting object-presence + normalized spatial relations to the subject",
+      "inputs": "full-frame decoded source RGB; frozen closed vocabulary; local inference on owned hardware",
+      "output_semantics": "object presence list + normalized spatial relations (e.g. 'object left of subject / large in frame / behind subject'), each tagged detected/abstained; no absolute px in prose; machine-readable boxes stay in evidence_payload JSON",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: Grounding DINO (Apache-2.0 open-vocabulary detection, arbitrary objects from free-form text, HF Transformers path). No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen vocabulary + detection threshold; emit [ABSTAIN] on low-confidence/occluded detections; never fabricate an object that is not detected; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen vocabulary/prompt/threshold with pinned digests; (b) capability probe on local stack (non-sensitive verification) BEFORE trusting the producer; (c) controlled claim-support round-trip on the frozen 24-item cohort vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "object-relations"
+      ],
+      "model_candidates": [
+        "grounding-dino-open-vocab"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "pose-articulation",
+      "name": "pose-articulation / kinematic constraints",
+      "arm_issue": 62,
+      "hypothesis": "Declared kinematic articulation measurements (per-joint flexion angles, torso/pelvis orientation, contrapposto/weight-bearing stance, limb-overlap structure, symmetry ratios) reduce unsupported pose/stance/limb claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The pose-articulation evidence condition does not reduce unsupported pose/stance/limb claims or increase supported claims versus its matched no-evidence baseline, or the measured kinematics are not distinguishable from body-type's static ratios (redundant axis).",
+      "deterministic_signal": "pose2 GOLIATH-308 keypoints + seg2 masks: joint-angle ranges (elbow/knee flexion), torso/pelvis orientation from keypoint triangles, contrapposto/weight-bearing detection, limb-overlap count, symmetry/asymmetry ratios",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2.npy + seg2.npy",
+      "selection_rationale": "Body-type #32 measures anthropometric RATIOS but not articulated kinematics (joint angles, stance, weight-bearing, limb overlap); deterministic from existing pose2+seg2 with zero new model, low cost, feeds the dossier pose/stance evidence axis.",
+      "scope": "deterministic articulation measurement: per-joint angles, torso/pelvis orientation from keypoint triangles, contrapposto/weight-bearing detection, limb-overlap count from seg2 masks, symmetry/asymmetry ratios; scale-invariant only in prose",
+      "inputs": "frozen pose2.npy (GOLIATH-308) + seg2.npy; read-only canonical/derived artifacts",
+      "output_semantics": "kinematic ratios/angles + stance class + overlap structure, machine-readable in evidence_payload; prose carries only scale-invariant relations (e.g. 'weight on one leg', 'bent arms') verifiable from ratios",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (pose2 GOLIATH-308 keypoints + seg2 region masks); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain where joint confidence is too low, limbs are cropped at frame edge, weight-bearing signal is ambiguous, or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound pose2/seg2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze; (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review (incl. distinguishability from body-type's static ratios); (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pose-articulation",
+        "pose2-keypoints",
+        "seg2-region"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -354,7 +503,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 5,
+  "selection_progress": 7,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -385,6 +534,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 5
+    },
+    {
+      "arm_id": "pose-articulation",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 6
     }
   ]
 }

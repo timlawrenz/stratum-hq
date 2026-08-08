@@ -398,13 +398,12 @@ def test_resumption_documents_preserve_the_active_state_and_two_stage_boundary()
     research_readme = (ROOT / "research" / "README.md").read_text()
 
     # The resumption documents must reflect the live one-active/two-stage
-    # invariants. As of 2026-08-06 the sweep is EXHAUSTED (10/10 validated;
-    # vlm-dense-description #47 was the last, BETTER), so there is NO active
-    # arm and the documented next action is brainstorm-new-data — the status
-    # must say so explicitly and must not resurrect a phantom sole-active arm.
-    assert "Sweep EXHAUSTED — no active arm remains" in status
-    assert "brainstorm-new-data" in status
-    assert "is the sole `research:active`" not in status
+    # invariants. As of 2026-08-06 the brainstorm-widen registered 5 NEW arms
+    # (#58–#62) and pose-articulation #62 was selected as the sole active arm
+    # (exploit, EIG 0.45); next action is research-pending on pose-articulation.
+    assert "pose-articulation" in status
+    assert "is the sole `research:active`" in status  # one-active invariant
+    assert "brainstorm-widen" in status
     assert "The `stratum-ffhq` strategist is re-engaged for autonomous research" in status
     assert "The `stratum-ffhq` strategist is paused" not in status
     assert "#33 lighting" in status
