@@ -77,6 +77,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "face-visibility:v1",
     "environment-clearance:v1",
     "eye-color:v1",
+    "facial-expression:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -724,6 +725,29 @@ def render_eye_color(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def render_facial_expression(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant facial-expression claim (arm #81).
+
+    Verbalizes ONLY the coarse expression band. Raw normalized ratios stay in
+    the machine-readable payload and are never caption claims.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-facial-expression
+        # runs) — emit no claim, never a fabricated expression statement.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "expression not measurable"
+        return [f"facial-expression: abstain ({reason})"]
+    band = config.get("expression_band")
+    if band == "neutral":
+        return ["facial-expression: neutral expression (mouth relaxed, corners level)"]
+    if band == "slight-smile":
+        return ["facial-expression: slight smile (mouth corners raised and widened)"]
+    if band == "open-smile":
+        return ["facial-expression: open smile / laughing (mouth open, corners raised)"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1217,6 +1241,22 @@ def _eye_color_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _facial_expression_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "expression_band": config.get("expression_band"),
+        "spread_ratio": config.get("spread_ratio"),
+        "openness_ratio": config.get("openness_ratio"),
+        "corner_elevation_ratio": config.get("corner_elevation_ratio"),
+        "reference_fallback": config.get("reference_fallback"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1243,6 +1283,7 @@ def build_evidence_payload(
     face_visibility: Mapping[str, Any] | None = None,
     environment_clearance: Mapping[str, Any] | None = None,
     eye_color: Mapping[str, Any] | None = None,
+    facial_expression: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1321,6 +1362,7 @@ def build_evidence_payload(
             "face_visibility": _face_visibility_payload(face_visibility),
             "environment_clearance": _environment_clearance_payload(environment_clearance),
             "eye_color": _eye_color_payload(eye_color),
+            "facial_expression": _facial_expression_payload(facial_expression),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1364,6 +1406,7 @@ def assemble_dossier(
     face_visibility: Mapping[str, Any] | None = None,
     environment_clearance: Mapping[str, Any] | None = None,
     eye_color: Mapping[str, Any] | None = None,
+    facial_expression: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1396,6 +1439,7 @@ def assemble_dossier(
         ("face-visibility:v1", "face-visibility", render_face_visibility(face_visibility or {})),
         ("environment-clearance:v1", "environment-clearance", render_environment_clearance(environment_clearance or {})),
         ("eye-color:v1", "eye-color", render_eye_color(eye_color or {})),
+        ("facial-expression:v1", "facial-expression", render_facial_expression(facial_expression or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
