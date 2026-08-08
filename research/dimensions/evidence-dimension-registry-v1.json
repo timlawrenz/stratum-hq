@@ -667,7 +667,181 @@
       "feeds": [
         "dossier-context4k"
       ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "iris-eye-color",
+      "name": "eye color estimation",
+      "arm_issue": 80,
+      "hypothesis": "A deterministic iris-hue measurement (coarse scale-invariant eye-color band from pose2 GOLIATH-308 iris/pupil keypoints + the already-decoded source RGB, CPU, no new model) reduces unsupported eye-color claims ('her blue eyes', 'dark eyes') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The eye-color evidence condition does not reduce unsupported eye-color claims or increase supported claims versus its matched no-evidence baseline, or the iris crop is too small/glared to be discriminating (band-degeneracy / high abstention), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: eye-color band from iris/pupil keypoints + source RGB; scale-invariant color name only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Face_Neck crop + pose2 iris/pupil keypoints + decoded source RGB; local CPU, in-memory",
+      "selection_rationale": "No validated arm measures eye color (face-geometry #60 is shape bands only; skin #31 is skin tone; apparent-age #73 age). 'Blue/brown/dark eyes' is a recurring caption claim with zero support. Genuinely-NEW part; feasibility probe shows 20/24 iris keypoints reliable.",
+      "scope": "Deterministic iris-hue measurement over the pose2 l/r iris+pupil keypoints within the seg2 Face_Neck crop of the decoded source; emit a coarse scale-invariant eye-color band (brown / blue-grey / green-hazel / dark / abstain); never a numeric RGB claim in prose.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 iris/pupil keypoints) + seg2.npy (Face_Neck mask) + already-decoded source RGB (SHA-bound); local CPU, in-memory, no new model",
+      "output_semantics": "one coarse scale-invariant eye-color band per item (or abstain when the iris is too small / glared / occluded); raw sampled HSV/XYZ stats stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness.eye_color deterministic module (new, code-sha256 pinned at freeze); computed in memory with no corpus write",
+      "abstention_policy": "abstain when iris keypoints are low-confidence, the iris region is tiny or under specular glare, or the crop is too dark to resolve hue; never fabricate an eye color; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (bands spread, no band >= 75%, honest abstains); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "eye-color"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "facial-expression",
+      "name": "smile / facial expression",
+      "arm_issue": 81,
+      "hypothesis": "A deterministic smile/expression measurement (scale-invariant mouth-corner spread vs face-width band from pose2 mouth-corner keypoints, CPU, no new model) reduces unsupported 'smiling / neutral / laughing' claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The facial-expression evidence condition does not reduce unsupported expression claims or increase supported claims versus its matched no-evidence baseline, or the mouth-corner geometry is not discriminating (band-degeneracy / high abstention), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: smile/expression band from mouth-corner spread normalized by face width; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 mouth-corner/cupid-bow/lower-lip keypoints + seg2 Face_Neck; local CPU, in-memory",
+      "selection_rationale": "Expression ('she smiles', 'neutral expression') recurs in captions with NO validated support (face-geometry #60 = static shape; gaze #68 = head direction). Feasibility probe: 19/24 mouth-corner keypoints reliable. Genuinely-NEW part.",
+      "scope": "Deterministic facial-expression / smile measurement from pose2 mouth-corner and lower-lip keypoints normalized by the face (eye-spacing) width; emit a coarse expression band (neutral / slight smile / open smile / abstain); never overlay identity or emotion claims beyond the geometry-supported band.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 mouth-corner + eye keypoints) + seg2 Face_Neck mask; local CPU, in-memory, no new model",
+      "output_semantics": "one coarse scale-invariant expression band per item (or abstain when the mouth is occluded / keypoints low-conf); raw mouth-corner spread ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.facial_expression deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the mouth is occluded, too small, or keypoints below confidence; never fabricate a smile/emotion; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "facial-expression"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "hairstyle",
+      "name": "hair length / arrangement",
+      "arm_issue": 82,
+      "hypothesis": "A deterministic hairstyle measurement (scale-invariant hair-length band vs shoulder line + hair-arrangement band from seg2 Hair-region extent + pose2 shoulder keypoints, CPU, no new model) reduces unsupported 'long hair / short hair / hair up or tied back' claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The hairstyle evidence condition does not reduce unsupported hair-shape/arrangement claims or increase supported claims versus its matched no-evidence baseline, or the hair-extent geometry is redundant with hair #30 color/region (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: hair-length + hair-arrangement bands from seg2 Hair extent vs pose2 shoulder line; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Hair mask (24/24) + pose2 shoulder/neck keypoints; local CPU, in-memory",
+      "selection_rationale": "hair #30 validated COLOR + region coverage only; 'long/short hair', 'hair tied back/up' are caption claims with no shape support. seg2 Hair is present 24/24. Genuinely-NEW part (hairstyle, not hair color).",
+      "scope": "Deterministic hairstyle / hair-arrangement measurement from the seg2 Hair region relative to pose2 shoulder/neck keypoints; emit scale-invariant hair-length band (short / shoulder / long) and arrangement band (down / tied-back / up / abstain); never color or identity claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 Hair mask) + pose2.npy (GOLIATH-308 shoulders/neck); local CPU, in-memory, no new model",
+      "output_semantics": "coarse scale-invariant hair-length band + hair-arrangement band per item (or abstain when Hair absent/degenerate); raw hair-extent y ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.hairstyle deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the Hair region is absent, tiny, or ambiguous (head cropped); never fabricate a hairstyle; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "hairstyle"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.45,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "body-configuration",
+      "name": "whole-body posture configuration class",
+      "arm_issue": 83,
+      "hypothesis": "A deterministic body-configuration band (standing / seated / reclined + uprightness) computed in memory from pose2 GOLIATH-308 keypoint geometry (pelvis-height fraction, torso vs hip-to-ankle extent, knee flexion) reduces unsupported posture-class claims ('she stands', 'she is seated on the edge', 'she reclines') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The body-configuration evidence condition does not reduce unsupported posture-class claims or increase supported claims versus its matched no-evidence baseline, or the configuration bands are not distinguishable from pose-articulation's per-joint signals (redundant axis), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: whole-body posture-configuration class from pose2 keypoint geometry; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 GOLIATH-308 hips/ankles/knees/shoulders; local CPU, in-memory",
+      "selection_rationale": "pose-articulation #62 emits per-joint flexion/stance but NOT a top-level standing/seated/reclined class. 'Standing by the pool' / 'seated on the edge' are recurring claims. Genuinely-NEW aggregate part.",
+      "scope": "Deterministic whole-body configuration classification from pose2 keypoint geometry: pelvis-height fraction of frame, torso-extent vs hip-to-ankle extent ratio, torso lean, knee flexion interplay; emit one coarse posture class (standing / seated / reclined / abstain); only scale-invariant ratios.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 hips/ankles/knees/shoulders); local CPU, in-memory, no new model",
+      "output_semantics": "one coarse body-configuration band per item (or abstain when keypoints too sparse); raw keypoint ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.body_configuration deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when fewer than ~4 core joints are reliable or the configuration is ambiguous; never fabricate a posture class; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "body-configuration"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
       "state": "active",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "face-visibility",
+      "name": "face visibility / occlusion",
+      "arm_issue": 84,
+      "hypothesis": "A deterministic face-visibility measurement (scale-invariant fraction of the seg2 Face_Neck region occluded by Hair/Hand/Arm classes + coarse band clearly-visible / partially-occluded / mostly-covered, computed in memory from seg2 DOME-29) reduces unsupported 'face fully visible / hair covering her face' claims and improves face-dependent abstention honesty on the frozen 24-item cohort.",
+      "falsified_if": "The face-visibility evidence condition does not reduce unsupported face-visibility/occlusion claims or increase supported claims versus its matched no-evidence baseline, or the occlusion fraction is degenerate on the cohort (no band >= 75%), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: face-occlusion fraction + visibility band from seg2 Face_Neck vs Hair/Hand/Arm masks; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Face_Neck + Hair + Hand + Arm masks; local CPU, in-memory",
+      "selection_rationale": "face-geometry #60 / gaze #68 abstain when the face is not found, but NO arm measures the DEGREE of face occlusion. 'Hair across her face' / 'face fully visible' are caption claims. Genuinely-NEW part.",
+      "scope": "Deterministic face-visibility measurement from seg2: occlusion fraction of the Face_Neck region by Hair/Hand/Arm union classes + coarse visibility band; never face-shape, identity, or aesthetic claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 Face_Neck + Hair + Hand + Arm masks); local CPU, in-memory, no new model",
+      "output_semantics": "coarse face-visibility band per item + occlusion fraction (payload); raw pixel fractions stay in evidence_payload, never prose",
+      "provenance": "research_harness.face_visibility deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when there is no Face_Neck region (no face in frame); never fabricate visibility; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "face-visibility"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "environment-clearance",
+      "name": "subject-to-environment distance / negative space",
+      "arm_issue": 85,
+      "hypothesis": "A deterministic subject-environment clearance band (scale-invariant normalized background clearance around the subject silhouette — tight / moderate / spacious) computed in memory from seg2 Background-class occupancy around the subject reduces unsupported spatial-settings claims ('close to a wall', 'in an open space', 'leaning against a backdrop') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The environment-clearance evidence condition does not reduce unsupported spatial-settings/negative-space claims or increase supported claims versus its matched no-evidence baseline, or the clearance metric is redundant with setting #34 / camera-viewing-angle #74 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: subject-environment clearance band from seg2 Background split; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Background vs subject masks; local CPU, in-memory",
+      "selection_rationale": "setting #34 measures background as a whole (coverage/color/tone); #74 measures framing/headroom. NO arm measures local subject-to-surroundings clearance (negative space). 'Close to a wall' / 'open space' are unsupported spatial-settings claims. Genuinely-NEW part.",
+      "scope": "Deterministic subject-to-environment clearance from seg2: normalized background clearance in directional bands around the subject silhouette + coarse clearance band; never identity, setting color, or aesthetic claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 subject vs Background masks); local CPU, in-memory, no new model",
+      "output_semantics": "coarse subject-environment clearance band per item (or abstain when the subject fills the frame — no background clearance); raw normalized distances stay in evidence_payload, never prose",
+      "provenance": "research_harness.environment_clearance deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the subject fills the frame edge-to-edge (no Background clearance measurable) or the mask is degenerate; never fabricate; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "environment-clearance"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
       "valid_non_improving_experiments": 0
     }
   ],
@@ -683,7 +857,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 16,
+  "selection_progress": 17,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -774,6 +948,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 15
+    },
+    {
+      "arm_id": "affordance-contact",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 16
     }
   ]
 }

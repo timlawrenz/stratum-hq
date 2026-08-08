@@ -54,6 +54,7 @@ from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
+from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1653,6 +1654,67 @@ def _serialize_image_focus(focus: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _affordance_contact_evidence() -> dict[str, Any]:
+    """Declared deterministic subject self-contact / affordance specialist (arm #76)."""
+    module_path = Path(compute_affordance_contact.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-affordance-contact-v1",
+        "specialists": [
+            {
+                "id": "in-memory-affordance-contact-v1",
+                "scope": "Subject self-contact / affordance geometry from pose2 GOLIATH-308 keypoints + seg2 DOME-29 masks only: hand-to-own-body contact (which and how many hands rest against her own trunk), hand elevation/gesture (which and how many hands are raised above the hip line), and subject grounding (whether her silhouette reaches the bottom frame edge). The subject-to-EXTERNAL-object contact axis (held-in-hand / leaning-on / sitting-on an object) is NOT claimed — seg2 has no object classes, that axis is the object-relations arm's Grounding-DINO domain. Never identity, clothing, color, or aesthetic claims; only the scale-invariant contact/elevation counts and the grounded binary in prose.",
+                "inputs": "Frozen selected-item pose2.npy (GOLIATH-308) + seg2.npy (DOME-29); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant self-contact measurements (hand-contact count, hand-elevation count, grounded binary) or explicit abstention, not semantic ground truth or caption claims; only scale-invariant facts are verbalized; normalized wrist distances stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.affordance_contact.compute_affordance_contact "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; a hand whose wrist keypoint is unreported or below confidence abstains for that hand (never fabricated); when the shoulder/acromion width is unreliable the hand axes abstain while grounding (frame-based, scale-free) may still be measured; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Low wrist keypoint confidence on occluded/cropped hands abstains that hand; no reliable shoulder width disables the normalized hand axes; a full-frame subject whose feet extend past the bottom edge reads as grounded (legitimate standing) while a subject seated with visible space below reads as floating. seg2 cannot detect external objects, so held-in-hand / leaning-on-object claims are never made from this specialist.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_affordance_contact(contact: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an affordance-contact dict.
+
+    Verbalizes ONLY scale-invariant self-contact facts: hand-own-body contact
+    count, hand-elevation/gesture count, and the grounded binary. Raw
+    normalized wrist distances and pixel values stay in the machine-readable
+    evidence_payload JSON and are not caption claims.
+    """
+    lines = [
+        "AFFORDANCE-CONTACT (subject self-contact / gesture / grounding, scale-invariant):"
+    ]
+    if not contact:
+        lines.append("- affordance/self-contact not measured for this item")
+        return "\n".join(lines)
+    if contact.get("abstained"):
+        reason = contact.get("abstention_reason") or "affordance not measurable"
+        lines.append(f"- affordance/self-contact abstained ({reason})")
+        return "\n".join(lines)
+    n_contact = int(contact.get("hand_contact_count") or 0)
+    if n_contact >= 2:
+        lines.append("- both hands rest against her own body")
+    elif n_contact == 1:
+        lines.append("- one hand rests against her own body")
+    n_raised = int(contact.get("hand_elevation_count") or 0)
+    if n_raised >= 2:
+        lines.append("- both hands are raised (gesturing)")
+    elif n_raised == 1:
+        lines.append("- one hand is raised (gesturing)")
+    if contact.get("grounded"):
+        lines.append("- subject is grounded (in contact with the lower part of the frame)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1775,6 +1837,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # subject masks for the face/body crop policy; seg2 is read-only validation
     # data, never mutated.
     "apparent-age": ("seg2.npy",),
+    # Arm #76 affordance-contact: deterministic subject self-contact /
+    # affordance measurements (hand-to-own-body contact, hand elevation,
+    # grounding) computed in memory from pose2 GOLIATH-308 keypoints + seg2
+    # DOME-29 masks; no new model.
+    "affordance-contact": ("pose2.npy", "seg2.npy"),
 }
 
 
@@ -1867,7 +1934,7 @@ def build_stage_b_plan(
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
-        "image-focus", "apparent-age",
+        "image-focus", "apparent-age", "affordance-contact",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2358,6 +2425,36 @@ def build_stage_b_plan(
             "bands are verbalized; the raw floating age estimate and gender probe stay in evidence_payload "
             "and are never caption claims."
         )
+    elif evidence_kind == "affordance-contact":
+        evidence = _affordance_contact_evidence()
+        evidence_condition_id = "context-raw-affordance-contact"
+        comparison_plan_id = "stage-b-first500-affordance-contact-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic subject "
+            "self-contact/affordance measurements (hand-to-own-body contact count, hand-elevation/"
+            "gesture count, and subject grounding — all scale-invariant, computed in memory from "
+            "pose2 GOLIATH-308 keypoints + seg2 DOME-29 masks, no new model) may reduce unsupported "
+            "'hand on hip' / 'gesturing' / 'standing vs seated' interaction claims or increase "
+            "supported self-contact claims in captions versus its matched no-evidence baseline when "
+            "the source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The affordance-contact evidence condition does not reduce unsupported interaction/contact "
+            "claims or increase supported claims versus its matched no-evidence baseline, or the "
+            "measured self-contact structure is not distinguishable from pose-articulation's arm "
+            "proximity signal (redundant axis), or an apparent difference is attributable to an "
+            "uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Self-contact is computed in memory from the frozen "
+            "selected pose2.npy (GOLIATH-308) + seg2.npy (DOME-29) — no new model, CPU only. Only "
+            "scale-invariant facts are verbalized: hand-contact count, hand-elevation count, and the "
+            "grounded binary; raw normalized wrist distances and pixel coordinates stay in "
+            "evidence_payload and are never caption claims. seg2 has no object classes, so subject-to-"
+            "external-object contact (held-in-hand / leaning-on an object) is honestly NOT claimed from "
+            "this specialist — that axis is the object-relations arm's validated Grounding-DINO domain."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2647,6 +2744,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "image-focus"
     elif "context-raw-apparent-age" in condition_ids:
         rebuild_kind = "apparent-age"
+    elif "context-raw-affordance-contact" in condition_ids:
+        rebuild_kind = "affordance-contact"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2720,6 +2819,7 @@ def _load_selected_item(
     include_camera_viewing_angle: bool = False,
     include_image_focus: bool = False,
     include_apparent_age: bool = False,
+    include_affordance_contact: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2882,6 +2982,14 @@ def _load_selected_item(
             apparent_age = compute_apparent_age(seg2, rgb, model_dir=APPARENT_AGE_MODEL_DIR)
         except ApparentAgeError as exc:
             raise StageBRunError(f"apparent-age abort for frozen selected item {image_id}: {exc}") from exc
+    affordance_contact = None
+    if include_affordance_contact:
+        try:
+            affordance_contact = compute_affordance_contact(pose2, seg2)
+        except AffordanceContactError as exc:
+            raise StageBRunError(
+                f"affordance-contact abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -2917,6 +3025,7 @@ def _load_selected_item(
         "camera_viewing_angle": camera_viewing_angle,
         "image_focus": image_focus,
         "apparent_age": apparent_age,
+        "affordance_contact": affordance_contact,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -2975,6 +3084,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
         image_focus=prepared.get("image_focus"),
         apparent_age=prepared.get("apparent_age"),
+        affordance_contact=prepared.get("affordance_contact"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -2996,6 +3106,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         camera_viewing_angle=prepared.get("camera_viewing_angle"),
         image_focus=prepared.get("image_focus"),
         apparent_age=prepared.get("apparent_age"),
+        affordance_contact=prepared.get("affordance_contact"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3105,6 +3216,10 @@ def _render_condition(
         apparent_age = prepared.get("apparent_age")
         evidence_text = _serialize_apparent_age(apparent_age)
         return raw.copy(), _context_prompt(evidence_text), apparent_age
+    if condition_id == "context-raw-affordance-contact":
+        affordance_contact = prepared.get("affordance_contact")
+        evidence_text = _serialize_affordance_contact(affordance_contact)
+        return raw.copy(), _context_prompt(evidence_text), affordance_contact
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3324,6 +3439,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-apparent-age"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #76: only the affordance-contact run computes deterministic subject
+    # self-contact / affordance bands (CPU, no new model) — gate on the frozen
+    # plan's conditions.
+    include_affordance_contact = any(
+        str(condition.get("id")) == "context-raw-affordance-contact"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3340,6 +3462,7 @@ def execute_stage_b(
             include_camera_viewing_angle=include_camera_viewing_angle,
             include_image_focus=include_image_focus,
             include_apparent_age=include_apparent_age,
+            include_affordance_contact=include_affordance_contact,
         )
         for item in items
     ]
