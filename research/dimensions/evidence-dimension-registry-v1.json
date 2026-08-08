@@ -725,7 +725,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -984,6 +984,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 21
+    },
+    {
+      "arm_id": "facial-expression",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 22
     }
   ]
 }
