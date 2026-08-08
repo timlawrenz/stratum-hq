@@ -1,0 +1,1129 @@
+{
+  "schema_version": 1,
+  "program_id": "stratum-contextual-specialist-research",
+  "goal": "Enumeration and sweep of open-world evidence dimensions toward a ~100K-token per-asset dossier that compresses into a ~4K-token context4k.",
+  "sweep_terms": {
+    "terminal_states": [
+      "validated",
+      "falsified",
+      "exhausted"
+    ],
+    "per_dimension_strike_limit": 3,
+    "brainstorm_states": [
+      "brainstorm-new-data"
+    ],
+    "exploration": {
+      "every_n": 4,
+      "novelty_bonus": 0.15
+    },
+    "stall": {
+      "no_validation_in_last": 2,
+      "selector_top_score_below": 0.1
+    },
+    "downstream_boost": {
+      "enabled": true,
+      "fraction": 0.5
+    }
+  },
+  "dimensions": [
+    {
+      "id": "clothing",
+      "name": "clothing/apparel",
+      "arm_issue": 29,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared DOME-29 clothing/apparel measurements (coverage, garment classes, per-garment dominant colors) reduce unsupported clothing claims in captions on the frozen first-500 cohort.",
+      "falsified_if": "The clothing-evidence condition does not reduce unsupported clothing claims or increase supported claims versus its matched no-evidence baseline under fixed view/prompt/model/settings.",
+      "deterministic_signal": "seg2 DOME-29 Apparel(1)/Upper_Clothing(23)/Lower_Clothing(13)/Torso(22)/Socks/Shoes classes + per-class dominant color from source pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Clothing is a high-frequency hallucination risk and is deterministically measurable from existing seg2+pixels with no new model.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
+      "specialists": [
+        {
+          "name": "Florence-2-Flux-Large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set clothing/apparel attribute tagging (garment type, color) from source pixels",
+          "known_failure_modes": [
+            "hallucinated attributes on tight crops",
+            "long-tail garment names may drift from source truth"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.7,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-apparel",
+        "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "hair",
+      "name": "hair",
+      "arm_issue": 30,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared hair measurements (color, area fraction, length proxy) reduce invented hair-color/coverage claims.",
+      "falsified_if": "The hair-evidence condition does not improve claim support versus its matched no-evidence baseline.",
+      "deterministic_signal": "seg2 Hair(4) region area/position + dominant color from source pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Hair color/length is commonly hallucinated and is deterministically measurable from the existing Hair class.",
+      "prior_evidence_strength": 0.6,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-hair",
+        "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "skin-color",
+      "name": "skin-color/tone",
+      "arm_issue": 31,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared exposed-skin dominant color/tone reduces invented skin-tone claims.",
+      "falsified_if": "Skin-tone evidence does not improve supported claims or reduce unsupported color claims.",
+      "deterministic_signal": "seg2 Face_Neck(3)/limb skin regions + source pixel dominant color",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Skin tone is a frequent hallucination target and is measurable from existing seg2 masks.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "seg2-skin",
+        "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "body-type",
+      "name": "body-type/proportions",
+      "arm_issue": 32,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared anthropometric ratios (shoulder:hip, torso:leg, limb lengths) improve body/limb description support.",
+      "falsified_if": "Proportion evidence does not improve supported body/pose claims over baseline.",
+      "deterministic_signal": "pose2 Goliath-308 keypoints (shoulder/hip/limb ratios) + seg2 region fractions",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 + seg2",
+      "selection_rationale": "Pose evidence already improved claims in arm #4; body proportions are the direct extension using the same keypoints.",
+      "prior_evidence_strength": 0.8,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pose2-keypoints",
+        "seg2-region-fraction"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "lighting",
+      "name": "lighting",
+      "arm_issue": 33,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared luminance/dynamic-range/lighting-direction statistics reduce invented shadow/lighting claims.",
+      "falsified_if": "Lighting evidence does not reduce unsupported lighting claims.",
+      "deterministic_signal": "normal2 direction statistics + source luminance/histogram/dynamic-range",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; normal2 + source pixels",
+      "selection_rationale": "Lighting is a common soft-detail hallucination and is measurable from existing pixel/normal artifacts.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "normal2",
+        "source-luminance"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "setting",
+      "name": "setting/environment",
+      "arm_issue": 34,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared background palette/non-subject statistics improve scene-environment claim support.",
+      "falsified_if": "Setting evidence does not improve supported scene claims or reduce invented background details.",
+      "deterministic_signal": "seg2 Background/non-subject region + source color palette",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Background is frequently over-described and is measurable from the existing seg2 Background class.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "seg2-background",
+        "source-pixel-color"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "texture",
+      "name": "texture/material",
+      "arm_issue": 35,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "Declared per-region texture proxies (edge/gradient statistics) reduce invented material/texture claims.",
+      "falsified_if": "Texture evidence does not improve support or reduce unsupported material claims.",
+      "deterministic_signal": "per-mask gradient/edge statistics from source pixels (e.g. gradient magnitude inside seg2 regions)",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 + source pixels",
+      "selection_rationale": "Material/texture is a common hallucination and is measurable deterministically without new models.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction"
+      ],
+      "specialists": [
+        {
+          "name": "Florence-2-large",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI/models/LLM",
+          "scope": "open-set material/texture/attribute description from source pixels",
+          "known_failure_modes": [
+            "material attribution is confounded by lighting",
+            "may over-specify texture"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "seg2-region",
+        "source-gradient"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "dossier-context4k",
+      "name": "full-dossier assembly and context4k compression",
+      "arm_issue": 36,
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "An expanded per-item dossier assembled from verified evidence dimensions (target >=100K tokens, claim-by-claim evidence links) can be compressed to a ~4K-token context4k artifact that preserves supported claims better than a plain 4K summarization baseline.",
+      "falsified_if": "context4k does not preserve supported claims at materially higher density than a 4K baseline summarization (round-trip claim-support audit not passed).",
+      "deterministic_signal": "Verified dimension specialists + relational determinations assembled per item",
+      "metric_version": "context4k-roundtrip-v1",
+      "data_snapshot": "first-500 core-covered cohort expanded dossier",
+      "selection_rationale": "This is the program-level goal: ~100K descriptive tokens per asset compressed into ~4K context while keeping evidence links — beyond any single dimension.",
+      "validation_methods": [
+        "claim-support",
+        "reconstruction",
+        "roundtrip-audit"
+      ],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
+        }
+      ],
+      "prior_evidence_strength": 0.9,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "verified-dimension-specialists",
+        "relational-determinations"
+      ]
+    },
+    {
+      "id": "reconstruction",
+      "name": "generative reconstruction validation (ComfyUI round-trip)",
+      "arm_issue": 37,
+      "hypothesis": "Generative reconstruction is a valid, non-LLM measure of per-asset information preserved by a caption/context: images generated from a caption/context via local ComfyUI score higher in CLIP ViT-L/14 similarity against the original source than images generated from a degraded baseline (e.g. no context / truncated context), so reconstruction can validate the 100K->4K dossier pipeline independently of claim-support review.",
+      "falsified_if": "Reconstruction similarity does not correlate with information content (a fixed 4K context cannot be distinguished from a truncated/baseline context by CLIP score), or the diffusion checkpoint fails to decode the relevant attributes at all (ceiling effect / degenerate similarity).",
+      "deterministic_signal": "CLIP ViT-L/14 similarity (source vs generated-from-context4k, and source vs generated-from-degraded-baseline) via local ComfyUI over frozen diffusion checkpoints",
+      "metric_version": "reconstruction-clip-v1",
+      "data_snapshot": "first-500 core-covered cohort; local ComfyUI at /mnt/fscache/essdee/ComfyUI; 195 diffusion checkpoints at /mnt/nas-ai-models/checkpoints; CLIP ViT-L/14 openai/clip-vit-large-patch14 + timm/vit_large_patch14_clip_224.openai in HF cache",
+      "selection_rationale": "Claim-support review (gemma4/LLM) is the current sole downstream check on caption/PENDING dossier quality. Reconstruction adds a generation-grounded, non-LLM, end-to-end test that an independent reviewer cannot substitute for, and directly measures the top-level goal (context that regenerates the asset) rather than only claim agreement. It also exercises the underused local ComfyUI + NAS checkpoint inventory.",
+      "scope": "generative reconstruction of source images from dossier/context artifacts; CLIP ViT-L/14 similarity of generated vs source and vs degraded-baseline generations",
+      "inputs": "context4k.json / context4k.md / compression.json artifacts + source image (read-only canonical), frozen ComfyUI pipeline + one frozen diffusion checkpoint",
+      "output_semantics": "per-item CLIP ViT-L/14 cosine similarity (generated vs source); delta between context-driven and baseline generations; scale-invariant to camera framing",
+      "provenance": "local ComfyUI at /mnt/fscache/essdee/ComfyUI (.venv python3.14, torch 2.12+cu130); checkpoints at /mnt/nas-ai-models/checkpoints (SD1.5, SDXL, flux1Schnell, sd3, pony, SUPIR); CLIP ViT-L/14 openai/clip-vit-large-patch14 and timm/vit_large_patch14_clip_224.openai in HF cache",
+      "abstention_policy": "reject generations failing sanity checks (empty/discarded generation, sampler error, degenerate output); abstain when the diffusion checkpoint fails to decode relevant attributes (ceiling effect) and report it, never treating failure as a BETTER signal",
+      "qualification_gate": "PASS only after: (a) a frozen cohort and fixed ComfyUI checkpoint + sampler/generation settings; (b) a controlled one-axis comparison (full context vs baseline) scoring original vs generated with a fixed CLIP ViT-L/14 model; (c) calibration of the scoring on known cases and a null case (empty/meaningless prompt); (d) independent review of the reconstruction protocol; and (e) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "known_failure_modes": [
+        "generative model does not reproduce identity/subject exactly",
+        "CLIP score is a weak identity proxy",
+        "GPU time per item is large",
+        "ceiling effect / degenerate similarity can make DELTA uninformative"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "context4k-reconstruction",
+        "clip-vitl14-similarity"
+      ],
+      "validation_methods": [
+        "reconstruction",
+        "roundtrip-audit"
+      ],
+      "specialists": [
+        {
+          "name": "ComfyUI reconstruction (SD1.5/SDXL/flux1Schnell)",
+          "source": "local ComfyUI /mnt/fscache/essdee/ComfyUI + /mnt/nas-ai-models/checkpoints (195 diffusion checkpoints)",
+          "scope": "generate image from context4k/dossier; compare to source with CLIP ViT-L/14 similarity",
+          "known_failure_modes": [
+            "generative model does not reproduce identity/subject exactly",
+            "CLIP score is a weak identity proxy",
+            "GPU time per item is large"
+          ]
+        }
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "vlm-dense-description",
+      "name": "open-weight VLM dense multi-view description",
+      "arm_issue": 47,
+      "hypothesis": "A locally-run open-weight VLM producing a dense, multi-view descriptive block for a single curated woman source image (full-frame + seg2-derived focal crops), routed claim-by-claim with abstention, materially raises supported-claim density on the frozen 24-item cohort versus the deterministic dossier alone, and is a legitimately-new evidence part toward the 100K expanded-dossier floor (option B of decision #46).",
+      "falsified_if": "The VLM dense description does not raise supported-claim density on the frozen cohort beyond the deterministic dossier + honest-expansion ceiling, or abstains at too low a rate to be trustworthy (unchecked verbosity), or is not distinguishable from a redundant attribute-tagger over already-validated axes.",
+      "deterministic_signal": "learned VLM dense description (MODEL FLIP 2026-08-06: qwen3-vl:32b FAILED qualification on the real corpus — silent empty responses on both vision and plain text, server-side decode wedge not restartable without root; production evidence producer is now gemma3:27b local Ollama digest a418f5838eaf on Strix, verified to emit the full tagged 6-subsection block on corpus items; qwen3.5-9b Mar 2026 Apache-2.0 remains a newer single-GPU candidate) over full-frame + focal crops; each claim tagged observed/inferred/abstained; scale-invariant ratios only in prose",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; source pixels + seg2 crop regions; local Ollama/ComfyUI stack",
+      "selection_rationale": "The arm-36 honest expansion-ceiling audit proved deterministic evidence tops out at 2040-3489 tokens/item (7-50x below the 100K floor); a VLM dense-description specialist is the concrete option-B evidence source named in decision #46 and is a NEW evidence part per the open-world sourcing directive (local options exhausted).",
+      "scope": "dense multi-view descriptive prose for a single curated woman source image: full-frame + focal crops (face, upper body, garment regions derived from seg2); evidence prose, not a caption",
+      "inputs": "decoded source RGB full-frame + fixed focal crops derived from seg2 regions; frozen prompt",
+      "output_semantics": "structured markdown block of dense descriptive claims (subject, garments, hair, skin, setting, pose, facial detail), each claim tagged observed/inferred/abstained; no absolute pixel or raw-coordinate numbers in prose; scale-invariant ratios only; machine-readable measurements stay in evidence_payload JSON",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: Molmo/Molmo-72B (AI2, fully open weights+data, PixMo dense-caption pretraining, top captioning benchmark; arXiv 2409.17146); Qwen2-VL-72B/Qwen2.5-VL (open weight, strongest MMMU/OCRBench); InternVL3-78B (MIT license). No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen prompt + deterministic crop policy; emit [ABSTAIN] on regions with insufficient visible pixels (motion blur/occlusion/DOF crop); detector/measurement disagreement is a quality anomaly, never content; no absolute pixel claim in prose",
+      "qualification_gate": "PASS only after: (a) frozen crop/prompt/view policy with pinned digests; (b) controlled document-utility check reproducing every fact deterministic specialists already declare on a known case AND adding materially more supported claims on the frozen 24-item cohort (claim-support rubric v1, same reviewer); (c) calibration on known cases + null case; (d) abstention audit (observed/inferred/abstained rates, unchecked verbosity is a fail); (e) independent adversarial review of the protocol; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only, additive artifacts only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "high",
+      "evidence_parts": [
+        "vlm-dense-description",
+        "seg2-crop-region"
+      ],
+      "model_candidates": [
+        "open-vlm-dense-captioner",
+        "gemma3-27b-ollama",
+        "qwen3-vl-32b-ollama",
+        "qwen3.5-9b"
+      ],
+      "validation_methods": [
+        "claim-support",
+        "roundtrip-audit"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0,
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "pointmap-depth",
+      "name": "point-map / 3D depth-ordering",
+      "arm_issue": 58,
+      "hypothesis": "Declared point-map relative-depth ordering measurements (foreground/background plane separation, occlusion structure, subject-depth ordering) reduce unsupported depth/occlusion/foreground-background claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The pointmap-depth evidence condition does not reduce unsupported depth/occlusion claims or increase supported claims versus its matched no-evidence baseline under fixed view/prompt/model/settings, or the measured depth-order is not distinguishable from the seg2-background plane (redundant axis).",
+      "deterministic_signal": "pointmap.npy per-pixel 3D points (CAM frame) + seg2 region masks: relative depth ordering, subject-vs-background plane separation ratio, self-occlusion/overlap structure from point-depth discontinuity at region boundaries",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort (24/24 frozen items have source-matched pointmap.npy + seg2.npy); pointmap is a core-chain artifact not bound by any validated arm",
+      "selection_rationale": "Point-map is a genuinely-new evidence surface (relative 3D structure/occlusion) present on 24/24 frozen items yet not bound as an evidence input by any validated arm; deterministic, zero new model, low cost, directly grows the dossier depth/foreground-background evidence axis.",
+      "scope": "deterministic per-item point-map depth-ordering measurement: relative depth order of seg2 regions, subject/background plane separation strength, occlusion structure between subject parts; scale-invariant ratios and depth-order relations only, never absolute metric distances in prose",
+      "inputs": "frozen pointmap.npy (source-matched) + seg2.npy region masks + pose2.npy keypoints; read-only canonical/derived artifacts",
+      "output_semantics": "depth-order relations + scale-invariant separation/overlap ratios, machine-readable in evidence_payload; prose carries only scale-invariant ordering claims (e.g. 'subject clearly separated from background', 'limb occludes torso')",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (pointmap.npy is source-dimension-matched float16 3D point field); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain when pointmap is absent/ill-formed or degenerate (zero extent), when scale is degenerate (subject fills frame such that no plane separation is measurable), or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound pointmap/seg2/pose2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze (no band >=75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pointmap-depth"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "matting-alpha",
+      "name": "matting / alpha-fidelity",
+      "arm_issue": 59,
+      "hypothesis": "Declared matting/alpha measurements (subject coverage ratio, soft-edge band width, hair/fine-feature delimiter structure, silhouette closedness) reduce unsupported edge-quality/hair/silhouette claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The matting evidence condition does not reduce unsupported edge-quality/fine-feature claims or increase supported claims versus its matched no-evidence baseline, or the measured alpha structure is not distinguishable from seg2 region coverage (redundant axis).",
+      "deterministic_signal": "matting.npy per-pixel soft alpha (source-matched) + seg2 masks + source pixels: subject alpha-integral coverage, soft-edge band width, hair/fine-detail delimiter energy, silhouette closedness",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort (24/24 frozen items have source-matched matting.npy); matting is a core-chain artifact not bound by any validated arm",
+      "selection_rationale": "Matting is a genuinely-new surface (per-pixel alpha fidelity: edge softness, hair/non-silhouette detail) present on 24/24 frozen items yet unbound by validated arms; deterministic, zero new model, low cost, feeds the dossier edge-quality evidence axis.",
+      "scope": "deterministic per-item matting measurement: subject alpha coverage ratio, soft-edge band width, hair/fine-feature delimiter structure, silhouette closedness; scale-invariant ratios/bands only in prose",
+      "inputs": "frozen matting.npy (source-matched) + seg2.npy masks + source pixels for edge color grounding; read-only canonical/derived artifacts",
+      "output_semantics": "subject-coverage ratio, soft-edge band width, edge-structure health bands, machine-readable in evidence_payload; prose carries only scale-invariant fidelity claims (e.g. 'soft detachable hair strands', 'sharp clean silhouette')",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (matting.npy is source-dimension-matched float16 alpha); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain when matting is absent/ill-formed or degenerate (all-one/all-zero alpha), or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound matting/seg2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze (no band >=75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "matting-alpha"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "face-geometry",
+      "name": "facial detail / face-shape geometry",
+      "arm_issue": 60,
+      "hypothesis": "A locally-run open-weight facial-landmark model plus deterministic facial-geometry ratios (eye spacing:face width, facial thirds, mouth-width:face ratio) reduce unsupported facial-detail claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The face-geometry evidence condition does not reduce unsupported facial-detail claims or increase supported claims versus its matched no-evidence baseline, or the landmark model fails qualification on real corpus items (high abstention, missing faces).",
+      "deterministic_signal": "learned 478-point facial landmarks (mediapipe-facemesh-3d-class candidate, Apache-2.0 on-device) + deterministic facial ratios (eye-spacing/face-width, facial-thirds, mouth/face, jawline widths) — scale-invariant only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; face crop derived from seg2 Face_Neck region; local 4090/Strix",
+      "selection_rationale": "Facial DETAIL (eye shape/size/spacing, nose/lip geometry, face shape) is a high-frequency hallucination axis not covered by any validated arm (hair covers region+color, skin-color covers tone); local deterministic options exhausted (pose2 GOLIATH-308 has only coarse facial keypoints), so this is the open-world NEW-model-class path per the sourcing directive.",
+      "scope": "local open-weight facial-landmark/geometry model over the seg2 Face_Neck crop, emitting facial-geometry ratios and landmark-confirmed observable feature claims; scale-invariant only in prose",
+      "inputs": "face crop derived from seg2 Face_Neck region, frozen crop/prompt policy, decoded source RGB; local inference on owned hardware",
+      "output_semantics": "facial geometry ratios + landmark-confirmed observable feature claims, each tagged observed/abstained; no absolute px or raw-coordinate numbers in prose (scale-invariant ratios only)",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: MediaPipe Face Mesh (Apache-2.0, standard on-device 478-point 3D mesh; output x/y normalized, z relative scale); alternatives (DAD-3DHeads, face alignment NN) noted for comparison. No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen crop/prompt policy; emit [ABSTAIN] on insufficient face pixels (turned head, occlusion, extreme DOF, ambiguous makeup); no absolute pixel claim in prose; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen crop/prompt policy with pinned digests; (b) capability probe on local stack (non-sensitive verification) BEFORE trusting the producer; (c) controlled claim-support round-trip on the frozen 24-item cohort vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit (unchecked verbosity is a fail); (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "face-geometry",
+        "seg2-crop-region"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "object-relations",
+      "name": "object / accessory presence + spatial relations",
+      "arm_issue": 61,
+      "hypothesis": "A locally-run open-weight text-grounded object detector over a frozen closed vocabulary (furniture/props/held-objects/accessories) emitting object presence + normalized spatial relations reduces unsupported object-claim and background-object hallucination in captions on the frozen 24-item cohort.",
+      "falsified_if": "The object-relations evidence condition does not reduce unsupported object claims or increase supported claims versus its matched no-evidence baseline, or the detector fails qualification on real corpus items.",
+      "deterministic_signal": "learned open-vocabulary text-grounded detection (grounding-dino-open-vocab class candidate, Apache-2.0) over full-frame source with a frozen closed vocabulary; object presence + coarse bounding-box spatial relations, scale-invariant only in prose",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB; local 4090/Strix (HF Transformers path)",
+      "selection_rationale": "No validated arm measures discrete objects/accessories (setting #34 measures background palette/bands, not objects); this is the relational/interaction axis the brainstorm explicitly widens toward; local deterministic options exhausted (DOME_29 has no fine object classes), so it is the open-world NEW-model-class arm.",
+      "scope": "local open-weight text-grounded object detector over full-frame source, frozen closed vocabulary (furniture/props/held-objects/accessory classes), emitting object-presence + normalized spatial relations to the subject",
+      "inputs": "full-frame decoded source RGB; frozen closed vocabulary; local inference on owned hardware",
+      "output_semantics": "object presence list + normalized spatial relations (e.g. 'object left of subject / large in frame / behind subject'), each tagged detected/abstained; no absolute px in prose; machine-readable boxes stay in evidence_payload JSON",
+      "provenance": "open weights run on owned hardware only (local 4090 via scheduler or Strix). Literature scan 2026-08-06: Grounding DINO (Apache-2.0 open-vocabulary detection, arbitrary objects from free-form text, HF Transformers path). No hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "frozen vocabulary + detection threshold; emit [ABSTAIN] on low-confidence/occluded detections; never fabricate an object that is not detected; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen vocabulary/prompt/threshold with pinned digests; (b) capability probe on local stack (non-sensitive verification) BEFORE trusting the producer; (c) controlled claim-support round-trip on the frozen 24-item cohort vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "evidence_parts": [
+        "object-relations"
+      ],
+      "model_candidates": [
+        "grounding-dino-open-vocab"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "pose-articulation",
+      "name": "pose-articulation / kinematic constraints",
+      "arm_issue": 62,
+      "hypothesis": "Declared kinematic articulation measurements (per-joint flexion angles, torso/pelvis orientation, contrapposto/weight-bearing stance, limb-overlap structure, symmetry ratios) reduce unsupported pose/stance/limb claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The pose-articulation evidence condition does not reduce unsupported pose/stance/limb claims or increase supported claims versus its matched no-evidence baseline, or the measured kinematics are not distinguishable from body-type's static ratios (redundant axis).",
+      "deterministic_signal": "pose2 GOLIATH-308 keypoints + seg2 masks: joint-angle ranges (elbow/knee flexion), torso/pelvis orientation from keypoint triangles, contrapposto/weight-bearing detection, limb-overlap count, symmetry/asymmetry ratios",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2.npy + seg2.npy",
+      "selection_rationale": "Body-type #32 measures anthropometric RATIOS but not articulated kinematics (joint angles, stance, weight-bearing, limb overlap); deterministic from existing pose2+seg2 with zero new model, low cost, feeds the dossier pose/stance evidence axis.",
+      "scope": "deterministic articulation measurement: per-joint angles, torso/pelvis orientation from keypoint triangles, contrapposto/weight-bearing detection, limb-overlap count from seg2 masks, symmetry/asymmetry ratios; scale-invariant only in prose",
+      "inputs": "frozen pose2.npy (GOLIATH-308) + seg2.npy; read-only canonical/derived artifacts",
+      "output_semantics": "kinematic ratios/angles + stance class + overlap structure, machine-readable in evidence_payload; prose carries only scale-invariant relations (e.g. 'weight on one leg', 'bent arms') verifiable from ratios",
+      "provenance": "deterministic, computed in-memory from existing core artifacts (pose2 GOLIATH-308 keypoints + seg2 region masks); no new model, no corpus mutation, noncanonical output only",
+      "abstention_policy": "abstain where joint confidence is too low, limbs are cropped at frame edge, weight-bearing signal is ambiguous, or pose2 detector count != exactly one; detector/measurement disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen plan + SHA-bound pose2/seg2 evidence inputs; (b) band-calibration probe on the frozen cohort before freeze; (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null case; (e) independent adversarial review (incl. distinguishability from body-type's static ratios); (f) no corpus mutation, local-first, scheduler-managed GPU, noncanonical output only.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "pose-articulation",
+        "pose2-keypoints",
+        "seg2-region"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "gaze-head-orientation",
+      "name": "gaze / head-orientation (camera-interaction)",
+      "arm_issue": 68,
+      "hypothesis": "A locally-run estimator over the already-installed MediaPipe FaceLandmarker 478-point mesh emitting scale-invariant gaze/head-orientation bands (facing camera, turned away, head up/down, profile) reduces unsupported camera-interaction claims and increases supported relational claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The gaze/head-orientation evidence condition does not reduce unsupported camera-interaction claims or increase supported claims versus its matched no-evidence baseline, or the face mesh fails qualification on real corpus items (high abstention / degenerate orientation), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "reuses the validated MediaPipe FaceLandmarker mesh (owned hardware, local CPU, already installed from arm #60); scale-invariant head-orientation bands computed from 3D landmark geometry, never absolute pixels",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB + seg2; local 4090 (MediaPipe tasks API)",
+      "selection_rationale": "No validated arm measures gaze/head orientation relative to the camera (face-geometry #60 measures shape bands only). Camera interaction ('looking directly at the camera', 'head turned away') is a recurring caption claim with no deterministic support. This is the relational/interaction axis the brainstorm demands (a NEW evidence part, not an attribute-tagger over a validated axis).",
+      "scope": "Scale-invariant head-orientation bands from the existing MediaPipe FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck crop (union policy, arm #60): head yaw band (facing camera / partially turned / profile or turned away), head pitch band (level / down / up), with a plausibility/abstention gate.",
+      "inputs": "full-frame decoded source RGB + seg2.npy (DOME-29 Face_Neck mask); already-installed MediaPipe FaceLandmarker 'face_landmarker.task' (owned hardware, local CPU, tasks API)",
+      "output_semantics": "scale-invariant gaze/head-orientation bands, each tagged detected/abstained; raw yaw/pitch angles and mesh z-coords stay in evidence_payload JSON, never prose (camera-frame-relative but direction is invariant under scale)",
+      "provenance": "research_harness.face_geometry MediaPipe FaceLandmarker mesh (Apache-2.0, local CPU, owned hardware; model face_landmarker.task sha256 64184e229b...) — same asset validated in arm #60; computed in memory with no corpus write; no hosted third-party inference",
+      "abstention_policy": "frozen thresholds + human-plausibility gate; abstain with surfaced reason on no-face / degenerate mesh (arm #60 union policy: 21/24 detected, 3 honest abstains); never fabricate a gaze direction; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "gaze-head-orientation"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "scene-category",
+      "name": "semantic scene category (CLIP zero-shot)",
+      "arm_issue": 69,
+      "hypothesis": "A locally-run open-weight CLIP ViT-L/14 zero-shot classifier over a frozen closed scene-category set (indoor studio, plain wall backdrop, bedroom, living room, outdoor beach, outdoor garden, outdoor field, body of water, urban street, poolside) emitting a confident semantic scene label reduces unsupported background/scene claims and increases supported scene claims versus its matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The scene-category evidence condition does not reduce unsupported background/scene claims or increase supported claims versus its matched no-evidence baseline, or the classifier fails qualification on real corpus items (low confidence, random labels), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "open-weight zero-shot classification (openai/clip-vit-large-patch14, already in the local HF cache via arm #37; MIT/open weight, owned hardware). Frozen closed label set + prompt prefix + temperature; scale-invariant label only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; full-frame decoded source RGB; local CPU (harness venv + cached CLIP ViT-L/14)",
+      "selection_rationale": "Setting #34 measures background coverage/palette/bands but never the semantic WHAT-KIND-OF-PLACE (indoor studio vs outdoor beach vs poolside). Scene category is a genuinely-new SEMANTIC axis and a NEW model class. Candidacy verified on the frozen cohort (2026-08-07): 24/24 classified, 8 categories across 10, top-1 max share 29% (no band >= 75%), moderate p50 confidence 0.543.",
+      "scope": "CLIP ViT-L/14 zero-shot text-image similarity over full-frame source against a frozen closed set of scene categories (cohort-derived from the arm-#47 VLM scene vocabulary); emit the argmax category only when above a calibrated confidence threshold.",
+      "inputs": "full-frame decoded source RGB; frozen closed scene-label set; local CLIP ViT-L/14 inference on owned hardware (CPU)",
+      "output_semantics": "one scene-category label per item (or abstain below threshold), scale-invariant; CLIP similarity logits stay in evidence_payload JSON, never prose",
+      "provenance": "openai/clip-vit-large-patch14 (open weight, MIT, already in the local HF cache at /mnt/nas-ai-models/huggingface-cache — downloaded for arm #37, sha256-pinnable); run on owned hardware via the harness venv; no hosted third-party inference of the sensitive corpus; no corpus write",
+      "abstention_policy": "frozen label set + confidence threshold; [ABSTAIN] below threshold; never overwrite an ambiguous scene with a confident-looking guess; classifier disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen label set/prompt prefix/temperature pinned; (b) capability + calibration probe on the frozen cohort (24/24 classified, max top-1 share 29% measured 2026-08-07); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "scene-semantic-category"
+      ],
+      "model_candidates": [
+        "clip-zero-shot-scene"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "apparent-age",
+      "name": "apparent age estimation",
+      "arm_issue": 73,
+      "hypothesis": "A locally-run open-weight apparent-age estimator (MiVOLO-V2, Apache-2.0) emitting a scale-invariant age-band (e.g. late-teens / twenties / thirties-and-up) reduces unsupported age-related claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The apparent-age evidence condition does not reduce unsupported age claims or increase supported claims versus its matched no-evidence baseline, or the age model fails qualification on real corpus items (high abstention / degenerate ages), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW MODEL CLASS: open-weight MiVOLO-V2 age+gender transformer (Apache-2.0, face+body input, arXiv 2307.04616) run on owned hardware; scale-invariant apparent-age band only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Face_Neck crop + full-frame subject region; local GPU/CPU on owned hardware",
+      "selection_rationale": "No validated arm measures apparent age (face-geometry #60 measures shape bands; hair #30 color/region; skin #31 tone). 'She looks young/twenties' is a recurring caption claim with no deterministic support. Genuinely NEW semantic axis + NEW model class per the open-world sourcing directive.",
+      "scope": "Open-weight apparent-age estimation (MiVOLO-V2, face+body multi-input transformer) over the seg2 Face_Neck crop + full-frame subject; emit a scale-invariant age-band (coarse, e.g. late-teens/twenties/thirties+) with a calibrated confidence/abstention gate; never a precise numeric age claim in prose.",
+      "inputs": "seg2 Face_Neck crop (margin-expanded) + full-frame subject region from seg2 source RGB; local MiVOLO-V2 on owned hardware (GPU via scheduler or CPU)",
+      "output_semantics": "one coarse scale-invariant age band per item (or abstain when the face is small/occluded/atypical); the raw floating age estimate stays in evidence_payload JSON, never prose",
+      "provenance": "MiVOLO-V2 open weights (Apache-2.0, iitolstykh/mivolo_v2, arXiv 2307.04616; model.safetensors sha256 to be pinned at installation); run on owned hardware only; no hosted third-party inference of the sensitive corpus; no corpus write",
+      "abstention_policy": "calibrated abstention floor on model confidence; abstain on small/turned/occluded faces with a surfaced reason; detector disagreement is a quality anomaly, never content; never verbalize a precise age, only a coarse band",
+      "qualification_gate": "PASS only after: (a) model + crop/prompt policy pinned with sha256; (b) capability + band-calibration probe on the frozen cohort (spread across bands, no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "apparent-age-band"
+      ],
+      "model_candidates": [
+        "mivolo-v2-age-gender"
+      ],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "camera-viewing-angle",
+      "name": "camera viewing-angle / framing",
+      "arm_issue": 74,
+      "hypothesis": "Deterministic camera-relative framing measurements (camera height vs subject eye-line, vertical headroom, subject frame-share — all scale-invariant, from seg2 subject bbox + full-frame) reduce unsupported camera-perspective / framing claims and support shot-scale claims on the frozen 24-item cohort.",
+      "falsified_if": "The camera-viewing-angle evidence condition does not reduce unsupported camera/perspective/framing claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic camera-relative framing from seg2 subject bbox + image geometry (eye-line vertical position, headroom ratio, subject frame-share); scale-invariant only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 subject bbox + full-frame dimensions; local in-memory",
+      "selection_rationale": "gaze-head #68 measures subject→camera head direction but NO arm measures camera→subject framing (eye-level vs high/low camera, headroom, shot scale — 'close-up/mid/full'). Camera viewing-angle is a genuinely NEW relational/framing axis, deterministic from existing artifacts, no new model needed.",
+      "scope": "Camera-relative viewing-angle and framing from seg2 subject bbox + full-frame geometry: camera-height band (eye-level / high angle / low angle from the subject's eye-line vertical position), vertical headroom band, and shot-scale band (close-up / mid / full from subject frame-share). Scale-invariant ratios only in prose.",
+      "inputs": "seg2.npy subject mask (already read for the exactly-one-subject invariant) + full-frame decoded source RGB dims; no new model",
+      "output_semantics": "scale-invariant camera-relative framing bands, each tagged measured/abstained; raw pixel positions and frame-share stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness camera-viewing-angle deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + source dims with no corpus write",
+      "abstention_policy": "abstain when the subject bbox is degenerate (subject not fully in frame) or the eye-line is unmeasurable; framing claims only surfaced when the band is calibrated; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "camera-viewing-angle"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "image-focus-depth-of-field",
+      "name": "image focus / depth-of-field quality",
+      "arm_issue": 75,
+      "hypothesis": "Deterministic focus-quality measurements (global sharpness, subject-vs-background acutance split, depth-of-field band — all scale-invariant, from source pixels + seg2 region split) reduce unsupported focus/blur/DOF claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The image-focus evidence condition does not reduce unsupported focus/blur/depth-of-field claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic focus/DOF from source-pixel gradient/edge energy in the subject vs non-subject (seg2-split) regions; scale-invariant acutance bands",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; source RGB pixels + seg2 region masks; local in-memory",
+      "selection_rationale": "texture #35 measures per-region surface/pattern bands but NOT optical focus quality ('sharp', 'soft-focus background', 'bokeh'); no validated arm covers DOF/focus. Fast, deterministic, genuinely NEW evidence part from existing artifacts, no new model needed.",
+      "scope": "Image focus quality from source-pixel gradient/edge energy within the seg2 subject region vs the non-subject (background) region: global-sharpness band, background-defocus (DOF) band, subject-vs-background acutance contrast. Scale-invariant bands only.",
+      "inputs": "seg2.npy subject/background masks + the already-decoded source RGB pixels; computed in memory; no new model",
+      "output_semantics": "scale-invariant focus/DOF bands (crisp / soft-focus / defocused-background), each tagged measured/abstained; raw edge-energy statistics stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness image-focus deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + source pixels with no corpus write",
+      "abstention_policy": "abstain when the subject/background region lacks a raw-pixel floor or the edge-energy statistics are dominated by texture (so DOF is not isolable); detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "image-focus-dof"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "affordance-contact",
+      "name": "subject-object affordance / contact interaction",
+      "arm_issue": 76,
+      "hypothesis": "Deterministic subject-to-object contact relations (held-in-hand / sitting-on / leaning-on / adjacent from seg2 region adjacency + pose2 hand keypoints, scale-invariant) reduce unsupported interaction claims and support relational camera-interaction claims on the frozen 24-item cohort.",
+      "falsified_if": "The affordance-contact evidence condition does not reduce unsupported interaction/contact claims or increase supported claims versus its matched no-evidence baseline, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: deterministic contact/affordance relations from seg2 region adjacency + pose2 hand keypoints; scale-invariant contact bands",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 region masks + pose2 keypoints; local in-memory",
+      "selection_rationale": "object-relations #61 measures object presence/placement but NOT subject↔object CONTACT ('holding a glass', 'leaning on the wall'); gaze #68 head direction only. Contact/affordance is a genuinely NEW relational/interaction axis — the exact category the seed-diversity gate pushes toward.",
+      "scope": "Subject-to-object contact/affordance relations from seg2 region adjacency + pose2 hand keypoints: held-in-hand, hand-near-torso, sitting-on/contact-with-background-class, leaning. Scale-invariant contact labels/bands only.",
+      "inputs": "seg2.npy (region masks, already read for the exactly-one-subject invariant) + pose2.npy (GOLIATH-308 hand/wrist keypoints); computed in memory; no new model",
+      "output_semantics": "scale-invariant contact/affordance labels (or abstain) tagged observed/abstained; raw keypoint proximity values stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness affordance-contact deterministic module (new, code-sha256 pinned on freeze); computed in memory from the frozen seg2 + pose2 with no corpus write",
+      "abstention_policy": "abstain when no object region is adjacent to the subject (no contact possible), when hands are not visible, or when the proximity is ambiguous; never fabricate a contact; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) frozen thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (contact bands spread, no band >= 75%, honest abstains); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, scheduler-managed GPU.",
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "evidence_parts": [
+        "affordance-contact"
+      ],
+      "model_candidates": [],
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "iris-eye-color",
+      "name": "eye color estimation",
+      "arm_issue": 80,
+      "hypothesis": "A deterministic iris-hue measurement (coarse scale-invariant eye-color band from pose2 GOLIATH-308 iris/pupil keypoints + the already-decoded source RGB, CPU, no new model) reduces unsupported eye-color claims ('her blue eyes', 'dark eyes') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The eye-color evidence condition does not reduce unsupported eye-color claims or increase supported claims versus its matched no-evidence baseline, or the iris crop is too small/glared to be discriminating (band-degeneracy / high abstention), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: eye-color band from iris/pupil keypoints + source RGB; scale-invariant color name only",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Face_Neck crop + pose2 iris/pupil keypoints + decoded source RGB; local CPU, in-memory",
+      "selection_rationale": "No validated arm measures eye color (face-geometry #60 is shape bands only; skin #31 is skin tone; apparent-age #73 age). 'Blue/brown/dark eyes' is a recurring caption claim with zero support. Genuinely-NEW part; feasibility probe shows 20/24 iris keypoints reliable.",
+      "scope": "Deterministic iris-hue measurement over the pose2 l/r iris+pupil keypoints within the seg2 Face_Neck crop of the decoded source; emit a coarse scale-invariant eye-color band (brown / blue-grey / green-hazel / dark / abstain); never a numeric RGB claim in prose.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 iris/pupil keypoints) + seg2.npy (Face_Neck mask) + already-decoded source RGB (SHA-bound); local CPU, in-memory, no new model",
+      "output_semantics": "one coarse scale-invariant eye-color band per item (or abstain when the iris is too small / glared / occluded); raw sampled HSV/XYZ stats stay in evidence_payload JSON, never prose",
+      "provenance": "research_harness.eye_color deterministic module (new, code-sha256 pinned at freeze); computed in memory with no corpus write",
+      "abstention_policy": "abstain when iris keypoints are low-confidence, the iris region is tiny or under specular glare, or the crop is too dark to resolve hue; never fabricate an eye color; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (bands spread, no band >= 75%, honest abstains); (c) controlled claim-support round-trip vs matched no-evidence baseline; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "eye-color"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "facial-expression",
+      "name": "smile / facial expression",
+      "arm_issue": 81,
+      "hypothesis": "A deterministic smile/expression measurement (scale-invariant mouth-corner spread vs face-width band from pose2 mouth-corner keypoints, CPU, no new model) reduces unsupported 'smiling / neutral / laughing' claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The facial-expression evidence condition does not reduce unsupported expression claims or increase supported claims versus its matched no-evidence baseline, or the mouth-corner geometry is not discriminating (band-degeneracy / high abstention), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: smile/expression band from mouth-corner spread normalized by face width; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 mouth-corner/cupid-bow/lower-lip keypoints + seg2 Face_Neck; local CPU, in-memory",
+      "selection_rationale": "Expression ('she smiles', 'neutral expression') recurs in captions with NO validated support (face-geometry #60 = static shape; gaze #68 = head direction). Feasibility probe: 19/24 mouth-corner keypoints reliable. Genuinely-NEW part.",
+      "scope": "Deterministic facial-expression / smile measurement from pose2 mouth-corner and lower-lip keypoints normalized by the face (eye-spacing) width; emit a coarse expression band (neutral / slight smile / open smile / abstain); never overlay identity or emotion claims beyond the geometry-supported band.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 mouth-corner + eye keypoints) + seg2 Face_Neck mask; local CPU, in-memory, no new model",
+      "output_semantics": "one coarse scale-invariant expression band per item (or abstain when the mouth is occluded / keypoints low-conf); raw mouth-corner spread ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.facial_expression deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the mouth is occluded, too small, or keypoints below confidence; never fabricate a smile/emotion; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "facial-expression"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "hairstyle",
+      "name": "hair length / arrangement",
+      "arm_issue": 82,
+      "hypothesis": "A deterministic hairstyle measurement (scale-invariant hair-length band vs shoulder line + hair-arrangement band from seg2 Hair-region extent + pose2 shoulder keypoints, CPU, no new model) reduces unsupported 'long hair / short hair / hair up or tied back' claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The hairstyle evidence condition does not reduce unsupported hair-shape/arrangement claims or increase supported claims versus its matched no-evidence baseline, or the hair-extent geometry is redundant with hair #30 color/region (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: hair-length + hair-arrangement bands from seg2 Hair extent vs pose2 shoulder line; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Hair mask (24/24) + pose2 shoulder/neck keypoints; local CPU, in-memory",
+      "selection_rationale": "hair #30 validated COLOR + region coverage only; 'long/short hair', 'hair tied back/up' are caption claims with no shape support. seg2 Hair is present 24/24. Genuinely-NEW part (hairstyle, not hair color).",
+      "scope": "Deterministic hairstyle / hair-arrangement measurement from the seg2 Hair region relative to pose2 shoulder/neck keypoints; emit scale-invariant hair-length band (short / shoulder / long) and arrangement band (down / tied-back / up / abstain); never color or identity claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 Hair mask) + pose2.npy (GOLIATH-308 shoulders/neck); local CPU, in-memory, no new model",
+      "output_semantics": "coarse scale-invariant hair-length band + hair-arrangement band per item (or abstain when Hair absent/degenerate); raw hair-extent y ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.hairstyle deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the Hair region is absent, tiny, or ambiguous (head cropped); never fabricate a hairstyle; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "hairstyle"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.45,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "body-configuration",
+      "name": "whole-body posture configuration class",
+      "arm_issue": 83,
+      "hypothesis": "A deterministic body-configuration band (standing / seated / reclined + uprightness) computed in memory from pose2 GOLIATH-308 keypoint geometry (pelvis-height fraction, torso vs hip-to-ankle extent, knee flexion) reduces unsupported posture-class claims ('she stands', 'she is seated on the edge', 'she reclines') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The body-configuration evidence condition does not reduce unsupported posture-class claims or increase supported claims versus its matched no-evidence baseline, or the configuration bands are not distinguishable from pose-articulation's per-joint signals (redundant axis), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: whole-body posture-configuration class from pose2 keypoint geometry; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; pose2 GOLIATH-308 hips/ankles/knees/shoulders; local CPU, in-memory",
+      "selection_rationale": "pose-articulation #62 emits per-joint flexion/stance but NOT a top-level standing/seated/reclined class. 'Standing by the pool' / 'seated on the edge' are recurring claims. Genuinely-NEW aggregate part.",
+      "scope": "Deterministic whole-body configuration classification from pose2 keypoint geometry: pelvis-height fraction of frame, torso-extent vs hip-to-ankle extent ratio, torso lean, knee flexion interplay; emit one coarse posture class (standing / seated / reclined / abstain); only scale-invariant ratios.",
+      "inputs": "Frozen pose2.npy (GOLIATH-308 hips/ankles/knees/shoulders); local CPU, in-memory, no new model",
+      "output_semantics": "one coarse body-configuration band per item (or abstain when keypoints too sparse); raw keypoint ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.body_configuration deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when fewer than ~4 core joints are reliable or the configuration is ambiguous; never fabricate a posture class; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "body-configuration"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "face-visibility",
+      "name": "face visibility / occlusion",
+      "arm_issue": 84,
+      "hypothesis": "A deterministic face-visibility measurement (scale-invariant fraction of the seg2 Face_Neck region occluded by Hair/Hand/Arm classes + coarse band clearly-visible / partially-occluded / mostly-covered, computed in memory from seg2 DOME-29) reduces unsupported 'face fully visible / hair covering her face' claims and improves face-dependent abstention honesty on the frozen 24-item cohort.",
+      "falsified_if": "The face-visibility evidence condition does not reduce unsupported face-visibility/occlusion claims or increase supported claims versus its matched no-evidence baseline, or the occlusion fraction is degenerate on the cohort (no band >= 75%), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: face-occlusion fraction + visibility band from seg2 Face_Neck vs Hair/Hand/Arm masks; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Face_Neck + Hair + Hand + Arm masks; local CPU, in-memory",
+      "selection_rationale": "face-geometry #60 / gaze #68 abstain when the face is not found, but NO arm measures the DEGREE of face occlusion. 'Hair across her face' / 'face fully visible' are caption claims. Genuinely-NEW part.",
+      "scope": "Deterministic face-visibility measurement from seg2: occlusion fraction of the Face_Neck region by Hair/Hand/Arm union classes + coarse visibility band; never face-shape, identity, or aesthetic claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 Face_Neck + Hair + Hand + Arm masks); local CPU, in-memory, no new model",
+      "output_semantics": "coarse face-visibility band per item + occlusion fraction (payload); raw pixel fractions stay in evidence_payload, never prose",
+      "provenance": "research_harness.face_visibility deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when there is no Face_Neck region (no face in frame); never fabricate visibility; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "face-visibility"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "environment-clearance",
+      "name": "subject-to-environment distance / negative space",
+      "arm_issue": 85,
+      "hypothesis": "A deterministic subject-environment clearance band (scale-invariant normalized background clearance around the subject silhouette — tight / moderate / spacious) computed in memory from seg2 Background-class occupancy around the subject reduces unsupported spatial-settings claims ('close to a wall', 'in an open space', 'leaning against a backdrop') in captions on the frozen 24-item cohort.",
+      "falsified_if": "The environment-clearance evidence condition does not reduce unsupported spatial-settings/negative-space claims or increase supported claims versus its matched no-evidence baseline, or the clearance metric is redundant with setting #34 / camera-viewing-angle #74 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: subject-environment clearance band from seg2 Background split; scale-invariant",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Background vs subject masks; local CPU, in-memory",
+      "selection_rationale": "setting #34 measures background as a whole (coverage/color/tone); #74 measures framing/headroom. NO arm measures local subject-to-surroundings clearance (negative space). 'Close to a wall' / 'open space' are unsupported spatial-settings claims. Genuinely-NEW part.",
+      "scope": "Deterministic subject-to-environment clearance from seg2: normalized background clearance in directional bands around the subject silhouette + coarse clearance band; never identity, setting color, or aesthetic claims.",
+      "inputs": "Frozen seg2.npy (DOME-29 subject vs Background masks); local CPU, in-memory, no new model",
+      "output_semantics": "coarse subject-environment clearance band per item (or abstain when the subject fills the frame — no background clearance); raw normalized distances stay in evidence_payload, never prose",
+      "provenance": "research_harness.environment_clearance deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "abstain when the subject fills the frame edge-to-edge (no Background clearance measurable) or the mask is degenerate; never fabricate; detector disagreement is a quality anomaly, never content",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "environment-clearance"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "hair-texture",
+      "name": "hair texture / curl-waviness state",
+      "arm_issue": 94,
+      "hypothesis": "A deterministic hair-texture measurement (scale-invariant curl/straight state from the seg2 DOME-29 Hair region's local gradient orientation distribution, computed in memory; CPU, no new model) reduces unsupported 'curly / wavy / straight hair' textural claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The hair-texture evidence condition does not reduce unsupported hair-texture/curl claims or increase supported claims versus its matched no-evidence baseline, or the texture bands collapse (a single band >=75% of measured items), or the axis is redundant with hairstyle #82 / hair #30 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: hair-texture band (straight / wavy / curly) from seg2 Hair-region gradient-orientation distribution; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Hair mask (24/24); local CPU, in-memory",
+      "selection_rationale": "hairstyle #82 validates length + arrangement; hair #30 color + coverage. Curl/wave texture ('curly', 'wavy', 'straight') has NO validated support. Genuinely-NEW part (hair-texture).",
+      "scope": "Deterministic hair-texture / curl state from the seg2 Hair region: local-gradient dominant orientation variance + waviness proxy; coarse band (straight / wavy / curly / abstain); never color, length, or identity claims; only scale-invariant bands in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Hair mask); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse scale-invariant hair-texture band per item (or abstain when the Hair region is absent/tiny); raw gradient-orientation statistics stay in evidence_payload, never prose",
+      "provenance": "research_harness.hair_texture deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the Hair region is absent, tiny, or texture is unresolvable (cropped / too smooth); never fabricate a curl state",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "hair-texture"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "image-quality",
+      "name": "learned no-reference image quality (IQA)",
+      "arm_issue": 95,
+      "hypothesis": "A learned no-reference image-quality measurement (open-weight CLIP-IQA or a similar NR-IQA transformer, run locally CPU on owned hardware; NEW model class) adds a scale-invariant perceptual-quality band (sharp / moderate / degraded) that reduces unsupported 'crisp / high-quality / grainy' quality claims that image-focus #75 (a deterministic gradient DOF measure) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The IQA evidence condition does not reduce unsupported image-quality claims or increase supported claims versus its matched no-evidence baseline, or the quality bands collapse (a single band >=75% of measured items), or the axis is redundant with image-focus #75 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (image-quality) + NEW MODEL CLASS (open-weight no-reference IQA): perceptual-quality band from a locally-run open-weight IQA model on the SHA-bound source RGB",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local CPU, owned hardware only",
+      "selection_rationale": "image-focus #75 validates deterministic gradient DOF but not subjective quality ('crisp', 'grainy'). An open-weight NR-IQA model is a genuinely-NEW model class per open-world sourcing; local owned hardware only.",
+      "scope": "Learned no-reference perceptual-quality band from an open-weight IQA model run locally (owned hardware); coarse band (sharp / moderate / degraded) or abstain on model/input failure; never semantic content claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight IQA model staged locally; run on owned CPU/GPU hardware only",
+      "output_semantics": "Coarse scale-invariant quality band (sharp / moderate / degraded); raw quality score stays in evidence_payload, never prose",
+      "provenance": "open-weight no-reference IQA model (model.safetensors sha256 pinned on freeze) + research_harness.image_quality module; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on model/input failure or when the quality score is degenerate; never fabricate a quality class",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "image-quality"
+      ],
+      "model_candidates": [
+        "CLIP-IQA (torchmetrics/CLIPImageQualityAssessment, open-model, CLIP-based)",
+        "Q-Align (LMM-based no-reference IQA, ICML 2024)"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "validated",
+      "valid_non_improving_experiments": 1
+    },
+    {
+      "id": "body-volume",
+      "name": "3D body volume / bulk via open-weight whole-body mesh regression",
+      "arm_issue": 96,
+      "hypothesis": "An open-weight whole-body mesh-regression measurement (candidate HMR2.0 / 4D-Humans, NEW model class, run locally on owned hardware) that lifts the subject to a 3D body mesh and emits a scale-invariant normalized body-volume / bulk band (slim / average / fuller) reduces unsupported 'slim / curvy / full-figured' body-mass claims that 2D body-type #32 ratios cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The body-volume evidence condition does not reduce unsupported body-bulk claims or increase supported claims versus its matched no-evidence baseline, or the volume bands collapse (a single band >=75% of measured items), or the axis is redundant with body-type #32 (degenerate), or the 3D mesh regressor fails on too many frozen items (coverage below a pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (body-volume) + NEW MODEL CLASS (open-weight whole-body mesh regression HMR2.0/4D-Humans): normalized 3D body-volume band from a locally-run mesh regressor on the SHA-bound source RGB",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local owned hardware only",
+      "selection_rationale": "body-type #32 validates 2D proportions; 'curvy / slim / full-figured' mass claims have no 3D support. Whole-body mesh regression is a genuinely-NEW model class (open-world sourcing, local owned hardware only; SMPL-X license check before freeze).",
+      "scope": "Scale-invariant normalized body-volume/bulk band from an open-weight 3D whole-body mesh regression (HMR2.0/SMPL-X), run locally on owned hardware; coarse band (slim / average / fuller) or abstain when the mesh regression is unreliable; never identity or absolute-volume claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight mesh model staged locally; run on owned CPU/GPU hardware only",
+      "output_semantics": "Coarse scale-invariant body-volume band (slim / average / fuller); raw normalized volume/bulk stats stay in evidence_payload, never prose",
+      "provenance": "open-weight HMR2.0/4D-Humans whole-body mesh regressor (checkpoint sha256 pinned on freeze) + research_harness.body_volume module; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on mesh-regression failure, degenerate mesh, or model/input failure; never fabricate a body-volume class",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept (SMPL-X license note: non-commercial — verify license for research use before freezing).",
+      "evidence_parts": [
+        "body-volume"
+      ],
+      "model_candidates": [
+        "HMR2.0 / 4D-Humans (shubham-goel/4dhumans, open weights)",
+        "PyMAF-X (whole-body SMPL-X regression)"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "garment-type",
+      "name": "garment-type / silhouette-category (top vs bottom garments)",
+      "arm_issue": 97,
+      "hypothesis": "A deterministic garment-type measurement (scale-invariant upper/lower garment silhouette split from the seg2 DOME-29 clothing classes; CPU, no new model) reduces unsupported 'wearing a top / dressed / leggings' garment-category claims beyond clothing #29's color/coverage, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The garment-type evidence condition does not reduce unsupported garment-category claims or increase supported claims versus its matched no-evidence baseline, or the garment-type bands collapse (a single band >=75% of measured items), or the axis is redundant with clothing #29 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: garment-type / silhouette-category band from seg2 clothing-class coverage; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Apparel + Upper/Lower_Clothing + skin classes (24/24); local CPU, in-memory",
+      "selection_rationale": "clothing #29 validates class coverage + colors; the upper/lower garment CATEGORY split ('wearing a top', 'in leggings') is a distinct claim axis. Genuinely-NEW part (garment-type).",
+      "scope": "Deterministic garment-type / silhouette split from seg2 DOME-29 clothing classes (upper-body garment present / lower-body garment present / skin-dominant); coarse band or abstain; never color or identity claims; only scale-invariant categories in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing classes); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse garment-type band per item (or abstain when clothing classes are degenerate); raw class-coverage ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.garment_type deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when clothing/apparel classes are absent or degenerate (e.g. fully unclothed subject with no garment classes); never fabricate a garment type",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "garment-type"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "active",
+      "valid_non_improving_experiments": 0
+    }
+  ],
+  "goal_arm": "dossier-context4k",
+  "goal_floors": {
+    "expanded_dossier_min_tokens": 4001,
+    "compact_context_min_tokens": 4000
+  },
+  "evidence_budget": {
+    "basis": "measured honest expansion-ceiling audit, program-floor-aware (2026-08-06; run /mnt/nas-ai-models/research/stratum/dossier-expansion-audit-v2/): base deterministic dossier 387-648 tok/item; total record (prose+payload) 2040-3489; generous honest LM elaboration ceiling 8500-13500; under the reframed structural floor 4001 any_max_honest_floor_reached=true (24/24), deterministic record alone false",
+    "deterministic_min_tokens_per_item": 2040,
+    "deterministic_median_tokens_per_item": 2700,
+    "deterministic_max_tokens_per_item": 3489,
+    "honest_ceiling_max_tokens_per_item": 13500
+  },
+  "selection_progress": 24,
+  "conclusion_history": [
+    {
+      "arm_id": "dossier-context4k",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 1
+    },
+    {
+      "arm_id": "setting",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 2
+    },
+    {
+      "arm_id": "texture",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 3
+    },
+    {
+      "arm_id": "reconstruction",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 4
+    },
+    {
+      "arm_id": "vlm-dense-description",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 5
+    },
+    {
+      "arm_id": "pose-articulation",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 6
+    },
+    {
+      "arm_id": "pointmap-depth",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 7
+    },
+    {
+      "arm_id": "matting-alpha",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 8
+    },
+    {
+      "arm_id": "face-geometry",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 9
+    },
+    {
+      "arm_id": "object-relations",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 10
+    },
+    {
+      "arm_id": "scene-category",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 11
+    },
+    {
+      "arm_id": "gaze-head-orientation",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 12
+    },
+    {
+      "arm_id": "camera-viewing-angle",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 13
+    },
+    {
+      "arm_id": "image-focus-depth-of-field",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 14
+    },
+    {
+      "arm_id": "apparent-age",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 15
+    },
+    {
+      "arm_id": "affordance-contact",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 16
+    },
+    {
+      "arm_id": "body-configuration",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 17
+    },
+    {
+      "arm_id": "hairstyle",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 18
+    },
+    {
+      "arm_id": "face-visibility",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 19
+    },
+    {
+      "arm_id": "environment-clearance",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 20
+    },
+    {
+      "arm_id": "iris-eye-color",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 21
+    },
+    {
+      "arm_id": "facial-expression",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 22
+    },
+    {
+      "arm_id": "image-quality",
+      "verdict": "NOT_BETTER",
+      "state": "active",
+      "cycle": 23
+    },
+    {
+      "arm_id": "image-quality",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 24
+    }
+  ]
+}

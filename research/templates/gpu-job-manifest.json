@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "job_id": "replace-with-unique-job-id",
+  "target_gpu": "4090",
+  "requested_vram_gb": 1,
+  "maximum_duration": "1h",
+  "approved_issue": 1,
+  "manifest_state": "draft",
+  "authorization": {
+    "mode": "human_reviewed",
+    "approved_by": "replace-with-reviewer",
+    "approval_issue": 1
+  },
+  "host_route": "local",
+  "launcher_id": "registered-research-launcher",
+  "scheduler_project": "replace-with-scheduler-project",
+  "output_root": "/absolute/path/to/approved/research-artifacts/replace-with-arm",
+  "scheduler_lifecycle": [
+    "request",
+    "poll_and_claim",
+    "launch",
+    "verify",
+    "activate",
+    "heartbeat",
+    "release"
+  ]
+}
