@@ -55,6 +55,7 @@ from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
+from .body_configuration import BodyConfigurationError, compute_body_configuration
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1715,6 +1716,61 @@ def _serialize_affordance_contact(contact: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _body_configuration_evidence() -> dict[str, Any]:
+    """Declared deterministic whole-body posture-configuration specialist (arm #83)."""
+    module_path = Path(compute_body_configuration.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-body-configuration-v1",
+        "specialists": [
+            {
+                "id": "in-memory-body-configuration-v1",
+                "scope": "Whole-body posture-configuration class from pose2 GOLIATH-308 keypoint geometry only: pelvis-height fraction (normalized by frame height), torso-vs-leg vertical extent ratio, median knee flexion, and torso lean from vertical. Emits ONE coarse posture class (standing / seated / reclined) or an honest abstention. Never identity, clothing, color, aesthetics, or absolute-pixel claims; only the scale-invariant coarse class in prose.",
+                "inputs": "Frozen selected-item pose2.npy (GOLIATH-308 keypoints) + seg2.npy (DOME-29, used only for the frame-height denominator of the pelvis fraction); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant whole-body configuration class (standing / seated / reclined) or explicit abstention, not semantic ground truth or caption claims; only the coarse class is verbalized; raw normalized fractions / pixel extents stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.body_configuration.compute_body_configuration "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when fewer than ~4 core joints are reliable or the configuration is ambiguous (gray-zone knee flexion 140-150, or no reliable knee/torso signature); never fabricate a posture class; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Close-up / cropped portraits with few visible core joints abstain (no posture class claim); a subject seated upright with near-extended knees (crouched stance) can read as standing, and a standing subject with knees bent (relaxed / swaying) can read as seated — the coarse class is a band, not ground truth; reclined requires torso lean >= 45 deg (a side-lying subject seen edge-on may measure a low lean).",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_body_configuration(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a body-configuration dict.
+
+    Verbalizes ONLY the coarse scale-invariant posture class. Raw normalized
+    pelvis fractions, pixel extents, knee angles, and torso lean stay in the
+    machine-readable evidence_payload JSON and are not caption claims.
+    """
+    lines = [
+        "BODY-CONFIGURATION (whole-body posture class, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- body configuration not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "body configuration not measurable"
+        lines.append(f"- body configuration abstained ({reason})")
+        return "\n".join(lines)
+    cls = config.get("posture_class")
+    if cls == "standing":
+        lines.append("- subject is standing (upright, legs near-extended)")
+    elif cls == "seated":
+        lines.append("- subject is seated (hips elevated, knees bent)")
+    elif cls == "reclined":
+        lines.append("- subject is reclining (torso near-horizontal)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1842,6 +1898,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # grounding) computed in memory from pose2 GOLIATH-308 keypoints + seg2
     # DOME-29 masks; no new model.
     "affordance-contact": ("pose2.npy", "seg2.npy"),
+    # Arm #83 body-configuration: deterministic whole-body posture class
+    # (standing / seated / reclined) computed in memory from pose2 GOLIATH-308
+    # keypoints; seg2 supplies only the frame-height denominator.
+    "body-configuration": ("pose2.npy", "seg2.npy"),
 }
 
 
@@ -1934,7 +1994,7 @@ def build_stage_b_plan(
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
-        "image-focus", "apparent-age", "affordance-contact",
+        "image-focus", "apparent-age", "affordance-contact", "body-configuration",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2455,6 +2515,36 @@ def build_stage_b_plan(
             "external-object contact (held-in-hand / leaning-on an object) is honestly NOT claimed from "
             "this specialist — that axis is the object-relations arm's validated Grounding-DINO domain."
         )
+    elif evidence_kind == "body-configuration":
+        evidence = _body_configuration_evidence()
+        evidence_condition_id = "context-raw-body-configuration"
+        comparison_plan_id = "stage-b-first500-body-configuration-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic whole-body "
+            "posture-configuration classification (one coarse standing / seated / reclined class, "
+            "computed in memory from pose2 GOLIATH-308 keypoints — pelvis-height fraction, torso-vs-leg "
+            "extent ratio, knee flexion, torso lean; no new model) may reduce unsupported 'she stands' / "
+            "'she is seated' / 'she reclines' posture-class claims or increase supported posture claims in "
+            "captions versus its matched no-evidence baseline when the source item, view, prompt template, "
+            "local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The body-configuration evidence condition does not reduce unsupported posture-class claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the configuration "
+            "bands are not distinguishable from pose-articulation's per-joint signals (redundant axis), "
+            "or an apparent difference is attributable to an uncontrolled view, prompt, aggregator, "
+            "generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. The posture class is computed in memory from the frozen "
+            "selected pose2.npy (GOLIATH-308 shoulders/hips/knees/ankles), with seg2.npy supplying only the "
+            "frame-height denominator for the normalized pelvis fraction — no new model, CPU only. Only the "
+            "scale-invariant coarse class (standing / seated / reclined) is verbalized; raw normalized pelvis "
+            "fractions, pixel extents, knee angles, and torso lean stay in evidence_payload and are never "
+            "caption claims. Items with fewer than ~4 reliable core joints or an ambiguous configuration "
+            "abstain honestly (no fabricated posture class)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2746,6 +2836,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "apparent-age"
     elif "context-raw-affordance-contact" in condition_ids:
         rebuild_kind = "affordance-contact"
+    elif "context-raw-body-configuration" in condition_ids:
+        rebuild_kind = "body-configuration"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2820,6 +2912,7 @@ def _load_selected_item(
     include_image_focus: bool = False,
     include_apparent_age: bool = False,
     include_affordance_contact: bool = False,
+    include_body_configuration: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -2990,6 +3083,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"affordance-contact abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    body_configuration = None
+    if include_body_configuration:
+        try:
+            body_configuration = compute_body_configuration(pose2, seg2)
+        except BodyConfigurationError as exc:
+            raise StageBRunError(
+                f"body-configuration abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3026,6 +3127,7 @@ def _load_selected_item(
         "image_focus": image_focus,
         "apparent_age": apparent_age,
         "affordance_contact": affordance_contact,
+        "body_configuration": body_configuration,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3085,6 +3187,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         image_focus=prepared.get("image_focus"),
         apparent_age=prepared.get("apparent_age"),
         affordance_contact=prepared.get("affordance_contact"),
+        body_configuration=prepared.get("body_configuration"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3107,6 +3210,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         image_focus=prepared.get("image_focus"),
         apparent_age=prepared.get("apparent_age"),
         affordance_contact=prepared.get("affordance_contact"),
+        body_configuration=prepared.get("body_configuration"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3220,6 +3324,10 @@ def _render_condition(
         affordance_contact = prepared.get("affordance_contact")
         evidence_text = _serialize_affordance_contact(affordance_contact)
         return raw.copy(), _context_prompt(evidence_text), affordance_contact
+    if condition_id == "context-raw-body-configuration":
+        body_configuration = prepared.get("body_configuration")
+        evidence_text = _serialize_body_configuration(body_configuration)
+        return raw.copy(), _context_prompt(evidence_text), body_configuration
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3446,6 +3554,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-affordance-contact"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #83: only the body-configuration run computes the deterministic
+    # whole-body posture class (CPU, no new model) — gate on the frozen
+    # plan's conditions.
+    include_body_configuration = any(
+        str(condition.get("id")) == "context-raw-body-configuration"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3463,6 +3578,7 @@ def execute_stage_b(
             include_image_focus=include_image_focus,
             include_apparent_age=include_apparent_age,
             include_affordance_contact=include_affordance_contact,
+            include_body_configuration=include_body_configuration,
         )
         for item in items
     ]
