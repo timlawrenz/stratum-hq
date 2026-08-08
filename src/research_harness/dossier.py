@@ -73,6 +73,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "apparent-age:v1",
     "affordance-contact:v1",
     "body-configuration:v1",
+    "hairstyle:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -619,6 +620,38 @@ def render_body_configuration(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def render_hairstyle(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant hairstyle claim (arm #82).
+
+    Verbalizes ONLY the coarse length + arrangement bands. Raw normalized
+    below-shoulder fractions and pixel spans stay in the machine-readable
+    payload and are never caption claims.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-hairstyle runs) —
+        # emit no claim, never a fabricated hairstyle.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "hairstyle not measurable"
+        return [f"hairstyle: abstain ({reason})"]
+    if not config.get("hair_present"):
+        return ["hairstyle: abstain (no hair region present)"]
+    lines: list[str] = []
+    length = config.get("hair_length_band")
+    if length == "short":
+        lines.append("hairstyle: hair is short (does not extend below the shoulders)")
+    elif length == "shoulder-length":
+        lines.append("hairstyle: hair is shoulder-length")
+    elif length == "long":
+        lines.append("hairstyle: hair is long (extends below the shoulders)")
+    arr = config.get("hair_arrangement_band")
+    if arr == "down":
+        lines.append("hairstyle: hair hangs down below the shoulders")
+    elif arr == "kept-up":
+        lines.append("hairstyle: hair is kept above the shoulders (short crop, tied back, or up)")
+    return lines
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1042,6 +1075,24 @@ def _body_configuration_payload(config: Mapping[str, Any] | None) -> dict[str, A
     return payload
 
 
+def _hairstyle_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "hair_present": config.get("hair_present"),
+        "hair_length_band": config.get("hair_length_band"),
+        "hair_arrangement_band": config.get("hair_arrangement_band"),
+        "hair_below_shoulder_ratio": config.get("hair_below_shoulder_ratio"),
+        "hair_below_shoulder_fraction": config.get("hair_below_shoulder_fraction"),
+        "hair_span_ratio": config.get("hair_span_ratio"),
+        "hair_centroid_row_fraction": config.get("hair_centroid_row_fraction"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1064,6 +1115,7 @@ def build_evidence_payload(
     apparent_age: Mapping[str, Any] | None = None,
     affordance_contact: Mapping[str, Any] | None = None,
     body_configuration: Mapping[str, Any] | None = None,
+    hairstyle: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1138,6 +1190,7 @@ def build_evidence_payload(
             "apparent_age": _apparent_age_payload(apparent_age),
             "affordance_contact": _affordance_contact_payload(affordance_contact),
             "body_configuration": _body_configuration_payload(body_configuration),
+            "hairstyle": _hairstyle_payload(hairstyle),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1177,6 +1230,7 @@ def assemble_dossier(
     apparent_age: Mapping[str, Any] | None = None,
     affordance_contact: Mapping[str, Any] | None = None,
     body_configuration: Mapping[str, Any] | None = None,
+    hairstyle: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1205,6 +1259,7 @@ def assemble_dossier(
         ("apparent-age:v1", "apparent-age", render_apparent_age(apparent_age or {})),
         ("affordance-contact:v1", "affordance-contact", render_affordance_contact(affordance_contact or {})),
         ("body-configuration:v1", "body-configuration", render_body_configuration(body_configuration or {})),
+        ("hairstyle:v1", "hairstyle", render_hairstyle(hairstyle or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

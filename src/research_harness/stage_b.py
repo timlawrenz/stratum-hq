@@ -56,6 +56,7 @@ from .face_geometry import FaceGeometryError, compute_face_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
+from .hairstyle import HairstyleError, compute_hairstyle
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1771,6 +1772,69 @@ def _serialize_body_configuration(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _hairstyle_evidence() -> dict[str, Any]:
+    """Declared deterministic hairstyle / hair-arrangement specialist (arm #82)."""
+    module_path = Path(compute_hairstyle.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-hairstyle-v1",
+        "specialists": [
+            {
+                "id": "in-memory-hairstyle-v1",
+                "scope": "Scale-invariant hairstyle measurement from seg2 DOME-29 Hair region + pose2 GOLIATH-308 shoulder/neck keypoints: hair-length band (short / shoulder-length / long — how far the hair's lowest extent hangs below the shoulder midpoint, normalized by shoulder width) and hair-arrangement band (down / kept-up — whether hair hangs below the shoulder line; 'kept-up' covers short crops, buns, and ties that a Hair silhouette cannot be separated into individually). Never identity, color, or absolute-pixel claims; only the scale-invariant coarse bands in prose.",
+                "inputs": "Frozen selected-item seg2.npy (DOME-29 Hair mask) + pose2.npy (GOLIATH-308 shoulder/neck keypoints); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant hairstyle bands (hair-length, hair-arrangement) or explicit abstention, not semantic ground truth or caption claims; only the coarse bands are verbalized; raw normalized fractions / pixel spans stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.hairstyle.compute_hairstyle "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when the Hair region is absent/below the raw-pixel floor or the shoulder/neck keypoints are unreliable (head-cropped portraits); never fabricate a hairstyle; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Head-cropped portraits with unreliable shoulders abstain (2/24 on the frozen cohort); a Hair silhouette cannot distinguish a short crop from a bun/tie, so those collapse honestly to the single 'kept-up' band (band-degeneracy recovery — the on-paper up/tied-back/down scheme was degenerate, 'up' never fired); a ponytail hanging below the shoulders reads 'down' like loose long hair.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_hairstyle(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a hairstyle dict.
+
+    Verbalizes ONLY the coarse scale-invariant length + arrangement bands.
+    Raw normalized fractions and pixel spans stay in the machine-readable
+    evidence_payload JSON and are not caption claims.
+    """
+    lines = [
+        "HAIRSTYLE (hair length + arrangement, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- hairstyle not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "hairstyle not measurable"
+        lines.append(f"- hairstyle abstained ({reason})")
+        return "\n".join(lines)
+    if not config.get("hair_present"):
+        lines.append("- hairstyle abstained (no hair region present)")
+        return "\n".join(lines)
+    length = config.get("hair_length_band")
+    if length == "short":
+        lines.append("- hair is short (does not extend below the shoulders)")
+    elif length == "shoulder-length":
+        lines.append("- hair is shoulder-length")
+    elif length == "long":
+        lines.append("- hair is long (extends below the shoulders)")
+    arr = config.get("hair_arrangement_band")
+    if arr == "down":
+        lines.append("- hair hangs down below the shoulders")
+    elif arr == "kept-up":
+        lines.append("- hair is kept above the shoulders (short crop, tied back, or up)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1902,6 +1966,9 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # (standing / seated / reclined) computed in memory from pose2 GOLIATH-308
     # keypoints; seg2 supplies only the frame-height denominator.
     "body-configuration": ("pose2.npy", "seg2.npy"),
+    # Arm #82 hairstyle: deterministic hair-length + hair-arrangement bands
+    # from seg2 DOME-29 Hair region + pose2 GOLIATH-308 shoulder/neck.
+    "hairstyle": ("pose2.npy", "seg2.npy"),
 }
 
 
@@ -1995,6 +2062,7 @@ def build_stage_b_plan(
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
+        "hairstyle",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2545,6 +2613,38 @@ def build_stage_b_plan(
             "caption claims. Items with fewer than ~4 reliable core joints or an ambiguous configuration "
             "abstain honestly (no fabricated posture class)."
         )
+    elif evidence_kind == "hairstyle":
+        evidence = _hairstyle_evidence()
+        evidence_condition_id = "context-raw-hairstyle"
+        comparison_plan_id = "stage-b-first500-hairstyle-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic hairstyle "
+            "measurement (scale-invariant hair-length band vs the pose2 shoulder line + hair-arrangement "
+            "band — down / kept-up — from seg2 Hair-region extent + pose2 shoulder/neck keypoints; CPU, "
+            "no new model) may reduce unsupported 'long hair / short hair / hair up or tied back' "
+            "hairstyle/arrangement claims in captions versus its matched no-evidence baseline when the "
+            "source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The hairstyle evidence condition does not reduce unsupported hair-shape/arrangement claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the hair-extent "
+            "geometry is redundant with hair #30's color/region coverage (degenerate), or the "
+            "hair-arrangement bands collapse (a single band taking >=75% of measured items), or an "
+            "apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Hairstyle is computed in memory from the frozen "
+            "selected seg2.npy (DOME-29 Hair region, present 24/24) + pose2.npy (GOLIATH-308 "
+            "shoulder/neck) — no new model, CPU only. Only the scale-invariant coarse bands (length: "
+            "short / shoulder-length / long; arrangement: down / kept-up) are verbalized; raw normalized "
+            "below-shoulder fractions and pixel spans stay in evidence_payload and are never caption "
+            "claims. The on-paper up/tied-back/down arrangement scheme was band-degenerate on the "
+            "calibration probe (7/7 non-down items were short crops mislabeled 'tied-back'; 'up' never "
+            "fired) and was honestly collapsed to a discriminating down / kept-up pair. Items with an "
+            "absent/tiny Hair region or unreliable shoulder/neck keypoints abstain honestly (2/24 on the "
+            "frozen cohort)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2838,6 +2938,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "affordance-contact"
     elif "context-raw-body-configuration" in condition_ids:
         rebuild_kind = "body-configuration"
+    elif "context-raw-hairstyle" in condition_ids:
+        rebuild_kind = "hairstyle"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -2913,6 +3015,7 @@ def _load_selected_item(
     include_apparent_age: bool = False,
     include_affordance_contact: bool = False,
     include_body_configuration: bool = False,
+    include_hairstyle: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3091,6 +3194,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"body-configuration abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    hairstyle = None
+    if include_hairstyle:
+        try:
+            hairstyle = compute_hairstyle(seg2, pose2)
+        except HairstyleError as exc:
+            raise StageBRunError(
+                f"hairstyle abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3128,6 +3239,7 @@ def _load_selected_item(
         "apparent_age": apparent_age,
         "affordance_contact": affordance_contact,
         "body_configuration": body_configuration,
+        "hairstyle": hairstyle,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3188,6 +3300,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         apparent_age=prepared.get("apparent_age"),
         affordance_contact=prepared.get("affordance_contact"),
         body_configuration=prepared.get("body_configuration"),
+        hairstyle=prepared.get("hairstyle"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3211,6 +3324,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         apparent_age=prepared.get("apparent_age"),
         affordance_contact=prepared.get("affordance_contact"),
         body_configuration=prepared.get("body_configuration"),
+        hairstyle=prepared.get("hairstyle"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3328,6 +3442,10 @@ def _render_condition(
         body_configuration = prepared.get("body_configuration")
         evidence_text = _serialize_body_configuration(body_configuration)
         return raw.copy(), _context_prompt(evidence_text), body_configuration
+    if condition_id == "context-raw-hairstyle":
+        hairstyle = prepared.get("hairstyle")
+        evidence_text = _serialize_hairstyle(hairstyle)
+        return raw.copy(), _context_prompt(evidence_text), hairstyle
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3561,6 +3679,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-body-configuration"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #82: only the hairstyle run computes the deterministic hair-length /
+    # hair-arrangement bands (CPU, no new model) — gate on the frozen plan's
+    # conditions.
+    include_hairstyle = any(
+        str(condition.get("id")) == "context-raw-hairstyle"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3579,6 +3704,7 @@ def execute_stage_b(
             include_apparent_age=include_apparent_age,
             include_affordance_contact=include_affordance_contact,
             include_body_configuration=include_body_configuration,
+            include_hairstyle=include_hairstyle,
         )
         for item in items
     ]
