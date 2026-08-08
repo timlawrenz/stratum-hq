@@ -49,6 +49,7 @@ from .skin_color import SkinColorError, compute_skin_tone
 from .lighting import LightingError, compute_lighting
 from .setting import SettingError, compute_setting
 from .texture import TextureError, compute_texture
+from .pose_articulation import PoseArticulationError, compute_pose_articulation
 
 
 class StageBRunError(RuntimeError):
@@ -787,6 +788,113 @@ def _serialize_texture(texture: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _pose_articulation_evidence() -> dict[str, Any]:
+    """Declared deterministic pose-articulation / kinematic specialist (arm #62)."""
+    module_path = Path(compute_pose_articulation.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-pose-articulation-v1",
+        "specialists": [
+            {
+                "id": "in-memory-pose-articulation-v1",
+                "scope": "Kinematic articulation of the single subject from pose2 GOLIATH-308 keypoints + seg2 limb masks only: per-joint flexion angles (elbow/knee), in-plane torso/pelvis orientation (twist/lean/pelvis tilt), weight-bearing stance + contrapposto class, limb-overlap/crossing structure (arms crossing the spine, legs crossed, arm proximity to torso), symmetry/asymmetry of flexion; never identity, clothing, or semantic pose labels beyond what joint geometry supports.",
+                "inputs": "Frozen selected-item pose2.npy (GOLIATH-308) + seg2.npy (DOME-29); recomputed in memory during this bounded run with no crawlr/stratum write.",
+                "output_semantics": "Provenance-bearing scale-invariant kinematic measurements (angles, normalized ratios, stance classes) or explicit abstention, not semantic ground truth or caption claims; only scale-invariant facts are verbalized.",
+                "provenance": (
+                    "research_harness.pose_articulation.compute_pose_articulation "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; every angle/ratio/stance emits None (never fabricated) when its supporting joints are absent or below confidence threshold; stance and contrapposto abstain when the weight-bearing signal is ambiguous; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "Low keypoint confidence on occluded/cropped limbs makes flexion angles abstain; in-plane torso twist cannot recover out-of-plane rotation; seg2 arm/torso proximity is a spatial proxy for occlusion, not a true depth ordering; contrapposto detection depends on both a clear weight shift and pelvis tilt and may abstain on partially visible legs.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_pose_articulation(articulation: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of a pose-articulation dict.
+
+    Verbalizes ONLY scale-invariant kinematic facts: joint-flexion bands
+    (extended / bent), stance class (weight on a leg / centered), contrapposto
+    stance, torso/pelvis orientation (twist/lean/tilt in degrees), limb-overlap
+    structure (arms crossed in front of torso), and flexion asymmetry. Raw
+    joint angles, pixel lengths, and seg2 fractions remain in the machine-
+    readable `evidence_payload` JSON (dossier / compressor input) and are not
+    caption claims — angles are scale-invariant, but a bare degree number is
+    not something a text-to-image model should be asked to render; the banded
+    "bent-arm"/"weight-on-one-leg" phrasing is.
+    """
+    lines = [
+        "POSE-ARTICULATION (deterministic, scale-invariant kinematics from Goliath-308 pose2 + seg2):"
+    ]
+    if not articulation.get("subject_present"):
+        lines.append("- no reliable subject keypoints -> abstain from pose/stance/limb claims")
+        return "\n".join(lines)
+
+    # Joint-flexion bands (scale-invariant: angles).
+    for side, key in (("left", "elbow_flexion_left"), ("right", "elbow_flexion_right")):
+        value = articulation.get(key)
+        if value is None:
+            lines.append(f"- {side} elbow flexion: not measurable (joint absent or low confidence)")
+        elif value < 135.0:
+            lines.append(f"- {side} arm visibly bent at the elbow")
+        else:
+            lines.append(f"- {side} arm extended at the elbow")
+    for side, key in (("left", "knee_flexion_left"), ("right", "knee_flexion_right")):
+        value = articulation.get(key)
+        if value is None:
+            lines.append(f"- {side} knee flexion: not measurable (joint absent or low confidence)")
+        elif value < 135.0:
+            lines.append(f"- {side} leg visibly bent at the knee")
+        else:
+            lines.append(f"- {side} leg extended at the knee")
+
+    # Stance / contrapposto (scale-invariant stance classes).
+    stance = articulation.get("stance_class")
+    if stance and stance != "centered":
+        leg = "left" if stance == "weight-left" else "right"
+        lines.append(f"- stance: weight clearly carried on the {leg} leg")
+    elif stance == "centered":
+        lines.append("- stance: weight evenly centered (no single weight-bearing leg)")
+    else:
+        lines.append("- stance: not measurable (weight-bearing signal ambiguous)")
+
+    contrapposto = articulation.get("contrapposto")
+    if contrapposto is True:
+        lines.append("- contrapposto stance: hips tilted with weight on one leg (counter-rotated hips/shoulders)")
+    elif contrapposto is False:
+        lines.append("- contrapposto stance: absent (hips level, weight-bearing signal even)")
+
+    # Torso/pelvis orientation (scale-invariant in-plane angles).
+    twist = articulation.get("torso_twist_deg")
+    lean = articulation.get("torso_lean_deg")
+    tilt = articulation.get("pelvis_tilt_deg")
+    if twist is not None:
+        lines.append(f"- torso/hips in-plane twist: {twist:.0f} degrees between shoulder and hip axes")
+    if lean is not None:
+        lines.append(f"- torso lean from vertical: {lean:.0f} degrees")
+    if tilt is not None:
+        lines.append(f"- pelvis tilt from horizontal: {tilt:.0f} degrees")
+
+    # Limb-overlap structure (scale-invariant crossing counts / fractions).
+    crossing = articulation.get("arm_crossing_count")
+    if crossing is not None and crossing > 0:
+        lines.append(f"- {crossing} arm(s) cross in front of the torso")
+    legs_crossed = articulation.get("legs_crossed")
+    if legs_crossed is True:
+        lines.append("- legs visually crossed")
+
+    # Flexion asymmetry (scale-invariant: angle difference).
+    asy = articulation.get("elbow_flexion_asymmetry_deg")
+    if asy is not None and asy > 15.0:
+        lines.append(f"- asymmetric arm positioning (left/right elbow flexion differ by {asy:.0f} degrees)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -863,6 +971,7 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "texture": ("seg2.npy",),
     "context4k": ("pose2.npy", "seg2.npy", "normal2.npy"),
     "vlm-dense": ("pose2.npy", "seg2.npy", "normal2.npy"),
+    "pose-articulation": ("pose2.npy", "seg2.npy"),
 }
 
 
@@ -953,7 +1062,7 @@ def build_stage_b_plan(
     """
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
-        "vlm-dense",
+        "vlm-dense", "pose-articulation",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -1150,6 +1259,33 @@ def build_stage_b_plan(
             "are per-channel-99.9-percentile-normalized so exposure/white balance cannot inflate gradients; "
             "only scale-invariant bands/fractions are verbalized; absolute gradient values and pixel counts "
             "stay in evidence_payload."
+        )
+    elif evidence_kind == "pose-articulation":
+        evidence = _pose_articulation_evidence()
+        evidence_condition_id = "context-raw-pose-articulation"
+        comparison_plan_id = "stage-b-first500-pose-articulation-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic pose-articulation "
+            "measurements (per-joint elbow/knee flexion angles, in-plane torso/pelvis orientation, weight-bearing "
+            "stance + contrapposto class, limb-overlap/crossing structure, flexion asymmetry — all scale-invariant "
+            "kinematics computed in memory from pose2 GOLIATH-308 keypoints + seg2 limb masks) may reduce "
+            "unsupported pose/stance/limb claims in captions versus its matched no-evidence baseline when the "
+            "source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The pose-articulation evidence condition does not reduce unsupported pose/stance/limb claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the measured kinematics are "
+            "not distinguishable from body-type's static ratios (redundant axis), or an apparent difference is "
+            "attributable to an uncontrolled view, prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "and pointmap are not used as evidence inputs. Kinematic articulation is computed in memory from the "
+            "frozen selected pose2 (GOLIATH-308 keypoints) + seg2 (DOME-29 limb/region masks) only. Only "
+            "scale-invariant facts are verbalized: joint-flexion bands (bent vs extended), stance class "
+            "(weight on a leg / centered), contrapposto, torso/pelvis in-plane angles, arm-crossing structure, "
+            "and flexion asymmetry. Absolute pixel positions/lengths and raw angles stay in evidence_payload "
+            "and are never caption claims."
         )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
@@ -1420,6 +1556,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "setting"
     elif "context-raw-texture" in condition_ids:
         rebuild_kind = "texture"
+    elif "context-raw-pose-articulation" in condition_ids:
+        rebuild_kind = "pose-articulation"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -1561,6 +1699,10 @@ def _load_selected_item(
         texture = compute_texture(seg2, np.asarray(image.convert("RGB"), dtype=np.uint8))
     except TextureError as exc:
         raise StageBRunError(f"texture abort for frozen selected item {image_id}: {exc}") from exc
+    try:
+        articulation = compute_pose_articulation(pose2, seg2)
+    except PoseArticulationError as exc:
+        raise StageBRunError(f"pose-articulation abort for frozen selected item {image_id}: {exc}") from exc
     derived_reads = ["pose2.npy", "seg2.npy"]
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
@@ -1587,6 +1729,7 @@ def _load_selected_item(
         "lighting": lighting,
         "setting": setting,
         "texture": texture,
+        "articulation": articulation,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -1635,6 +1778,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         lighting=lighting,
         setting=prepared.get("setting"),
         texture=prepared.get("texture"),
+        articulation=prepared.get("articulation"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -1646,6 +1790,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         lighting=lighting,
         setting=prepared.get("setting"),
         texture=prepared.get("texture"),
+        articulation=prepared.get("articulation"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -1715,6 +1860,10 @@ def _render_condition(
         texture = prepared["texture"]
         evidence_text = _serialize_texture(texture)
         return raw.copy(), _context_prompt(evidence_text), texture
+    if condition_id == "context-raw-pose-articulation":
+        articulation = prepared["articulation"]
+        evidence_text = _serialize_pose_articulation(articulation)
+        return raw.copy(), _context_prompt(evidence_text), articulation
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
