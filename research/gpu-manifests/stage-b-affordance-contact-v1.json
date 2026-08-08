@@ -23,7 +23,7 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "7b6338c738680ab4081f1b832ccd132aec4f38d1",
+    "git_commit": "932f3a2a2e1bf6957651e446141fb8971ad51c60",
     "launcher_source_sha256": "a05b0ea273cab2dffee66cb1072a88c6f336119dfe8caf003b4753cd5400cbd5",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
