@@ -72,6 +72,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "image-focus:v1",
     "apparent-age:v1",
     "affordance-contact:v1",
+    "body-configuration:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -594,6 +595,30 @@ def render_affordance_contact(contact: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_body_configuration(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant whole-body posture-class claim (arm #83).
+
+    Verbalizes ONLY the coarse posture class (standing / seated / reclined).
+    Raw normalized pelvis fractions, pixel extents, knee angles, and torso
+    lean stay in the machine-readable payload and are never caption claims.
+    """
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "body configuration not measurable"
+        return [f"body-configuration: abstain ({reason})"]
+    if not config:
+        # Dimension not measured for this item (e.g. non-body-configuration
+        # runs) — emit no claim, never a fabricated posture statement.
+        return []
+    cls = config.get("posture_class")
+    if cls == "standing":
+        return ["body-configuration: subject is standing (upright, legs near-extended)"]
+    if cls == "seated":
+        return ["body-configuration: subject is seated (hips elevated, knees bent)"]
+    if cls == "reclined":
+        return ["body-configuration: subject is reclining (torso near-horizontal)"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -999,6 +1024,24 @@ def _affordance_contact_payload(contact: Mapping[str, Any] | None) -> dict[str, 
     return payload
 
 
+def _body_configuration_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "posture_class": config.get("posture_class"),
+        "pelvis_height_fraction": config.get("pelvis_height_fraction"),
+        "torso_leg_extent_ratio": config.get("torso_leg_extent_ratio"),
+        "knee_flexion_left_deg": config.get("knee_flexion_left_deg"),
+        "knee_flexion_right_deg": config.get("knee_flexion_right_deg"),
+        "median_knee_flexion_deg": config.get("median_knee_flexion_deg"),
+        "torso_lean_deg": config.get("torso_lean_deg"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1020,6 +1063,7 @@ def build_evidence_payload(
     image_focus: Mapping[str, Any] | None = None,
     apparent_age: Mapping[str, Any] | None = None,
     affordance_contact: Mapping[str, Any] | None = None,
+    body_configuration: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1093,6 +1137,7 @@ def build_evidence_payload(
             "image_focus": _image_focus_payload(image_focus),
             "apparent_age": _apparent_age_payload(apparent_age),
             "affordance_contact": _affordance_contact_payload(affordance_contact),
+            "body_configuration": _body_configuration_payload(body_configuration),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1131,6 +1176,7 @@ def assemble_dossier(
     image_focus: Mapping[str, Any] | None = None,
     apparent_age: Mapping[str, Any] | None = None,
     affordance_contact: Mapping[str, Any] | None = None,
+    body_configuration: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1158,6 +1204,7 @@ def assemble_dossier(
         ("image-focus:v1", "image-focus", render_image_focus(image_focus or {})),
         ("apparent-age:v1", "apparent-age", render_apparent_age(apparent_age or {})),
         ("affordance-contact:v1", "affordance-contact", render_affordance_contact(affordance_contact or {})),
+        ("body-configuration:v1", "body-configuration", render_body_configuration(body_configuration or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
