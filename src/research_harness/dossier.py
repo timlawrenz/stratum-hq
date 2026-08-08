@@ -76,6 +76,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "hairstyle:v1",
     "face-visibility:v1",
     "environment-clearance:v1",
+    "eye-color:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -704,6 +705,25 @@ def render_environment_clearance(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def render_eye_color(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant eye-color claim (arm #80).
+
+    Verbalizes ONLY the coarse closed-set band. Raw RGB/HSV stats stay in the
+    machine-readable payload and are never caption claims.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-eye-color runs) —
+        # emit no claim, never a fabricated eye-color statement.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "eye color not measurable"
+        return [f"eye-color: abstain ({reason})"]
+    band = config.get("eye_color_band")
+    if band in ("brown", "dark", "blue", "green-hazel", "gray"):
+        return [f"eye-color: eyes are {band}"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1180,6 +1200,23 @@ def _environment_clearance_payload(config: Mapping[str, Any] | None) -> dict[str
     return payload
 
 
+def _eye_color_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "eye_color_band": config.get("eye_color_band"),
+        "sample_count": config.get("sample_count"),
+        "mean_rgb": config.get("mean_rgb"),
+        "hue_deg": config.get("hue_deg"),
+        "saturation": config.get("saturation"),
+        "value": config.get("value"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1205,6 +1242,7 @@ def build_evidence_payload(
     hairstyle: Mapping[str, Any] | None = None,
     face_visibility: Mapping[str, Any] | None = None,
     environment_clearance: Mapping[str, Any] | None = None,
+    eye_color: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1282,6 +1320,7 @@ def build_evidence_payload(
             "hairstyle": _hairstyle_payload(hairstyle),
             "face_visibility": _face_visibility_payload(face_visibility),
             "environment_clearance": _environment_clearance_payload(environment_clearance),
+            "eye_color": _eye_color_payload(eye_color),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1324,6 +1363,7 @@ def assemble_dossier(
     hairstyle: Mapping[str, Any] | None = None,
     face_visibility: Mapping[str, Any] | None = None,
     environment_clearance: Mapping[str, Any] | None = None,
+    eye_color: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1355,6 +1395,7 @@ def assemble_dossier(
         ("hairstyle:v1", "hairstyle", render_hairstyle(hairstyle or {})),
         ("face-visibility:v1", "face-visibility", render_face_visibility(face_visibility or {})),
         ("environment-clearance:v1", "environment-clearance", render_environment_clearance(environment_clearance or {})),
+        ("eye-color:v1", "eye-color", render_eye_color(eye_color or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
