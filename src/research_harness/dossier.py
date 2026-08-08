@@ -74,6 +74,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "affordance-contact:v1",
     "body-configuration:v1",
     "hairstyle:v1",
+    "face-visibility:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -652,6 +653,31 @@ def render_hairstyle(config: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def render_face_visibility(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant face-prominence claim (arm #84).
+
+    Verbalizes ONLY the coarse visibility band. The raw face-share ratio
+    stays in the machine-readable payload and is never a caption claim.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-face-visibility
+        # runs) — emit no claim, never a fabricated visibility statement.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "face visibility not measurable"
+        return [f"face-visibility: abstain ({reason})"]
+    if not config.get("face_present"):
+        return ["face-visibility: abstain (no face region present)"]
+    band = config.get("face_visibility_band")
+    if band == "clearly-visible":
+        return ["face-visibility: face is clearly visible (face dominates the head region)"]
+    if band == "partially-framed":
+        return ["face-visibility: face is partially framed by surrounding hair"]
+    if band == "hair-dominant":
+        return ["face-visibility: hair dominates the head region around a relatively small exposed face"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1093,6 +1119,22 @@ def _hairstyle_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _face_visibility_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "face_present": config.get("face_present"),
+        "face_share_of_head": config.get("face_share_of_head"),
+        "face_visibility_band": config.get("face_visibility_band"),
+        "face_px": config.get("face_px"),
+        "face_frame_coverage": config.get("face_frame_coverage"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1116,6 +1158,7 @@ def build_evidence_payload(
     affordance_contact: Mapping[str, Any] | None = None,
     body_configuration: Mapping[str, Any] | None = None,
     hairstyle: Mapping[str, Any] | None = None,
+    face_visibility: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1191,6 +1234,7 @@ def build_evidence_payload(
             "affordance_contact": _affordance_contact_payload(affordance_contact),
             "body_configuration": _body_configuration_payload(body_configuration),
             "hairstyle": _hairstyle_payload(hairstyle),
+            "face_visibility": _face_visibility_payload(face_visibility),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1231,6 +1275,7 @@ def assemble_dossier(
     affordance_contact: Mapping[str, Any] | None = None,
     body_configuration: Mapping[str, Any] | None = None,
     hairstyle: Mapping[str, Any] | None = None,
+    face_visibility: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1260,6 +1305,7 @@ def assemble_dossier(
         ("affordance-contact:v1", "affordance-contact", render_affordance_contact(affordance_contact or {})),
         ("body-configuration:v1", "body-configuration", render_body_configuration(body_configuration or {})),
         ("hairstyle:v1", "hairstyle", render_hairstyle(hairstyle or {})),
+        ("face-visibility:v1", "face-visibility", render_face_visibility(face_visibility or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
