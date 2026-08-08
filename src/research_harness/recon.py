@@ -29,7 +29,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-GOAL_ARM_PLAN = Path("/home/tim/source/activity/stratum-hq-stage-b-experiment/research/stage-b-plans/stage-b-roundtrip-context4k-v1.json")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+GOAL_ARM_PLAN = _REPO_ROOT / "research/stage-b-plans/stage-b-roundtrip-context4k-v1.json"
 DOSSIER_V2_ROOT = Path("/mnt/nas-ai-models/research/stratum/dossier-context4k-v2")
 CANONICAL_SOURCE_ROOT = Path("/mnt/nas-ai-models/training-data/crawlr/approved")
 
