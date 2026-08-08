@@ -903,7 +903,7 @@
         "dossier-context4k"
       ],
       "state": "active",
-      "valid_non_improving_experiments": 0
+      "valid_non_improving_experiments": 1
     },
     {
       "id": "body-volume",
@@ -1112,6 +1112,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 22
+    },
+    {
+      "arm_id": "image-quality",
+      "verdict": "NOT_BETTER",
+      "state": "active",
+      "cycle": 23
     }
   ]
 }
