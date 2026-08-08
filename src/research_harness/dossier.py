@@ -78,6 +78,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "environment-clearance:v1",
     "eye-color:v1",
     "facial-expression:v1",
+    "image-quality:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -536,6 +537,28 @@ def render_scene_category(scene: Mapping[str, Any]) -> list[str]:
         # runs) — emit no claim, never a fabricated label.
         return []
     return [f"scene-category: the setting is a {scene['category']}"]
+
+
+def render_image_quality(quality: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant no-reference perceptual-quality claim (arm #95).
+
+    Verbalizes ONLY the coarse scale-invariant quality band (or a surfaced
+    abstention). The raw CLIP-IQA score / aspect logits stay in the
+    machine-readable payload and are never caption claims.
+    """
+    if quality.get("abstained"):
+        reason = quality.get("abstention_reason") or "image quality not confidently measured"
+        return [f"image-quality: abstain ({reason})"]
+    if not quality or not quality.get("quality_band"):
+        # Dimension not measured for this item — emit no claim, never a
+        # fabricated band.
+        return []
+    band = quality["quality_band"]
+    if band == "sharp":
+        return ["image-quality: the photo appears sharp and crisp"]
+    if band == "moderate":
+        return ["image-quality: the photo appears of moderate quality"]
+    return ["image-quality: the photo appears degraded / low quality"]
 
 
 def render_apparent_age(age: Mapping[str, Any]) -> list[str]:
@@ -1051,6 +1074,23 @@ def _scene_category_payload(scene: Mapping[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def _image_quality_payload(quality: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not quality:
+        return {}
+    payload = {
+        "quality_band": quality.get("quality_band"),
+        "clip_iqa_score": quality.get("score"),
+        "aspect_scores": quality.get("aspect_scores"),
+        "aspect_logits": quality.get("aspect_logits"),
+        "sharp_floor": quality.get("sharp_floor"),
+        "moderate_floor": quality.get("moderate_floor"),
+    }
+    ab = quality.get("abstention_reason")
+    if quality.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def _gaze_head_payload(gaze: Mapping[str, Any] | None) -> dict[str, Any]:
     if not gaze:
         return {}
@@ -1273,6 +1313,7 @@ def build_evidence_payload(
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
+    image_quality: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
@@ -1352,6 +1393,7 @@ def build_evidence_payload(
             "face_geometry": _face_geometry_payload(face_geometry),
             "object_relations": _object_relations_payload(object_relations),
             "scene_category": _scene_category_payload(scene_category),
+            "image_quality": _image_quality_payload(image_quality),
             "gaze_head": _gaze_head_payload(gaze_head),
             "camera_viewing_angle": _camera_viewing_angle_payload(camera_viewing_angle),
             "image_focus": _image_focus_payload(image_focus),
@@ -1396,6 +1438,7 @@ def assemble_dossier(
     face_geometry: Mapping[str, Any] | None = None,
     object_relations: Mapping[str, Any] | None = None,
     scene_category: Mapping[str, Any] | None = None,
+    image_quality: Mapping[str, Any] | None = None,
     gaze_head: Mapping[str, Any] | None = None,
     camera_viewing_angle: Mapping[str, Any] | None = None,
     image_focus: Mapping[str, Any] | None = None,
@@ -1429,6 +1472,7 @@ def assemble_dossier(
         ("face-geometry:v1", "face-geometry", render_face_geometry(face_geometry or {})),
         ("object-relations:v1", "object-relations", render_object_relations(object_relations or {})),
         ("scene-category:v1", "scene-category", render_scene_category(scene_category or {})),
+        ("image-quality:v1", "image-quality", render_image_quality(image_quality or {})),
         ("gaze-head-orientation:v1", "gaze-head-orientation", render_gaze_head(gaze_head or {})),
         ("camera-viewing-angle:v1", "camera-viewing-angle", render_camera_viewing_angle(camera_viewing_angle or {})),
         ("image-focus:v1", "image-focus", render_image_focus(image_focus or {})),

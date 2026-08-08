@@ -902,8 +902,8 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
-      "valid_non_improving_experiments": 0
+      "state": "validated",
+      "valid_non_improving_experiments": 1
     },
     {
       "id": "body-volume",
@@ -963,7 +963,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0
     }
   ],
@@ -979,7 +979,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 23,
+  "selection_progress": 24,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1112,6 +1112,18 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 22
+    },
+    {
+      "arm_id": "image-quality",
+      "verdict": "NOT_BETTER",
+      "state": "active",
+      "cycle": 23
+    },
+    {
+      "arm_id": "image-quality",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 24
     }
   ]
 }
