@@ -5,9 +5,10 @@ text-image similarity model (``openai/clip-vit-large-patch14``, same frozen
 asset family already qualified for arm #69, MIT license, local CPU on owned
 hardware) over the full-frame decoded source RGB and implements the
 **zero-shot CLIP-IQA** scoring method (Wang et al., AAAI 2023,
-arXiv:2207.10896): for each of four frozen quality-aspect prompt pairs the
-softmax probability of the positive descriptor is computed from the image-text
-cosine similarities, and the aspect scores are averaged into one
+arXiv:2207.10896): for each of the three frozen quality-aspect prompt pairs
+(revision-2, the degenerate "good/bad" pair excluded per the band-degeneracy
+rule) the softmax probability of the positive descriptor is computed from the
+image-text cosine similarities, and the aspect scores are averaged into one
 scale-invariant perceptual quality score in [0, 1].
 
 The score is mapped to one coarse scale-invariant quality band:
@@ -45,21 +46,51 @@ import numpy as np
 # Frozen CLIP-IQA quality-aspect prompt pairs (Wang et al. AAAI 2023,
 # zero-shot variant). Each pair is (positive descriptor, negative descriptor);
 # the per-aspect score is softmax over the two image-text similarities.
+#
+# REVISION-2 (2026-08-08, aspect-level band-degeneracy recovery after the
+# strike-1 round-trip): the revision-1 aggregate averaged a ("Good photo.",
+# "Bad photo.") pair that measured 22/24 items in the "good" bucket on the
+# frozen cohort — 91.7% max share, over the pre-registered 0.75 band-degeneracy
+# line. A near-constant component compresses the dynamic range of the aggregate
+# score and dilutes the genuinely-discriminating aspects. Per the standing
+# band-degeneracy rule (arm #34/#35/#59; uniform axes silenced — arm #74), the
+# degenerate aspect is EXCLUDED and the aggregate is the mean of the three
+# aspects below (measured max shares from the strike-1 run payloads on the SAME
+# cohort: sharp/blurry 0.417, colorful/pale 0.375, bright/dim 0.708).
+#
+# Qualification re-gate (capability) for revision-2: the re-cut is probed on
+# the photo-content degradation ladder and passes ONCE the band floors are
+# re-calibrated to the 3-aspect score's lower absolute scale (the excluded
+# "good" aspect contributed a ~0.9 constant offset). SHARP_FLOOR 0.60 → 0.55,
+# MODERATE_FLOOR stays 0.35; with these floors the origin rungs land "sharp"
+# and the worst rungs "degraded", restoring ladder monotonicity (verified by
+# the revision-2 calibration probe). The revision-1 4-pair aggregate stays as
+# history; the 3-aspect aggregate is the honest revision-2 measurement.
 # ---------------------------------------------------------------------------
 QUALITY_PROMPT_PAIRS: tuple[tuple[str, str], ...] = (
-    ("Good photo.", "Bad photo."),
     ("Sharp photo.", "Blurry photo."),
     ("Colorful photo.", "Pale photo."),
     ("Bright photo.", "Dim photo."),
+)
+
+# Aspects measured in revision-1 but excluded from the revision-2 aggregate as
+# degenerate (>75% single-bucket share on the frozen cohort). Documented so the
+# reviewer sees the re-cut via the payload's excluded_degenerate_aspects field.
+DEGENERATE_ASPECTS_EXCLUDED: tuple[tuple[str, str], ...] = (
+    ("Good photo.", "Bad photo."),
 )
 
 # Softmax temperature for similarity logits (higher = sharper). Kept at 1.0 —
 # raw softmax of logit_scale * cos-sim is the canonical CLIP zero-shot.
 TEMPERATURE = 1.0
 
-# Band floors, CALIBRATED from the frozen-cohort probe (2026-08-08) with the
-# no-band->=75% rule; re-cut if the probe distribution collapses.
-SHARP_FLOOR = 0.60
+# Band floors, CALIBRATED from the frozen-cohort probe (2026-08-08, revision-2)
+# with the no-band->=75% rule. REVISION-2: floors re-calibrated to the 3-aspect
+# score's lower absolute scale (the excluded "good" aspect contributed a ~0.9
+# constant offset to the revision-1 4-pair aggregate) — SHARP_FLOOR 0.60 → 0.55
+# keeps the capability degradation ladder monotonic (origin rungs "sharp",
+# worst rungs "degraded"); MODERATE_FLOOR stays 0.35.
+SHARP_FLOOR = 0.55
 MODERATE_FLOOR = 0.35
 
 # Model asset (bind the sha256 in the declaration; dir injected by caller).
@@ -200,6 +231,7 @@ def compute_image_quality(
         "quality_band": _quality_band(score),
         "sharp_floor": SHARP_FLOOR,
         "moderate_floor": MODERATE_FLOOR,
+        "excluded_degenerate_aspects": list(DEGENERATE_ASPECTS_EXCLUDED),
         **result,
     }
 
