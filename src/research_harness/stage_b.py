@@ -59,6 +59,7 @@ from .body_configuration import BodyConfigurationError, compute_body_configurati
 from .hairstyle import HairstyleError, compute_hairstyle
 from .face_visibility import FaceVisibilityError, compute_face_visibility
 from .environment_clearance import EnvironmentClearanceError, compute_environment_clearance
+from .eye_color import EyeColorError, compute_eye_color
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1953,6 +1954,56 @@ def _serialize_environment_clearance(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _eye_color_evidence() -> dict[str, Any]:
+    """Declared deterministic iris-hue specialist (arm #80)."""
+    module_path = Path(compute_eye_color.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-eye-color-v1",
+        "specialists": [
+            {
+                "id": "in-memory-eye-color-v1",
+                "scope": "Deterministic eye-color measurement from pose2 GOLIATH-308 iris/pupil center + border keypoints and the already-decoded source RGB: sample the iris ANNULUS (between the pupil and iris borders, avoiding the dark pupil + specular glare), robust mean <- HSV, closed-set band (brown / dark / blue / green-hazel / gray). Emits ONE coarse band or an honest abstention. Never identity, skin color, or absolute-pixel claims; only the coarse closed-set band in prose; raw RGB/HSV stats stay payload-only.",
+                "inputs": "Frozen selected-item pose2.npy (GOLIATH-308 iris/pupil keypoints) + the already-decoded source RGB (SHA-bound via source_sha256); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant eye-color band (brown / dark / blue / green-hazel / gray) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw sampled RGB/HSV statistics stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.eye_color.compute_eye_color "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when neither eye's iris keypoints are reliable, the annulus is degenerate/tiny, the specimen is too dark to resolve hue, or the coordinate falls outside the decoded frame; never fabricate an eye color; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "3/24 frozen items abstain (eyes closed/cropped/heavily occluded). The band is coarse and hue/lighting-sensitive: shadowed brown can read 'dark', and a light low-sat eye can read 'gray'; distribution on the cohort is brown-dominant (15 brown / 5 dark / 1 blue, max_share 0.71 — honest for a brown-eye-dominant portrait cohort).",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_eye_color(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an eye-color dict.
+
+    Verbalizes ONLY the coarse closed-set band. Raw RGB/HSV statistics stay in
+    the machine-readable evidence_payload JSON and are not caption claims.
+    """
+    lines = [
+        "EYE-COLOR (iris hue, coarse closed-set band):"
+    ]
+    if not config:
+        lines.append("- eye color not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "eye color not measurable"
+        lines.append(f"- eye color abstained ({reason})")
+        return "\n".join(lines)
+    band = config.get("eye_color_band")
+    if band in ("brown", "dark", "blue", "green-hazel", "gray"):
+        lines.append(f"- eyes are {band}")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -2093,6 +2144,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # Arm #85 environment-clearance: deterministic subject-to-backdrop
     # negative-space band from seg2 (Background split around the subject).
     "environment-clearance": ("seg2.npy",),
+    # Arm #80 eye-color: deterministic iris-hue band from pose2 GOLIATH-308
+    # iris/pupil keypoints + the already-decoded source RGB (source bytes are
+    # SHA-bound via source_sha256).
+    "eye-color": ("pose2.npy",),
 }
 
 
@@ -2186,7 +2241,7 @@ def build_stage_b_plan(
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
-        "hairstyle", "face-visibility", "environment-clearance",
+        "hairstyle", "face-visibility", "environment-clearance", "eye-color",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2831,6 +2886,37 @@ def build_stage_b_plan(
             "spacious, max_share 0.45; 22/24 measured, 2 honest abstentions for full-bleed subjects with zero "
             "Background clearance)."
         )
+    elif evidence_kind == "eye-color":
+        evidence = _eye_color_evidence()
+        evidence_condition_id = "context-raw-eye-color"
+        comparison_plan_id = "stage-b-first500-eye-color-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic iris-hue "
+            "measurement (scale-invariant closed-set eye-color band — brown / dark / blue / "
+            "green-hazel / gray — sampled from the iris annulus via pose2 GOLIATH-308 iris/pupil "
+            "keypoints + the source RGB; CPU, no new model) may reduce unsupported 'her blue eyes / "
+            "brown eyes / dark eyes' claims in captions versus its matched no-evidence baseline when "
+            "the source item, view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The eye-color evidence condition does not reduce unsupported eye-color claims or increase "
+            "supported claims versus its matched no-evidence baseline, or the eye-color bands collapse "
+            "(a single band taking >=75% of measured items), or an apparent difference is attributable to an "
+            "uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Eye color is computed in memory from the frozen "
+            "selected pose2.npy (GOLIATH-308 iris/pupil center + border keypoints) + the already-decoded "
+            "source RGB (SHA-bound via source_sha256) — no new model, CPU only. Only the scale-invariant "
+            "coarse closed-set band (brown / dark / blue / green-hazel / gray) is verbalized; raw sampled "
+            "RGB/HSV statistics stay in evidence_payload and are never caption claims. Calibration probe "
+            "(measured 2026-08-08): 15 brown / 5 dark / 1 blue, max_share 0.71 (honest for a "
+            "brown-eye-dominant portrait cohort); 21/24 measured, 3 honest abstentions (eyes "
+            "closed/cropped/heavily occluded). The first classifier's broad 'value<0.30 or sat<0.18 -> "
+            "dark' rule mislabeled light low-sat eyes and was re-cut (shadow-dark brown/black by low "
+            "value, well-lit brown by warm hue, cool hue -> blue/green-hazel)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3130,6 +3216,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "face-visibility"
     elif "context-raw-environment-clearance" in condition_ids:
         rebuild_kind = "environment-clearance"
+    elif "context-raw-eye-color" in condition_ids:
+        rebuild_kind = "eye-color"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3208,6 +3296,7 @@ def _load_selected_item(
     include_hairstyle: bool = False,
     include_face_visibility: bool = False,
     include_environment_clearance: bool = False,
+    include_eye_color: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3410,6 +3499,15 @@ def _load_selected_item(
             raise StageBRunError(
                 f"environment-clearance abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    eye_color = None
+    if include_eye_color:
+        rgb_eye = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8))
+        try:
+            eye_color = compute_eye_color(pose2, rgb_eye)
+        except EyeColorError as exc:
+            raise StageBRunError(
+                f"eye-color abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3450,6 +3548,7 @@ def _load_selected_item(
         "hairstyle": hairstyle,
         "face_visibility": face_visibility,
         "environment_clearance": environment_clearance,
+        "eye_color": eye_color,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3513,6 +3612,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         hairstyle=prepared.get("hairstyle"),
         face_visibility=prepared.get("face_visibility"),
         environment_clearance=prepared.get("environment_clearance"),
+        eye_color=prepared.get("eye_color"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3539,6 +3639,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         hairstyle=prepared.get("hairstyle"),
         face_visibility=prepared.get("face_visibility"),
         environment_clearance=prepared.get("environment_clearance"),
+        eye_color=prepared.get("eye_color"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3668,6 +3769,10 @@ def _render_condition(
         environment_clearance = prepared.get("environment_clearance")
         evidence_text = _serialize_environment_clearance(environment_clearance)
         return raw.copy(), _context_prompt(evidence_text), environment_clearance
+    if condition_id == "context-raw-eye-color":
+        eye_color = prepared.get("eye_color")
+        evidence_text = _serialize_eye_color(eye_color)
+        return raw.copy(), _context_prompt(evidence_text), eye_color
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3922,6 +4027,12 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-environment-clearance"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #80: only the eye-color run computes the deterministic iris-hue band
+    # (CPU, no new model) — gate on the frozen plan's conditions.
+    include_eye_color = any(
+        str(condition.get("id")) == "context-raw-eye-color"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3943,6 +4054,7 @@ def execute_stage_b(
             include_hairstyle=include_hairstyle,
             include_face_visibility=include_face_visibility,
             include_environment_clearance=include_environment_clearance,
+            include_eye_color=include_eye_color,
         )
         for item in items
     ]
