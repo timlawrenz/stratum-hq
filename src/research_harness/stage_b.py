@@ -58,6 +58,7 @@ from .affordance_contact import AffordanceContactError, compute_affordance_conta
 from .body_configuration import BodyConfigurationError, compute_body_configuration
 from .hairstyle import HairstyleError, compute_hairstyle
 from .face_visibility import FaceVisibilityError, compute_face_visibility
+from .environment_clearance import EnvironmentClearanceError, compute_environment_clearance
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1894,6 +1895,64 @@ def _serialize_face_visibility(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _environment_clearance_evidence() -> dict[str, Any]:
+    """Declared deterministic subject-to-environment clearance specialist (arm #85)."""
+    module_path = Path(compute_environment_clearance.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-environment-clearance-v1",
+        "specialists": [
+            {
+                "id": "in-memory-environment-clearance-v1",
+                "scope": "Scale-invariant subject-to-environment clearance from seg2 DOME-29 only: normalized Background gaps around the subject bbox (left/right horizontal axis is the discriminating one on a portrait cohort), median -> clearance band (tight / moderate / spacious). Emits ONE coarse band or an honest abstention. Never identity, setting color/tone, aesthetics, or absolute-pixel claims; only the scale-invariant coarse band in prose. Band-degeneracy recovery: the on-paper median-of-all-4-axes was degenerate (tall full-body bbox -> vertical gaps ~0 -> 86% tight) and was honestly re-cut to left/right horizontal negative space.",
+                "inputs": "Frozen selected-item seg2.npy (DOME-29 subject vs Background masks); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant clearance band (tight / moderate / spacious) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw normalized distances stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.environment_clearance.compute_environment_clearance "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when the subject fills the frame edge-to-edge (no Background clearance measurable) or the subject mask is degenerate; never fabricate a clearance class; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "2/24 frozen items abstain (full-bleed subjects with zero Background clearance). The band is HORIZONTAL negative space (left/right), which is the axis separating 'close to a backdrop/wall' from 'in an open space' on a portrait cohort; it intentionally ignores the near-constant vertical gaps of a tall full-body bbox (silenced as non-discriminating). A subject framed wide with small actual side space but a small bbox may read roomier than it looks — the metric is bbox-normalized clearance, stated as such.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_environment_clearance(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a clearance dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. Raw normalized distances
+    stay in the machine-readable evidence_payload JSON and are not caption
+    claims.
+    """
+    lines = [
+        "ENVIRONMENT-CLEARANCE (subject-to-backdrop negative space, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- environment clearance not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "environment clearance not measurable"
+        lines.append(f"- environment clearance abstained ({reason})")
+        return "\n".join(lines)
+    if not config.get("subject_present"):
+        lines.append("- environment clearance abstained (no foreground subject present)")
+        return "\n".join(lines)
+    band = config.get("clearance_band")
+    if band == "tight":
+        lines.append("- subject is close to the surrounding backdrop/environment (tight negative space)")
+    elif band == "moderate":
+        lines.append("- subject has moderate clearance to the surrounding environment")
+    elif band == "spacious":
+        lines.append("- subject is in a spacious setting (ample surrounding open space)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -2031,6 +2090,9 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # Arm #84 face-visibility: deterministic face-prominence band from seg2
     # DOME-29 Face_Neck + Hair (face share of the local head region).
     "face-visibility": ("seg2.npy",),
+    # Arm #85 environment-clearance: deterministic subject-to-backdrop
+    # negative-space band from seg2 (Background split around the subject).
+    "environment-clearance": ("seg2.npy",),
 }
 
 
@@ -2124,7 +2186,7 @@ def build_stage_b_plan(
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
-        "hairstyle", "face-visibility",
+        "hairstyle", "face-visibility", "environment-clearance",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2739,6 +2801,36 @@ def build_stage_b_plan(
             "hair-dominant / 7 partially-framed / 4 clearly-visible, max_share 0.52; 23/24 measured, 1 "
             "honest abstention with no Face_Neck region)."
         )
+    elif evidence_kind == "environment-clearance":
+        evidence = _environment_clearance_evidence()
+        evidence_condition_id = "context-raw-environment-clearance"
+        comparison_plan_id = "stage-b-first500-environment-clearance-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic subject-to-environment "
+            "clearance measurement (scale-invariant subject-to-backdrop negative-space band — tight / moderate / "
+            "spacious — from the seg2 DOME-29 Background split around the subject; CPU, no new model) may reduce "
+            "unsupported 'close to a wall/backdrop' / 'in an open space' / 'leaning against a backdrop' spatial-"
+            "settings claims in captions versus its matched no-evidence baseline when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The environment-clearance evidence condition does not reduce unsupported spatial-settings/negative-space "
+            "claims or increase supported claims versus its matched no-evidence baseline, or the clearance metric is "
+            "redundant with setting #34 / camera-viewing-angle #74 (degenerate), or the clearance bands collapse "
+            "(a single band taking >=75% of measured items), or an apparent difference is attributable to an "
+            "uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files are "
+            "not used as evidence inputs. Clearance is computed in memory from the frozen selected seg2.npy "
+            "(DOME-29 subject vs Background split) only — no new model, CPU only. Only the scale-invariant coarse "
+            "band (tight / moderate / spacious) is verbalized; raw normalized distances stay in evidence_payload "
+            "and are never caption claims. Band-degeneracy recovery (measured 2026-08-08): the on-paper median of "
+            "all four directional clearances was DEGENERATE (tall full-body bbox -> vertical gaps ~0 -> 86% tight) "
+            "and was honestly re-cut to the left/right horizontal negative space (10 tight / 9 moderate / 3 "
+            "spacious, max_share 0.45; 22/24 measured, 2 honest abstentions for full-bleed subjects with zero "
+            "Background clearance)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3036,6 +3128,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "hairstyle"
     elif "context-raw-face-visibility" in condition_ids:
         rebuild_kind = "face-visibility"
+    elif "context-raw-environment-clearance" in condition_ids:
+        rebuild_kind = "environment-clearance"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3113,6 +3207,7 @@ def _load_selected_item(
     include_body_configuration: bool = False,
     include_hairstyle: bool = False,
     include_face_visibility: bool = False,
+    include_environment_clearance: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3307,6 +3402,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"face-visibility abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    environment_clearance = None
+    if include_environment_clearance:
+        try:
+            environment_clearance = compute_environment_clearance(seg2)
+        except EnvironmentClearanceError as exc:
+            raise StageBRunError(
+                f"environment-clearance abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3346,6 +3449,7 @@ def _load_selected_item(
         "body_configuration": body_configuration,
         "hairstyle": hairstyle,
         "face_visibility": face_visibility,
+        "environment_clearance": environment_clearance,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3408,6 +3512,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         body_configuration=prepared.get("body_configuration"),
         hairstyle=prepared.get("hairstyle"),
         face_visibility=prepared.get("face_visibility"),
+        environment_clearance=prepared.get("environment_clearance"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3433,6 +3538,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         body_configuration=prepared.get("body_configuration"),
         hairstyle=prepared.get("hairstyle"),
         face_visibility=prepared.get("face_visibility"),
+        environment_clearance=prepared.get("environment_clearance"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3558,6 +3664,10 @@ def _render_condition(
         face_visibility = prepared.get("face_visibility")
         evidence_text = _serialize_face_visibility(face_visibility)
         return raw.copy(), _context_prompt(evidence_text), face_visibility
+    if condition_id == "context-raw-environment-clearance":
+        environment_clearance = prepared.get("environment_clearance")
+        evidence_text = _serialize_environment_clearance(environment_clearance)
+        return raw.copy(), _context_prompt(evidence_text), environment_clearance
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3805,6 +3915,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-face-visibility"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #85: only the environment-clearance run computes the deterministic
+    # subject-to-backdrop negative-space band (CPU, no new model) — gate on
+    # the frozen plan's conditions.
+    include_environment_clearance = any(
+        str(condition.get("id")) == "context-raw-environment-clearance"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3825,6 +3942,7 @@ def execute_stage_b(
             include_body_configuration=include_body_configuration,
             include_hairstyle=include_hairstyle,
             include_face_visibility=include_face_visibility,
+            include_environment_clearance=include_environment_clearance,
         )
         for item in items
     ]
