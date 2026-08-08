@@ -62,6 +62,7 @@ from .environment_clearance import EnvironmentClearanceError, compute_environmen
 from .eye_color import EyeColorError, compute_eye_color
 from .facial_expression import FacialExpressionError, compute_facial_expression
 from .scene_category import SceneCategoryError, compute_scene_category
+from .image_quality import ImageQualityError, compute_image_quality
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
     CameraViewingAngleError,
@@ -1324,6 +1325,94 @@ def _serialize_scene_category(scene: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _image_quality_evidence() -> dict[str, Any]:
+    """Declared open-weight zero-shot CLIP-IQA quality specialist (arm #95)."""
+    module_path = Path(compute_image_quality.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_dir = Path(IMAGE_QUALITY_MODEL_ASSET)
+    model_sha = (
+        _sha256((model_dir / "model.safetensors").read_bytes())
+        if (model_dir / "model.safetensors").exists() else "MISSING"
+    )
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-image-quality-v1",
+        "specialists": [
+            {
+                "id": "in-memory-image-quality-v1",
+                "scope": "No-reference perceptual quality band (sharp / moderate / degraded) from a "
+                         "locally-run open-weight CLIP ViT-L/14 implementing the zero-shot CLIP-IQA "
+                         "scoring method (Wang et al., AAAI 2023) over the full-frame source. "
+                         "Emits the coarse scale-invariant quality band (or a surfaced abstention); "
+                         "never identity, skin-tone, or semantic content claims; the raw CLIP-IQA "
+                         "score and per-aspect logits stay payload-only.",
+                "inputs": ("Frozen selected-item already-decoded full-frame source RGB (SHA-bound via the item's "
+                           "source_sha256); local open-weight openai/clip-vit-large-patch14 (MIT, CPU, "
+                           "model.safetensors sha256 {model_sha}). Recomputed in memory during this bounded run "
+                           "with no crawlr/stratum write; model run on owned hardware only. seg2/pose2 stay "
+                           "validation-only reads.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant perceptual-quality band with a surfaced "
+                                     "abstention on model/input failure or an implausible score, not quality ground "
+                                     "truth or caption claims; only the coarse band is verbalized (raw score and "
+                                     "logits stay in the machine-readable payload)."),
+                "provenance": (
+                    "research_harness.image_quality.compute_image_quality "
+                    f"SHA-256 {code_hash}; model openai/clip-vit-large-patch14 (MIT, "
+                    f"HF Transformers path) sha256 {model_sha}; zero-shot CLIP-IQA method "
+                    "(Wang et al., AAAI 2023, arXiv:2207.10896), run locally on owned hardware (CPU, "
+                    "no VRAM contention with the caption model); computed in memory during this "
+                    "bounded run with no crawlr/stratum write, no hosted third-party inference of "
+                    "the sensitive corpus."
+                ).format(model_sha=model_sha),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing or detector count is not exactly one; abstain "
+                                      "(emit None/band with a surfaced reason) on model/input failure or an "
+                                      "implausible score outside [0, 1]. Never overwrite an ambiguous quality "
+                                      "judgement with a confident-looking guess; detector disagreement remains "
+                                      "a quality anomaly, never prompt content."),
+                "known_failure_modes": ("Zero-shot CLIP-IQA scores are not calibrated across domains; the "
+                                        "band floors are calibrated on this frozen cohort (2026-08-08 probe) "
+                                        "with the no-single-band->=75% rule; the model cannot express quality "
+                                        "aspects absent from the frozen prompt pairs (e.g. compression "
+                                        "artifacts not tracked by the four aspect pairs); image-focus #75 "
+                                        "remains the deterministic gradient/DOF ground for focus claims."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted until "
+                                       "the frozen comparison receives completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_image_quality(quality: Mapping[str, Any]) -> str:
+    """Deterministic natural-language rendering of an image-quality dict.
+
+    Verbalizes ONLY the scale-invariant coarse quality band (or a surfaced
+    abstention). The raw CLIP-IQA score, aspect probabilities, and logits
+    remain in the machine-readable `evidence_payload` JSON and are not caption
+    claims.
+    """
+    lines = [
+        "IMAGE-QUALITY (zero-shot CLIP-IQA, no-reference, scale-invariant):"
+    ]
+    if quality.get("abstained"):
+        reason = quality.get("abstention_reason") or "image quality not confidently measured"
+        lines.append(f"- image-quality abstained ({reason})")
+        return "\n".join(lines)
+    if not quality or not quality.get("quality_band"):
+        lines.append("- image-quality not measured for this item")
+        return "\n".join(lines)
+    band = quality.get("quality_band")
+    if band == "sharp":
+        lines.append("- the photo appears sharp and crisp")
+    elif band == "moderate":
+        lines.append("- the photo appears of moderate quality")
+    else:
+        lines.append("- the photo appears degraded / low quality")
+    return "\n".join(lines)
+
+
 def _apparent_age_evidence() -> dict[str, Any]:
     """Declared open-weight MiVOLO-V2 apparent-age specialist (arm #73)."""
     module_path = Path(compute_apparent_age.__code__.co_filename)
@@ -2142,6 +2231,13 @@ SCENE_CATEGORY_MODEL_ASSET = (
     "/mnt/nas-ai-models/research/stratum/models/scene-category"
 )
 
+# Frozen open-weight CLIP ViT-L/14 asset directory (arm #95, zero-shot
+# CLIP-IQA new model class). model.safetensors sha256
+# a2bf730a0c7debf160f7a6b50b3aaf3703e7e88ac73de7a314903141db026dcb
+IMAGE_QUALITY_MODEL_ASSET = (
+    "/mnt/nas-ai-models/research/stratum/models/image-quality"
+)
+
 _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "geometry": ("pose2.npy", "seg2.npy"),
     "body-type": ("pose2.npy", "seg2.npy"),
@@ -2163,6 +2259,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # derived artifact is an evidence input; seg2/pose2 stay validation-only
     # reads for the exactly-one-subject invariant.
     "scene-category": (),
+    # Arm #95 image-quality: zero-shot CLIP-IQA consumes ONLY the
+    # already-decoded full-frame source RGB (SHA-bound via the item's
+    # source_sha256). No derived artifact is an evidence input; seg2/pose2
+    # stay validation-only reads for the exactly-one-subject invariant.
+    "image-quality": (),
     # Arm #68 gaze-head-orientation: MediaPipe FaceLandmarker consumes the
     # already-decoded full-frame source RGB + the seg2 Face_Neck mask (for the
     # union crop fallback, as in face-geometry); seg2 is read-only validation
@@ -2301,7 +2402,7 @@ def build_stage_b_plan(
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
-        "facial-expression",
+        "facial-expression", "image-quality",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2673,6 +2774,38 @@ def build_stage_b_plan(
             "over a frozen closed scene-category set (cohort-derived from the arm-#47 VLM dense-description "
             "scene vocabulary) at the calibrated confidence floor (0.25). Only the scale-invariant label is "
             "verbalized; similarity logits/probabilities stay in evidence_payload and are never caption claims."
+        )
+    elif evidence_kind == "image-quality":
+        evidence = _image_quality_evidence()
+        evidence_condition_id = "context-raw-image-quality"
+        comparison_plan_id = "stage-b-first500-image-quality-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared no-reference perceptual-quality "
+            "determinations (one coarse scale-invariant band — sharp / moderate / degraded — from a "
+            "locally-run open-weight CLIP ViT-L/14 implementing the zero-shot CLIP-IQA scoring method, "
+            "Wang et al. AAAI 2023, over the full-frame source at calibrated band floors) may reduce "
+            "unsupported image-quality claims ('crisp', 'sharp', 'grainy', 'high-quality') beyond what "
+            "image-focus #75 deterministic gradient/DOF grounds, or increase supported quality claims in "
+            "captions versus its matched no-evidence baseline when the source item, view, prompt template, "
+            "local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The image-quality evidence condition does not reduce unsupported image-quality claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the CLIP-IQA "
+            "measurement fails qualification on real corpus items (high abstention / degenerate "
+            "no-discrimination bands), or an apparent difference is attributable to an uncontrolled view, "
+            "prompt, aggregator, generation, or evaluation change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files and pointmap are not used as evidence inputs; seg2/pose2 stay validation-only reads for "
+            "the exactly-one-subject invariant. Perceptual quality is computed in memory from the "
+            "already-decoded full-frame source RGB (SHA-bound via source_sha256) via the local open-weight "
+            "CLIP ViT-L/14 (openai/clip-vit-large-patch14, MIT, owned hardware, CPU; model.safetensors "
+            "bound by sha256) implementing the zero-shot CLIP-IQA scoring method (Wang et al., AAAI 2023) "
+            "with frozen aspect prompt pairs at calibrated band floors. Only the coarse scale-invariant "
+            "band is verbalized; raw score/aspect logits stay in evidence_payload and are never caption "
+            "claims."
         )
     elif evidence_kind == "gaze-head-orientation":
         evidence = _gaze_head_evidence()
@@ -3287,6 +3420,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
         rebuild_kind = "scene-category"
+    elif "context-raw-image-quality" in condition_ids:
+        rebuild_kind = "image-quality"
     elif "context-raw-gaze-head-orientation" in condition_ids:
         rebuild_kind = "gaze-head-orientation"
     elif "context-raw-camera-viewing-angle" in condition_ids:
@@ -3378,6 +3513,7 @@ def _load_selected_item(
     include_face_geometry: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
+    include_image_quality: bool = False,
     include_gaze_head: bool = False,
     include_camera_viewing_angle: bool = False,
     include_image_focus: bool = False,
@@ -3521,6 +3657,13 @@ def _load_selected_item(
             scene_category = compute_scene_category(rgb, model_asset_dir=SCENE_CATEGORY_MODEL_ASSET)
         except SceneCategoryError as exc:
             raise StageBRunError(f"scene-category abort for frozen selected item {image_id}: {exc}") from exc
+    image_quality = None
+    if include_image_quality:
+        rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
+        try:
+            image_quality = compute_image_quality(rgb, model_asset_dir=IMAGE_QUALITY_MODEL_ASSET)
+        except ImageQualityError as exc:
+            raise StageBRunError(f"image-quality abort for frozen selected item {image_id}: {exc}") from exc
     gaze_head = None
     if include_gaze_head:
         rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
@@ -3639,6 +3782,7 @@ def _load_selected_item(
         "face_geometry": face_geometry,
         "object_relations": object_relations,
         "scene_category": scene_category,
+        "image_quality": image_quality,
         "gaze_head": gaze_head,
         "camera_viewing_angle": camera_viewing_angle,
         "image_focus": image_focus,
@@ -3836,6 +3980,10 @@ def _render_condition(
         scene_category = prepared["scene_category"]
         evidence_text = _serialize_scene_category(scene_category)
         return raw.copy(), _context_prompt(evidence_text), scene_category
+    if condition_id == "context-raw-image-quality":
+        image_quality = prepared.get("image_quality")
+        evidence_text = _serialize_image_quality(image_quality)
+        return raw.copy(), _context_prompt(evidence_text), image_quality
     if condition_id == "context-raw-gaze-head-orientation":
         gaze_head = prepared["gaze_head"]
         evidence_text = _serialize_gaze_head(gaze_head)
@@ -4073,6 +4221,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-scene-category"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #95: only the image-quality run invokes the locally-run open-weight
+    # zero-shot CLIP-IQA (owned hardware) — gate on the frozen plan's
+    # conditions so other arms never pay the CLIP cost.
+    include_image_quality = any(
+        str(condition.get("id")) == "context-raw-image-quality"
+        for condition in (plan.get("conditions") or [])
+    )
     # Arm #68: only the gaze-head-orientation run invokes the locally-run
     # MediaPipe FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen
     # plan's conditions so other arms never pay the mesh cost.
@@ -4158,6 +4313,7 @@ def execute_stage_b(
             include_face_geometry=include_face_geometry,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
+            include_image_quality=include_image_quality,
             include_gaze_head=include_gaze_head,
             include_camera_viewing_angle=include_camera_viewing_angle,
             include_image_focus=include_image_focus,
