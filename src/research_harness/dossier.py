@@ -79,6 +79,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "eye-color:v1",
     "facial-expression:v1",
     "image-quality:v1",
+    "garment-type:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -771,6 +772,33 @@ def render_facial_expression(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def render_garment_type(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant garment-type / silhouette-category claim (arm #97).
+
+    Verbalizes ONLY the coarse garment-type band. Raw class-coverage ratios
+    stay in the machine-readable payload and are never caption claims.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-garment-type runs) —
+        # emit no claim, never a fabricated garment type.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "garment type not measurable"
+        return [f"garment-type: abstain ({reason})"]
+    if not config.get("subject_present"):
+        return ["garment-type: abstain (no foreground subject)"]
+    band = config.get("garment_type_band")
+    if band == "upper-lower-covered":
+        return ["garment-type: subject is dressed (upper and lower body covered)"]
+    if band == "upper-only":
+        return ["garment-type: upper body clothed, lower body exposed (e.g. wearing a top, legs uncovered)"]
+    if band == "lower-only":
+        return ["garment-type: lower body covered, upper body exposed"]
+    if band == "skin-dominant":
+        return ["garment-type: skin-dominant (no garment region cleared; exposed skin dominates)"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1297,6 +1325,27 @@ def _facial_expression_payload(config: Mapping[str, Any] | None) -> dict[str, An
     return payload
 
 
+def _garment_type_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "garment_type_band": config.get("garment_type_band"),
+        "upper_garment_present": config.get("upper_garment_present"),
+        "lower_garment_present": config.get("lower_garment_present"),
+        "skin_dominant": config.get("skin_dominant"),
+        "upper_garment_coverage": config.get("upper_garment_coverage"),
+        "lower_garment_coverage": config.get("lower_garment_coverage"),
+        "apparel_share": config.get("apparel_share"),
+        "torso_skin_coverage": config.get("torso_skin_coverage"),
+        "upper_skin_coverage": config.get("upper_skin_coverage"),
+        "lower_skin_coverage": config.get("lower_skin_coverage"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1325,6 +1374,7 @@ def build_evidence_payload(
     environment_clearance: Mapping[str, Any] | None = None,
     eye_color: Mapping[str, Any] | None = None,
     facial_expression: Mapping[str, Any] | None = None,
+    garment_type: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1405,6 +1455,7 @@ def build_evidence_payload(
             "environment_clearance": _environment_clearance_payload(environment_clearance),
             "eye_color": _eye_color_payload(eye_color),
             "facial_expression": _facial_expression_payload(facial_expression),
+            "garment_type": _garment_type_payload(garment_type),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1450,6 +1501,7 @@ def assemble_dossier(
     environment_clearance: Mapping[str, Any] | None = None,
     eye_color: Mapping[str, Any] | None = None,
     facial_expression: Mapping[str, Any] | None = None,
+    garment_type: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1484,6 +1536,7 @@ def assemble_dossier(
         ("environment-clearance:v1", "environment-clearance", render_environment_clearance(environment_clearance or {})),
         ("eye-color:v1", "eye-color", render_eye_color(eye_color or {})),
         ("facial-expression:v1", "facial-expression", render_facial_expression(facial_expression or {})),
+        ("garment-type:v1", "garment-type", render_garment_type(garment_type or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 

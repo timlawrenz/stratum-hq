@@ -61,6 +61,7 @@ from .face_visibility import FaceVisibilityError, compute_face_visibility
 from .environment_clearance import EnvironmentClearanceError, compute_environment_clearance
 from .eye_color import EyeColorError, compute_eye_color
 from .facial_expression import FacialExpressionError, compute_facial_expression
+from .garment_type import GarmentTypeError, compute_garment_type
 from .scene_category import SceneCategoryError, compute_scene_category
 from .image_quality import ImageQualityError, compute_image_quality
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
@@ -2149,6 +2150,66 @@ def _serialize_facial_expression(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _garment_type_evidence() -> dict[str, Any]:
+    """Declared deterministic garment-type / silhouette specialist (arm #97)."""
+    module_path = Path(compute_garment_type.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-garment-type-v1",
+        "specialists": [
+            {
+                "id": "in-memory-garment-type-v1",
+                "scope": "Scale-invariant garment-type / silhouette-category measurement from seg2 DOME-29 clothing classes only: upper garment present / lower garment present / skin-dominant coarse band (upper-lower-covered / upper-only / lower-only / skin-dominant), or an honest abstention. Never color, identity, or absolute-pixel claims; only the scale-invariant coarse band in prose. Band-degeneracy recovery: on-paper presence floors were calibrated from the frozen-cohort probe (2026-08-08) so no single band takes >=75% of measured items.",
+                "inputs": "Frozen selected-item seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing + skin classes); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing coarse garment-type band (upper-lower-covered / upper-only / lower-only / skin-dominant) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw class-coverage ratios stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.garment_type.compute_garment_type "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when clothing/apparel classes are absent or degenerate (e.g. fully unclothed subject with no garment classes); never fabricate a garment type; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "24/24 frozen items measured (band-dominant distribution upper-lower-covered 7 / upper-only 3 / lower-only 4 / skin-dominant 10, max_share 0.42). Apparel is ambiguous (dress vs top): its lower-half pixels count toward the lower garment (dress reaching the lower body); a tight crop that excludes the lower body cannot assert lower coverage. The band is a coarse silhouette category, not ground truth: 'skin-dominant' means no garment region cleared the calibrated floor, not that the subject is nude.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_garment_type(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a garment-type dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. Raw class-coverage ratios
+    stay in the machine-readable evidence_payload JSON and are not caption
+    claims.
+    """
+    lines = [
+        "GARMENT-TYPE (silhouette category, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- garment type not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "garment type not measurable"
+        lines.append(f"- garment type abstained ({reason})")
+        return "\n".join(lines)
+    if not config.get("subject_present"):
+        lines.append("- garment type abstained (no foreground subject present)")
+        return "\n".join(lines)
+    band = config.get("garment_type_band")
+    if band == "upper-lower-covered":
+        lines.append("- subject is dressed (upper and lower body covered)")
+    elif band == "upper-only":
+        lines.append("- upper body clothed, lower body exposed (e.g. wearing a top, legs uncovered)")
+    elif band == "lower-only":
+        lines.append("- lower body covered, upper body exposed")
+    elif band == "skin-dominant":
+        lines.append("- skin-dominant (no garment region cleared; exposed skin dominates)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -2308,6 +2369,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # Arm #81 facial-expression: deterministic smile/expression band from
     # pose2 GOLIATH-308 mouth-corner keypoints (scale-invariant).
     "facial-expression": ("pose2.npy",),
+    # Arm #97 garment-type: deterministic upper/lower garment silhouette
+    # category from seg2 DOME-29 clothing classes (Apparel + Upper/Lower
+    # Clothing + skin); scale-invariant coarse band.
+    "garment-type": ("seg2.npy",),
 }
 
 
@@ -2402,7 +2467,7 @@ def build_stage_b_plan(
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
-        "facial-expression", "image-quality",
+        "facial-expression", "image-quality", "garment-type",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3139,6 +3204,33 @@ def build_stage_b_plan(
             "to openness (open laughs, 2/24) + corner elevation (smile curvature, 8/24) + neutral (9/24); "
             "max_share 0.47; 19/24 measured, 5 honest abstentions (mouth occluded/low-confidence)."
         )
+    elif evidence_kind == "garment-type":
+        evidence = _garment_type_evidence()
+        evidence_condition_id = "context-raw-garment-type"
+        comparison_plan_id = "stage-b-first500-garment-type-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic garment-type / "
+            "silhouette-category measurement (scale-invariant upper/lower garment split from seg2 DOME-29 "
+            "clothing classes; CPU, no new model) may reduce unsupported 'wearing a top / dressed / leggings' "
+            "garment-category claims in captions versus its matched no-evidence baseline when the source item, "
+            "view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The garment-type evidence condition does not reduce unsupported garment-category claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the garment-type bands "
+            "collapse (a single band taking >=75% of measured items), or the axis is redundant with clothing "
+            "#29 (degenerate), or an apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files "
+            "are not used as evidence inputs. Garment type is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing + skin classes) only — no new model, CPU only. "
+            "Only the scale-invariant coarse band (upper-lower-covered / upper-only / lower-only / "
+            "skin-dominant) is verbalized; raw class-coverage ratios stay in evidence_payload and are never "
+            "caption claims. Band calibration (measured 2026-08-08 frozen-cohort probe): 24/24 measured, "
+            "distribution upper-lower-covered 7 / upper-only 3 / lower-only 4 / skin-dominant 10 "
+            "(max_share 0.42, no band >= 75%)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3525,6 +3617,7 @@ def _load_selected_item(
     include_environment_clearance: bool = False,
     include_eye_color: bool = False,
     include_facial_expression: bool = False,
+    include_garment_type: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3751,6 +3844,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"facial-expression abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    garment_type = None
+    if include_garment_type:
+        try:
+            garment_type = compute_garment_type(seg2)
+        except GarmentTypeError as exc:
+            raise StageBRunError(
+                f"garment-type abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3794,6 +3895,7 @@ def _load_selected_item(
         "environment_clearance": environment_clearance,
         "eye_color": eye_color,
         "facial_expression": facial_expression,
+        "garment_type": garment_type,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3859,6 +3961,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         environment_clearance=prepared.get("environment_clearance"),
         eye_color=prepared.get("eye_color"),
         facial_expression=prepared.get("facial_expression"),
+        garment_type=prepared.get("garment_type"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3887,6 +3990,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         environment_clearance=prepared.get("environment_clearance"),
         eye_color=prepared.get("eye_color"),
         facial_expression=prepared.get("facial_expression"),
+        garment_type=prepared.get("garment_type"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -4028,6 +4132,10 @@ def _render_condition(
         facial_expression = prepared.get("facial_expression")
         evidence_text = _serialize_facial_expression(facial_expression)
         return raw.copy(), _context_prompt(evidence_text), facial_expression
+    if condition_id == "context-raw-garment-type":
+        garment_type = prepared.get("garment_type")
+        evidence_text = _serialize_garment_type(garment_type)
+        return raw.copy(), _context_prompt(evidence_text), garment_type
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4301,6 +4409,12 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-facial-expression"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #97: only the garment-type run computes the deterministic silhouette
+    # split (CPU, no new model) — gate on the frozen plan's conditions.
+    include_garment_type = any(
+        str(condition.get("id")) == "context-raw-garment-type"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4325,6 +4439,7 @@ def execute_stage_b(
             include_environment_clearance=include_environment_clearance,
             include_eye_color=include_eye_color,
             include_facial_expression=include_facial_expression,
+            include_garment_type=include_garment_type,
         )
         for item in items
     ]
