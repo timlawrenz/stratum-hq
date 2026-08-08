@@ -75,6 +75,7 @@ DIMENSION_EVIDENCE_IDS: tuple[str, ...] = (
     "body-configuration:v1",
     "hairstyle:v1",
     "face-visibility:v1",
+    "environment-clearance:v1",
 )
 RELATIONAL_EVIDENCE_ID = "relational-determinations:v1"
 
@@ -678,6 +679,31 @@ def render_face_visibility(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def render_environment_clearance(config: Mapping[str, Any]) -> list[str]:
+    """Scale-invariant subject-to-environment clearance claim (arm #85).
+
+    Verbalizes ONLY the coarse clearance band. Raw normalized distances stay
+    in the machine-readable payload and are never caption claims.
+    """
+    if not config:
+        # Dimension not measured for this item (e.g. non-environment-clearance
+        # runs) — emit no claim, never a fabricated spatial-settings statement.
+        return []
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "environment clearance not measurable"
+        return [f"environment-clearance: abstain ({reason})"]
+    if not config.get("subject_present"):
+        return ["environment-clearance: abstain (no foreground subject present)"]
+    band = config.get("clearance_band")
+    if band == "tight":
+        return ["environment-clearance: subject is close to the surrounding backdrop/environment (tight negative space)"]
+    if band == "moderate":
+        return ["environment-clearance: subject has moderate clearance to the surrounding environment"]
+    if band == "spacious":
+        return ["environment-clearance: subject is in a spacious setting (ample surrounding open space)"]
+    return []
+
+
 def render_gaze_head(gaze: Mapping[str, Any]) -> list[str]:
     """Scale-invariant camera-relative head-orientation claim (arm #68).
 
@@ -1135,6 +1161,25 @@ def _face_visibility_payload(config: Mapping[str, Any] | None) -> dict[str, Any]
     return payload
 
 
+def _environment_clearance_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not config:
+        return {}
+    payload = {
+        "subject_present": config.get("subject_present"),
+        "clearance_band": config.get("clearance_band"),
+        "clearance_ratio": config.get("clearance_ratio"),
+        "clearance_top": config.get("clearance_top"),
+        "clearance_bottom": config.get("clearance_bottom"),
+        "clearance_left": config.get("clearance_left"),
+        "clearance_right": config.get("clearance_right"),
+        "subject_frame_coverage": config.get("subject_frame_coverage"),
+    }
+    ab = config.get("abstention_reason")
+    if config.get("abstained"):
+        payload["abstention"] = ab or "abstained"
+    return payload
+
+
 def build_evidence_payload(
     *,
     image_id: str,
@@ -1159,6 +1204,7 @@ def build_evidence_payload(
     body_configuration: Mapping[str, Any] | None = None,
     hairstyle: Mapping[str, Any] | None = None,
     face_visibility: Mapping[str, Any] | None = None,
+    environment_clearance: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
     source_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -1235,6 +1281,7 @@ def build_evidence_payload(
             "body_configuration": _body_configuration_payload(body_configuration),
             "hairstyle": _hairstyle_payload(hairstyle),
             "face_visibility": _face_visibility_payload(face_visibility),
+            "environment_clearance": _environment_clearance_payload(environment_clearance),
             "relational": {
                 "body_parts_visible": [
                     p.get("part") for p in (determinations.get("body_parts_visible") or []) if isinstance(p, Mapping)
@@ -1276,6 +1323,7 @@ def assemble_dossier(
     body_configuration: Mapping[str, Any] | None = None,
     hairstyle: Mapping[str, Any] | None = None,
     face_visibility: Mapping[str, Any] | None = None,
+    environment_clearance: Mapping[str, Any] | None = None,
     determinations: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Assemble the claim-by-claim expanded dossier for one item.
@@ -1306,6 +1354,7 @@ def assemble_dossier(
         ("body-configuration:v1", "body-configuration", render_body_configuration(body_configuration or {})),
         ("hairstyle:v1", "hairstyle", render_hairstyle(hairstyle or {})),
         ("face-visibility:v1", "face-visibility", render_face_visibility(face_visibility or {})),
+        ("environment-clearance:v1", "environment-clearance", render_environment_clearance(environment_clearance or {})),
         (RELATIONAL_EVIDENCE_ID, "relational", render_relational(determinations)),
     )
 
