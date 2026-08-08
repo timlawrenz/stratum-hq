@@ -1,8 +1,12 @@
 # Arm #76 affordance-contact / subject self-contact — round-trip
 
-**Status:** running (2026-08-07). Deterministic new evidence part (no new model):
-hand-to-own-body contact count, hand-elevation/gesture count, and subject
-grounding from pose2 GOLIATH-308 + seg2 DOME-29.
+**Verdict (harness-computed, 2026-08-07): BETTER.** support ratio 0.3219 →
+0.9218 (Δ +0.5999), supported 47 → 165, unsupported 99 → 14, paired positive
+20/24, sign-test p = 0.000772. Runs: `/mnt/nas-ai-models/research/stratum/
+stage-b-affordance-contact-v1` (96) + `-review` (96 rows). Registry:
+affordance-contact → validated (cycle 16); sweep now EXHAUSTED (21/21).
+Brainstorm-widen registered #80–#85; body-configuration #83 → active
+(exploit, EIG 0.65, selection_progress 17).
 
 ## What the arm adds
 Scale-invariant subject self-contact / affordance measurements (NEW deterministic
@@ -55,8 +59,7 @@ real geometry.
 ## Key pitfalls (from the design probe)
 1. **DOME-29 has no object classes** — seg2 is subject + Background only. Any
    "contact" claim about an external object would be fabricated; the honest
-   deterministic axes are own-body contact and grounding. Do NOT add a
-   "held-in-hand" prose claim to this specialist.
+   deterministic axes are own-body contact and grounding.
 2. **Normalization anchor**: use the acromion width first, shoulder fallback;
    when both are unavailable the hand axes must abstain (not guess a scale).
    The grounding band is frame-based and survives that abstention.
@@ -67,12 +70,12 @@ real geometry.
 4. Contact threshold 0.35 sw and elevation 0.30 sw were chosen from the cohort
    histogram (0/1/2 distribution); verify with the shipped probe on re-freeze.
 
-## Run layout
-- Plan `stage-b-first500-affordance-contact-v1` (96 records), GPU manifest
-  `stratum-stage-b-affordance-contact-v1` (4090, 22GB, 2h), run root
-  `/mnt/nas-ai-models/research/stratum/stage-b-affordance-contact-v1`,
-  review root `...-review` (96 rows, gemma4:e4b).
-- Command sequence in `references/roundtrip-arm-execution-recipe-2026-08-06.md`.
+## Round-trip notes
+- Both generation and review on local 4090 via the scheduler; plan
+  `stage-b-first500-affordance-contact-v1`, manifest
+  `stratum-stage-b-affordance-contact-v1`. Evidence text reached the model
+  (sample caption grounded in "both hands rest against her own body" matching
+  the probe's contact=2 for that item).
 
 ## Verification
 `pytest tests/ -q` (635 passed incl. the 14 new), `validate-program` valid,
