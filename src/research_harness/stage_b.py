@@ -60,6 +60,7 @@ from .hairstyle import HairstyleError, compute_hairstyle
 from .face_visibility import FaceVisibilityError, compute_face_visibility
 from .environment_clearance import EnvironmentClearanceError, compute_environment_clearance
 from .eye_color import EyeColorError, compute_eye_color
+from .facial_expression import FacialExpressionError, compute_facial_expression
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -2004,6 +2005,61 @@ def _serialize_eye_color(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _facial_expression_evidence() -> dict[str, Any]:
+    """Declared deterministic smile/expression specialist (arm #81)."""
+    module_path = Path(compute_facial_expression.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-facial-expression-v1",
+        "specialists": [
+            {
+                "id": "in-memory-facial-expression-v1",
+                "scope": "Scale-invariant smile/facial-expression measurement from pose2 GOLIATH-308 mouth-corner keypoints only: mouth-corner spread, mouth opening, and corner elevation normalized by the inter-eye reference; expression band (neutral / slight-smile / open-smile). Emits ONE coarse band or an honest abstention. Never identity, static face shape, gaze, or absolute-pixel claims; only the scale-invariant coarse band in prose. Band-degeneracy recovery: the first openness-only 3-band cut was degenerate (89% slight-smile on a spread-near-constant cohort) and was re-cut to openness (open laughs) + corner elevation (smile curvature).",
+                "inputs": "Frozen selected-item pose2.npy (GOLIATH-308 mouth-corner + eye-center keypoints); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant expression band (neutral / slight-smile / open-smile) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw normalized ratios stay in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.facial_expression.compute_facial_expression "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when the mouth is occluded / keypoints are low-confidence / the face reference is unusable; never fabricate a smile; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "5/24 frozen items abstain (mouth occluded/low-confidence). Expression is a coarse band, not ground truth: a relaxed neutral mouth with slightly widened corners can read slight-smile, and an open mouth can be talking rather than laughing; the corner-elevation signal is small relative to reference (median 0.04) and lighting/pose-sensitive. Distribution on the cohort: neutral 9 / slight-smile 8 / open-smile 2 (max_share 0.47).",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_facial_expression(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an expression dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. Raw normalized ratios
+    stay in the machine-readable evidence_payload JSON and are not caption
+    claims.
+    """
+    lines = [
+        "FACIAL-EXPRESSION (smile / expression band, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- facial expression not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "expression not measurable"
+        lines.append(f"- facial expression abstained ({reason})")
+        return "\n".join(lines)
+    band = config.get("expression_band")
+    if band == "neutral":
+        lines.append("- neutral expression (mouth relaxed, corners level)")
+    elif band == "slight-smile":
+        lines.append("- slight smile (mouth corners raised and widened)")
+    elif band == "open-smile":
+        lines.append("- open smile / laughing (mouth open, corners raised)")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -2148,6 +2204,9 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # iris/pupil keypoints + the already-decoded source RGB (source bytes are
     # SHA-bound via source_sha256).
     "eye-color": ("pose2.npy",),
+    # Arm #81 facial-expression: deterministic smile/expression band from
+    # pose2 GOLIATH-308 mouth-corner keypoints (scale-invariant).
+    "facial-expression": ("pose2.npy",),
 }
 
 
@@ -2242,6 +2301,7 @@ def build_stage_b_plan(
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
+        "facial-expression",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2917,6 +2977,35 @@ def build_stage_b_plan(
             "dark' rule mislabeled light low-sat eyes and was re-cut (shadow-dark brown/black by low "
             "value, well-lit brown by warm hue, cool hue -> blue/green-hazel)."
         )
+    elif evidence_kind == "facial-expression":
+        evidence = _facial_expression_evidence()
+        evidence_condition_id = "context-raw-facial-expression"
+        comparison_plan_id = "stage-b-first500-facial-expression-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic smile/facial-"
+            "expression measurement (scale-invariant neutral / slight-smile / open-smile band from "
+            "pose2 GOLIATH-308 mouth-corner keypoints; CPU, no new model) may reduce unsupported "
+            "'she smiles / neutral expression / laughing' claims in captions versus its matched "
+            "no-evidence baseline when the source item, view, prompt template, local model, and "
+            "generation settings are controlled."
+        )
+        falsified_if = (
+            "The facial-expression evidence condition does not reduce unsupported smile/expression claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the expression bands "
+            "collapse (a single band taking >=75% of measured items), or an apparent difference is "
+            "attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Expression is computed in memory from the frozen "
+            "selected pose2.npy (GOLIATH-308 mouth-corner + eye-center keypoints) only — no new model, CPU "
+            "only. Only the scale-invariant coarse band (neutral / slight-smile / open-smile) is verbalized; "
+            "raw normalized spread/openness/elevation ratios stay in evidence_payload and are never caption "
+            "claims. Band-degeneracy recovery (measured 2026-08-08): the first openness-only 3-band cut was "
+            "DEGENERATE (89% slight-smile on a spread-near-constant portrait cohort) and was honestly re-cut "
+            "to openness (open laughs, 2/24) + corner elevation (smile curvature, 8/24) + neutral (9/24); "
+            "max_share 0.47; 19/24 measured, 5 honest abstentions (mouth occluded/low-confidence)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3218,6 +3307,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "environment-clearance"
     elif "context-raw-eye-color" in condition_ids:
         rebuild_kind = "eye-color"
+    elif "context-raw-facial-expression" in condition_ids:
+        rebuild_kind = "facial-expression"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3297,6 +3388,7 @@ def _load_selected_item(
     include_face_visibility: bool = False,
     include_environment_clearance: bool = False,
     include_eye_color: bool = False,
+    include_facial_expression: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3508,6 +3600,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"eye-color abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    facial_expression = None
+    if include_facial_expression:
+        try:
+            facial_expression = compute_facial_expression(pose2)
+        except FacialExpressionError as exc:
+            raise StageBRunError(
+                f"facial-expression abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3549,6 +3649,7 @@ def _load_selected_item(
         "face_visibility": face_visibility,
         "environment_clearance": environment_clearance,
         "eye_color": eye_color,
+        "facial_expression": facial_expression,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3613,6 +3714,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         face_visibility=prepared.get("face_visibility"),
         environment_clearance=prepared.get("environment_clearance"),
         eye_color=prepared.get("eye_color"),
+        facial_expression=prepared.get("facial_expression"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3640,6 +3742,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         face_visibility=prepared.get("face_visibility"),
         environment_clearance=prepared.get("environment_clearance"),
         eye_color=prepared.get("eye_color"),
+        facial_expression=prepared.get("facial_expression"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3773,6 +3876,10 @@ def _render_condition(
         eye_color = prepared.get("eye_color")
         evidence_text = _serialize_eye_color(eye_color)
         return raw.copy(), _context_prompt(evidence_text), eye_color
+    if condition_id == "context-raw-facial-expression":
+        facial_expression = prepared.get("facial_expression")
+        evidence_text = _serialize_facial_expression(facial_expression)
+        return raw.copy(), _context_prompt(evidence_text), facial_expression
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4033,6 +4140,12 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eye-color"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #81: only the facial-expression run computes the deterministic
+    # smile band (CPU, no new model) — gate on the frozen plan's conditions.
+    include_facial_expression = any(
+        str(condition.get("id")) == "context-raw-facial-expression"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4055,6 +4168,7 @@ def execute_stage_b(
             include_face_visibility=include_face_visibility,
             include_environment_clearance=include_environment_clearance,
             include_eye_color=include_eye_color,
+            include_facial_expression=include_facial_expression,
         )
         for item in items
     ]

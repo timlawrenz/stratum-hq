@@ -725,7 +725,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -843,6 +843,128 @@
       ],
       "state": "validated",
       "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "hair-texture",
+      "name": "hair texture / curl-waviness state",
+      "arm_issue": 94,
+      "hypothesis": "A deterministic hair-texture measurement (scale-invariant curl/straight state from the seg2 DOME-29 Hair region's local gradient orientation distribution, computed in memory; CPU, no new model) reduces unsupported 'curly / wavy / straight hair' textural claims in captions on the frozen 24-item cohort.",
+      "falsified_if": "The hair-texture evidence condition does not reduce unsupported hair-texture/curl claims or increase supported claims versus its matched no-evidence baseline, or the texture bands collapse (a single band >=75% of measured items), or the axis is redundant with hairstyle #82 / hair #30 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: hair-texture band (straight / wavy / curly) from seg2 Hair-region gradient-orientation distribution; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Hair mask (24/24); local CPU, in-memory",
+      "selection_rationale": "hairstyle #82 validates length + arrangement; hair #30 color + coverage. Curl/wave texture ('curly', 'wavy', 'straight') has NO validated support. Genuinely-NEW part (hair-texture).",
+      "scope": "Deterministic hair-texture / curl state from the seg2 Hair region: local-gradient dominant orientation variance + waviness proxy; coarse band (straight / wavy / curly / abstain); never color, length, or identity claims; only scale-invariant bands in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Hair mask); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse scale-invariant hair-texture band per item (or abstain when the Hair region is absent/tiny); raw gradient-orientation statistics stay in evidence_payload, never prose",
+      "provenance": "research_harness.hair_texture deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the Hair region is absent, tiny, or texture is unresolvable (cropped / too smooth); never fabricate a curl state",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "hair-texture"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "image-quality",
+      "name": "learned no-reference image quality (IQA)",
+      "arm_issue": 95,
+      "hypothesis": "A learned no-reference image-quality measurement (open-weight CLIP-IQA or a similar NR-IQA transformer, run locally CPU on owned hardware; NEW model class) adds a scale-invariant perceptual-quality band (sharp / moderate / degraded) that reduces unsupported 'crisp / high-quality / grainy' quality claims that image-focus #75 (a deterministic gradient DOF measure) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The IQA evidence condition does not reduce unsupported image-quality claims or increase supported claims versus its matched no-evidence baseline, or the quality bands collapse (a single band >=75% of measured items), or the axis is redundant with image-focus #75 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (image-quality) + NEW MODEL CLASS (open-weight no-reference IQA): perceptual-quality band from a locally-run open-weight IQA model on the SHA-bound source RGB",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local CPU, owned hardware only",
+      "selection_rationale": "image-focus #75 validates deterministic gradient DOF but not subjective quality ('crisp', 'grainy'). An open-weight NR-IQA model is a genuinely-NEW model class per open-world sourcing; local owned hardware only.",
+      "scope": "Learned no-reference perceptual-quality band from an open-weight IQA model run locally (owned hardware); coarse band (sharp / moderate / degraded) or abstain on model/input failure; never semantic content claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight IQA model staged locally; run on owned CPU/GPU hardware only",
+      "output_semantics": "Coarse scale-invariant quality band (sharp / moderate / degraded); raw quality score stays in evidence_payload, never prose",
+      "provenance": "open-weight no-reference IQA model (model.safetensors sha256 pinned on freeze) + research_harness.image_quality module; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on model/input failure or when the quality score is degenerate; never fabricate a quality class",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "image-quality"
+      ],
+      "model_candidates": [
+        "CLIP-IQA (torchmetrics/CLIPImageQualityAssessment, open-model, CLIP-based)",
+        "Q-Align (LMM-based no-reference IQA, ICML 2024)"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "active",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "body-volume",
+      "name": "3D body volume / bulk via open-weight whole-body mesh regression",
+      "arm_issue": 96,
+      "hypothesis": "An open-weight whole-body mesh-regression measurement (candidate HMR2.0 / 4D-Humans, NEW model class, run locally on owned hardware) that lifts the subject to a 3D body mesh and emits a scale-invariant normalized body-volume / bulk band (slim / average / fuller) reduces unsupported 'slim / curvy / full-figured' body-mass claims that 2D body-type #32 ratios cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The body-volume evidence condition does not reduce unsupported body-bulk claims or increase supported claims versus its matched no-evidence baseline, or the volume bands collapse (a single band >=75% of measured items), or the axis is redundant with body-type #32 (degenerate), or the 3D mesh regressor fails on too many frozen items (coverage below a pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (body-volume) + NEW MODEL CLASS (open-weight whole-body mesh regression HMR2.0/4D-Humans): normalized 3D body-volume band from a locally-run mesh regressor on the SHA-bound source RGB",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local owned hardware only",
+      "selection_rationale": "body-type #32 validates 2D proportions; 'curvy / slim / full-figured' mass claims have no 3D support. Whole-body mesh regression is a genuinely-NEW model class (open-world sourcing, local owned hardware only; SMPL-X license check before freeze).",
+      "scope": "Scale-invariant normalized body-volume/bulk band from an open-weight 3D whole-body mesh regression (HMR2.0/SMPL-X), run locally on owned hardware; coarse band (slim / average / fuller) or abstain when the mesh regression is unreliable; never identity or absolute-volume claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight mesh model staged locally; run on owned CPU/GPU hardware only",
+      "output_semantics": "Coarse scale-invariant body-volume band (slim / average / fuller); raw normalized volume/bulk stats stay in evidence_payload, never prose",
+      "provenance": "open-weight HMR2.0/4D-Humans whole-body mesh regressor (checkpoint sha256 pinned on freeze) + research_harness.body_volume module; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on mesh-regression failure, degenerate mesh, or model/input failure; never fabricate a body-volume class",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept (SMPL-X license note: non-commercial — verify license for research use before freezing).",
+      "evidence_parts": [
+        "body-volume"
+      ],
+      "model_candidates": [
+        "HMR2.0 / 4D-Humans (shubham-goel/4dhumans, open weights)",
+        "PyMAF-X (whole-body SMPL-X regression)"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "medium",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "garment-type",
+      "name": "garment-type / silhouette-category (top vs bottom garments)",
+      "arm_issue": 97,
+      "hypothesis": "A deterministic garment-type measurement (scale-invariant upper/lower garment silhouette split from the seg2 DOME-29 clothing classes; CPU, no new model) reduces unsupported 'wearing a top / dressed / leggings' garment-category claims beyond clothing #29's color/coverage, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The garment-type evidence condition does not reduce unsupported garment-category claims or increase supported claims versus its matched no-evidence baseline, or the garment-type bands collapse (a single band >=75% of measured items), or the axis is redundant with clothing #29 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: garment-type / silhouette-category band from seg2 clothing-class coverage; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 Apparel + Upper/Lower_Clothing + skin classes (24/24); local CPU, in-memory",
+      "selection_rationale": "clothing #29 validates class coverage + colors; the upper/lower garment CATEGORY split ('wearing a top', 'in leggings') is a distinct claim axis. Genuinely-NEW part (garment-type).",
+      "scope": "Deterministic garment-type / silhouette split from seg2 DOME-29 clothing classes (upper-body garment present / lower-body garment present / skin-dominant); coarse band or abstain; never color or identity claims; only scale-invariant categories in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing classes); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse garment-type band per item (or abstain when clothing classes are degenerate); raw class-coverage ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.garment_type deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when clothing/apparel classes are absent or degenerate (e.g. fully unclothed subject with no garment classes); never fabricate a garment type",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "garment-type"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -857,7 +979,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 22,
+  "selection_progress": 23,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -984,6 +1106,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 21
+    },
+    {
+      "arm_id": "facial-expression",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 22
     }
   ]
 }
