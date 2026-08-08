@@ -57,6 +57,7 @@ from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
 from .hairstyle import HairstyleError, compute_hairstyle
+from .face_visibility import FaceVisibilityError, compute_face_visibility
 from .scene_category import SceneCategoryError, compute_scene_category
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1835,6 +1836,64 @@ def _serialize_hairstyle(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _face_visibility_evidence() -> dict[str, Any]:
+    """Declared deterministic face-prominence specialist (arm #84)."""
+    module_path = Path(compute_face_visibility.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-face-visibility-v1",
+        "specialists": [
+            {
+                "id": "in-memory-face-visibility-v1",
+                "scope": "Scale-invariant face-prominence measurement from seg2 DOME-29 Face_Neck + Hair only: face_share_of_head = Face_Neck px / (Face_Neck + Hair) px inside the Face_Neck bbox dilated to the local head window (margin proportional to face extent). Emits ONE coarse band (clearly-visible / partially-framed / hair-dominant) or an honest abstention. Never identity, facial-shape, gaze, or absolute-pixel claims; only the scale-invariant coarse band in prose. Band-degeneracy recovery: the on-paper occlusion-overlap measure was degenerate (hard-label seg2 can never overlap classes at a pixel -> 0.000 for 23/23) and was honestly re-cut to face-to-hair prominence.",
+                "inputs": "Frozen selected-item seg2.npy (DOME-29 Face_Neck + Hair masks); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+                "output_semantics": "Provenance-bearing scale-invariant face-prominence band (clearly-visible / partially-framed / hair-dominant) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; the raw face-share ratio stays in the machine-readable payload.",
+                "provenance": (
+                    "research_harness.face_visibility.compute_face_visibility "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when the Face_Neck region is absent/below the raw-pixel floor (no face in frame); never fabricate a visibility class; detector disagreement remains a quality anomaly, never prompt content.",
+                "known_failure_modes": "1/24 frozen items abstain (no Face_Neck region). The arm reports face prominence relative to surrounding hair, NOT a pixel-overlap occlusion figure (structurally impossible on hard-label seg2); 'hair-dominant' means hair occupies the large majority of the local head region around a relatively small exposed face, stated as prominence. A face fully wrapped by voluminous (non-covering) hair reads 'hair-dominant' too — the band is prominence, not degree of covering.",
+                "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_face_visibility(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a face-visibility dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. The raw face-share ratio
+    stays in the machine-readable evidence_payload JSON and is not a caption
+    claim.
+    """
+    lines = [
+        "FACE-VISIBILITY (face prominence relative to hair, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- face visibility not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "face visibility not measurable"
+        lines.append(f"- face visibility abstained ({reason})")
+        return "\n".join(lines)
+    if not config.get("face_present"):
+        lines.append("- face visibility abstained (no face region present)")
+        return "\n".join(lines)
+    band = config.get("face_visibility_band")
+    if band == "clearly-visible":
+        lines.append("- face is clearly visible (face dominates the head region)")
+    elif band == "partially-framed":
+        lines.append("- face is partially framed by surrounding hair")
+    elif band == "hair-dominant":
+        lines.append("- hair dominates the head region around a relatively small exposed face")
+    return "\n".join(lines)
+
+
 def _geometry_evidence() -> dict[str, Any]:
     module_path = Path(derive_determinations.__code__.co_filename)
     code_hash = _sha256(module_path.read_bytes())
@@ -1969,6 +2028,9 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # Arm #82 hairstyle: deterministic hair-length + hair-arrangement bands
     # from seg2 DOME-29 Hair region + pose2 GOLIATH-308 shoulder/neck.
     "hairstyle": ("pose2.npy", "seg2.npy"),
+    # Arm #84 face-visibility: deterministic face-prominence band from seg2
+    # DOME-29 Face_Neck + Hair (face share of the local head region).
+    "face-visibility": ("seg2.npy",),
 }
 
 
@@ -2062,7 +2124,7 @@ def build_stage_b_plan(
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
-        "hairstyle",
+        "hairstyle", "face-visibility",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -2645,6 +2707,38 @@ def build_stage_b_plan(
             "absent/tiny Hair region or unreliable shoulder/neck keypoints abstain honestly (2/24 on the "
             "frozen cohort)."
         )
+    elif evidence_kind == "face-visibility":
+        evidence = _face_visibility_evidence()
+        evidence_condition_id = "context-raw-face-visibility"
+        comparison_plan_id = "stage-b-first500-face-visibility-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic face-visibility "
+            "measurement (scale-invariant face-prominence band — clearly-visible / partially-framed / "
+            "hair-dominant — from the seg2 DOME-29 Face_Neck + Hair regions; CPU, no new model) may "
+            "reduce unsupported 'face fully visible / hair covering her face / face mostly hidden' "
+            "visibility claims in captions versus its matched no-evidence baseline when the source item, "
+            "view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The face-visibility evidence condition does not reduce unsupported face-occlusion/visibility "
+            "claims or increase supported claims versus its matched no-evidence baseline, or the "
+            "face-prominence bands are redundant with face-geometry #60's face-presence handling "
+            "(degenerate), or the arrangement bands collapse (a single band taking >=75% of measured "
+            "items), or an apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Face-visibility is computed in memory from the frozen "
+            "selected seg2.npy (DOME-29 Face_Neck + Hair) only — no new model, CPU only. Only the "
+            "scale-invariant coarse band (clearly-visible / partially-framed / hair-dominant) is "
+            "verbalized; the raw face-share ratio stays in evidence_payload and is never a caption claim. "
+            "Band-degeneracy recovery (measured 2026-08-08): the on-paper occlusion-overlap measure was "
+            "DEGENERATE on hard-label seg2 (one class per pixel -> Face_Neck can never overlap Hair at a "
+            "pixel -> 0.000 for 23/23, max_share 1.00) and was honestly re-cut to the face-to-hair "
+            "prominence ratio with a proportional local-head-window margin (well-distributed: 12 "
+            "hair-dominant / 7 partially-framed / 4 clearly-visible, max_share 0.52; 23/24 measured, 1 "
+            "honest abstention with no Face_Neck region)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -2940,6 +3034,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "body-configuration"
     elif "context-raw-hairstyle" in condition_ids:
         rebuild_kind = "hairstyle"
+    elif "context-raw-face-visibility" in condition_ids:
+        rebuild_kind = "face-visibility"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3016,6 +3112,7 @@ def _load_selected_item(
     include_affordance_contact: bool = False,
     include_body_configuration: bool = False,
     include_hairstyle: bool = False,
+    include_face_visibility: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3202,6 +3299,14 @@ def _load_selected_item(
             raise StageBRunError(
                 f"hairstyle abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    face_visibility = None
+    if include_face_visibility:
+        try:
+            face_visibility = compute_face_visibility(seg2)
+        except FaceVisibilityError as exc:
+            raise StageBRunError(
+                f"face-visibility abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3240,6 +3345,7 @@ def _load_selected_item(
         "affordance_contact": affordance_contact,
         "body_configuration": body_configuration,
         "hairstyle": hairstyle,
+        "face_visibility": face_visibility,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -3301,6 +3407,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         affordance_contact=prepared.get("affordance_contact"),
         body_configuration=prepared.get("body_configuration"),
         hairstyle=prepared.get("hairstyle"),
+        face_visibility=prepared.get("face_visibility"),
         determinations=prepared["determinations"],
     )
     payload = build_evidence_payload(
@@ -3325,6 +3432,7 @@ def _rendered_context4k(prepared: Mapping[str, Any]) -> tuple[str, dict[str, Any
         affordance_contact=prepared.get("affordance_contact"),
         body_configuration=prepared.get("body_configuration"),
         hairstyle=prepared.get("hairstyle"),
+        face_visibility=prepared.get("face_visibility"),
         determinations=prepared["determinations"],
         source_sha256=prepared.get("source_sha256"),
     )
@@ -3446,6 +3554,10 @@ def _render_condition(
         hairstyle = prepared.get("hairstyle")
         evidence_text = _serialize_hairstyle(hairstyle)
         return raw.copy(), _context_prompt(evidence_text), hairstyle
+    if condition_id == "context-raw-face-visibility":
+        face_visibility = prepared.get("face_visibility")
+        evidence_text = _serialize_face_visibility(face_visibility)
+        return raw.copy(), _context_prompt(evidence_text), face_visibility
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -3686,6 +3798,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-hairstyle"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #84: only the face-visibility run computes the deterministic
+    # face-prominence band (CPU, no new model) — gate on the frozen plan's
+    # conditions.
+    include_face_visibility = any(
+        str(condition.get("id")) == "context-raw-face-visibility"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -3705,6 +3824,7 @@ def execute_stage_b(
             include_affordance_contact=include_affordance_contact,
             include_body_configuration=include_body_configuration,
             include_hairstyle=include_hairstyle,
+            include_face_visibility=include_face_visibility,
         )
         for item in items
     ]
