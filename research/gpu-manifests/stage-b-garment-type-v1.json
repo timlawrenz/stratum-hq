@@ -1,0 +1,52 @@
+{
+  "approved_issue": 18,
+  "authorization": {
+    "approval_issue": 18,
+    "approved_by": "timlawrenz direct #18 approval and autonomous-decision delegation in authenticated Hermes WebUI, 2026-08-04",
+    "mode": "human_reviewed"
+  },
+  "execution": {
+    "candidate_manifest_fingerprint": "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
+    "candidate_manifest_path": "/mnt/nas-ai-models/research/stratum/first-500-coverage-balanced-candidate-manifest-v1.json",
+    "comparison_plan_fingerprint": "e9b6a4dea920e2da98d277bc9dd73084e8ae64b3b9316c0a91cd8405a36b1286",
+    "comparison_plan_relative_path": "research/stage-b-plans/stage-b-garment-type-v1.json",
+    "comparison_plan_sha256": "babf6e0b6eaa0541dbe23dec6ac326e1aceaeef41e75da236e75efa0d3672603",
+    "expected_record_count": 96,
+    "generation": {
+      "context_window": 4096,
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "num_predict": 384,
+      "seed": 20260804,
+      "temperature": 0.0,
+      "timeout_seconds": 300,
+      "top_k": 1,
+      "top_p": 1.0
+    },
+    "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
+    "git_commit": "7a6185d09ff895e338d692411718dbd70f157ce0",
+    "launcher_source_sha256": "a05b0ea273cab2dffee66cb1072a88c6f336119dfe8caf003b4753cd5400cbd5",
+    "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
+    "model_name": "gemma3:27b",
+    "runner_module": "research_harness.stage_b",
+    "runner_source_sha256": "f055ebe9eb5bca6e9135f9c9b32286e6ebf7a1d0b20b2fdab23eb9c27e7a813c"
+  },
+  "host_route": "local",
+  "job_id": "stratum-stage-b-garment-type-v1",
+  "launcher_id": "registered-research-launcher",
+  "manifest_state": "approved",
+  "maximum_duration": "2h",
+  "output_root": "/mnt/nas-ai-models/research/stratum/stage-b-garment-type-v1",
+  "requested_vram_gb": 22,
+  "scheduler_lifecycle": [
+    "request",
+    "poll_and_claim",
+    "launch",
+    "verify",
+    "activate",
+    "heartbeat",
+    "release"
+  ],
+  "scheduler_project": "stratum-contextual-specialist-research",
+  "schema_version": 1,
+  "target_gpu": "4090"
+}
