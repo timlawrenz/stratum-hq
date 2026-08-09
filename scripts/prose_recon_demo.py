@@ -94,7 +94,7 @@ def wait_server(timeout_s: int = 240) -> None:
 
 def generate(prompt: str, seed: int, prefix: str) -> Path:
     pid = post_json(COMFY_URL + "/prompt", {"prompt": workflow(prompt, seed, prefix)})["prompt_id"]
-    deadline = time.time() + 600
+    deadline = time.time() + 1500  # ROCm first-pass kernel tuning can exceed 10 min
     while time.time() < deadline:
         try:
             hist = post_json(f"{COMFY_URL}/history/{pid}", {}, timeout=30)
