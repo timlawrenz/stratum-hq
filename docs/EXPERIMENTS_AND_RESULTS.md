@@ -2,6 +2,20 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## 2026-08-08 wave — arms #80–#85 + #95 — `[ALL EMPIRICAL RUNS COMPLETE — VERDICT: BETTER]` (incl. the program's first strike-1 → honest revision)
+
+**Round-trips (harness-computed, all on the frozen 24-item cohort, 96-record generation + independent review each):**
+- **#85 environment-clearance** (NEW deterministic part: subject-to-backdrop negative-space band from seg2 DOME-29 background split) — 0.3219 → **0.9158**, p=0.000111.
+- **#80 iris-eye-color** (NEW deterministic part: iris-hue band from pose2 GOLIATH-308 iris keypoints + source RGB) — 0.3219 → **0.9776**, p=0.000428.
+- **#81 facial-expression** (NEW deterministic part: smile/expression band from pose2 mouth-corner geometry; band-degeneracy recovery — openness-only cut was 89% degenerate, re-cut to openness + corner-elevation; mouth-WIDTH not height in the eye-less fallback) — 0.3219 → **0.9689**, p=0.0013. Sweep EXHAUSTED 27/27 → next_action brainstorm-new-data.
+- **#84 face-visibility** (NEW deterministic part: face-prominence band from seg2 Face_Neck + Hair; environment-clearance activated via the ε-greedy EXPLORE slot at selection 20) — 0.3219 → **0.9767**, supported 47→210, unsupported 99→5, paired 20/23, p=0.000244.
+- **#82 hairstyle** (NEW deterministic part: hair-length band normalized by shoulder width + hair-arrangement down/kept-up from seg2 Hair + pose2; 'up/tied-back' band proved DEGENERATE on this cohort — collapsed honestly to down/kept-up) — 0.3219 → **0.8063**, p=0.003305.
+- **#83 body-configuration** (NEW deterministic part: standing/seated/reclined whole-body posture class from pose2 torso-lean + knee flexion + pelvis height; first cut abstained 17/24, re-cut to classify on whichever discriminating signal is present) — 0.3219 → **0.8966**, p=0.000772.
+- **#95 image-quality** (NEW MODEL CLASS: zero-shot CLIP-IQA, local CPU, owned hardware) — **strike 1 NOT_BETTER** (0.3219 → 0.5055, p=0.105057, recorded honestly as the program's first strike); **revision-2 BETTER** (aspect-level band-degeneracy recovery — dropped the 91.7%-degenerate good/bad aspect, recalibrated floors to 0.55/0.35, re-gated qualification, genuinely new rendered evidence): 0.3219 → **0.7111**, p=0.024521. Registry: image-quality → validated cycle 23.
+**Fifth widen (2026-08-08):** #94 hair-texture, #95 image-quality, #96 body-volume (NEW model class — open-weight whole-body mesh regression), #97 garment-type (NEW deterministic part — seg2 DOME-29 upper/lower garment silhouette split) registered via gated `propose-dimensions --require-new-evidence-part`.
+**Arm #97 garment-type — ACTIVE, round-trip FROZEN + GPU-QUEUED (2026-08-09):** calibration probe 24/24 measured, 0 abstentions, bands upper-lower-covered 7 / upper-only 3 / skin-dominant 10 / lower-only 4 (max 42% — non-degenerate); plan + manifest frozen and validated (96 records, 4090, git_commit pin 7a6185d); generation job `stratum-stage-b-garment-type-v1` queued behind the user's 24h manual gaming-block (until ~2026-08-10 13:24Z). Next tick after release: `--poll-and-launch` → review wrapper → `autonomous-tick --review-dir-from` → label-sync.
+**Validation:** full pytest suite 742 passed; `validate-program`/`validate-dimension-registry`/`validate-comparison-plan`/`validate-gpu-manifest` all valid. Label-sync: issues #80–#85, #95 `research:validated`; #97 `research:active`; #94/#96 `research:proposal` (0 ops needed — already mirrored).
+
 ## Arm #75 — image-focus / depth-of-field evidence — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
 
 **Date:** 2026-08-07 (frozen-cohort two-pass calibration probe → freeze → 96-caption generation → independent review → deterministic tick)

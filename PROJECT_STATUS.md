@@ -1,7 +1,11 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-07 (arm #75 image-focus-depth-of-field ROUND-TRIP COMPLETE → BETTER; arm #74 camera-viewing-angle BETTER; arm #68 gaze-head BETTER; apparent-age #73 now the sole active arm)
-**Phase / status:** **ACTIVE — empirical Stage-B loop running; 19 validated (all 15 feeders + dossier-context4k + reconstruction + gaze-head #68 + camera-viewing-angle #74 + image-focus-dof #75) + 1 active (apparent-age #73) + 1 proposal (affordance-contact #76); 0 blocked.**
+**Last updated:** 2026-08-09 (arms #80–#85 + #95 ALL VALIDATED BETTER 2026-08-08, including the program's first strike-1 NOT_BETTER → honest revision → BETTER (arm #95 image-quality); arm #97 garment-type now the sole active arm — plan + GPU manifest frozen, generation job queued behind a 24h manual gaming-block on the 4090)
+**Phase / status:** ACTIVE — empirical Stage-B loop running; **28 validated** (26 goal feeders + goal arm dossier-context4k + reconstruction) + **1 active (garment-type #97)** + **2 proposals (hair-texture #94, body-volume #96)**; 0 blocked; goal inputs 89.7% validated, `goal_unreachable: false` (floor 4001, `any_max_honest_floor_reached` 24/24).
+
+**2026-08-08 WAVE COMPLETE — arms #80–#85, #95 ALL VALIDATED BETTER (harness-computed).** In order: **#85 environment-clearance** (subject-to-backdrop negative-space, NEW deterministic part from seg2 background split — support ratio 0.3219 → 0.9158, p=0.000111), **#80 iris-eye-color** (iris-hue band from pose2 iris keypoints + source RGB — 0.3219 → 0.9776, p=0.000428), **#81 facial-expression** (mouth-corner geometry bands from pose2 GOLIATH-308 — 0.3219 → 0.9689, p=0.0013; sweep EXHAUSTED 27/27 → brainstorm-new-data), **#84 face-visibility** (face-prominence band from seg2 Face_Neck + Hair — 0.3219 → 0.9767, 47→210 supported, 99→5 unsupported, p=0.000244; environment-clearance activated via the ε-greedy EXPLORE slot at selection 20), **#82 hairstyle** (hair-length + hair-arrangement bands from seg2 Hair + pose2 — 0.3219 → 0.8063, p=0.003305; band-degeneracy recovery: 'up/tied-back' collapsed to down/kept-up), **#83 body-configuration** (standing/seated/reclined posture class from pose2 + seg2 — 0.3219 → 0.8966, p=0.000772), **#95 image-quality** (zero-shot CLIP-IQA, NEW model class, local CPU — **strike 1: NOT_BETTER** 0.3219 → 0.5055, p=0.105057 → **honest revision** (aspect-level band-degeneracy recovery: dropped the 91.7%-degenerate good/bad aspect, recalibrated floors 0.55/0.35) → **BETTER** 0.3219 → 0.7111, p=0.024521; registry image-quality → validated cycle 23, **garment-type #97 → active**). Third widen registered #94 hair-texture, #95 image-quality, #96 body-volume, #97 garment-type via the gated `propose-dimensions --require-new-evidence-part` channel.
+
+**Arm #97 garment-type — ACTIVE, round-trip frozen and GPU-queued (2026-08-08/09).** NEW deterministic part (no new model): upper/lower garment silhouette split from seg2 DOME-29 Apparel + Upper/Lower_Clothing + skin classes, scale-invariant band (upper-only / lower-only / upper-lower-covered / skin-dominant). Calibration probe on the frozen 24-item cohort: **24/24 measured, 0 abstentions, bands 7/3/10/4 (max 42% — non-degenerate)**, coverage ratios stay payload-only. Plan `research/stage-b-plans/stage-b-garment-type-v1.json` + manifest `research/gpu-manifests/stage-b-garment-type-v1.json` frozen (96 records = 24 items × 4 conditions, 4090, git_commit pin 7a6185d; `validate-comparison-plan` + `validate-gpu-manifest` both valid, 742 tests green). Generation job `stratum-stage-b-garment-type-v1` is **queued behind the user's manual 24h gaming-block** (`gaming-block-20260809`, claimed 2026-08-09 13:24Z, ~until 08-10 13:24Z) — next cron tick after release runs `--poll-and-launch` → review wrapper → `autonomous-tick`. Label-sync confirms issue #97 `research:active`, #94/#96 `research:proposal`.
 
 **Arm #75 image-focus-depth-of-field ROUND-TRIP COMPLETE → BETTER (2026-08-07, harness-computed, on `exp/stage-b-image-focus-arm75-20260807`).** NEW-EVIDENCE-PART deterministic focus / depth-of-field quality (no new model), computed in memory from the already-decoded source RGB (SHA-bound via source_sha256) + seg2 region split, acutance measured on the region INTERIOR of the canonical-512 luminance gradient (silhouette-halo-free). Two-pass calibration probe on the frozen 24-item cohort: **DOF ratio** (background interior median / subject interior median acutance, cuts 0.45/0.80 → 9/8/7, max share 37.5%) and **subject-vs-frame ratio** (cuts 0.9/1.6 → 3/12/9, max share 50%) — both scale-invariant and non-degenerate; subject-vs-frame-P99 was rejected (24/24 degenerate); flat-background guard (bg_p99 < 4.0) abstains honestly on untextured backdrops. Support ratio 0.3219 → 0.8187 (Δ +0.4968), supported 47 → 149, unsupported 99 → 33, paired positive 15/17, sign-test p=0.001175. Registry: image-focus-depth-of-field → **validated** (cycle 14); **apparent-age #73 → active** (exploit, selection_progress 15). Runs: `stage-b-image-focus-v1` (96) + `-review` (96). One-active invariant holds (19 validated + 1 active + 1 proposal).
 
@@ -148,15 +152,11 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **19 validated**
-  (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35,
-  reconstruction #37, **vlm-dense-description #47**, **pose-articulation #62**, **pointmap-depth #58**,
-  **matting-alpha #59**, **face-geometry #60**, **object-relations #61**, **scene-category #69**,
-  **gaze-head-orientation #68**, **camera-viewing-angle #74**, **image-focus-depth-of-field #75**),
-  **1 active (apparent-age #73), 1 proposal (affordance-contact #76)**,
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **28 validated** (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35, reconstruction #37, vlm-dense-description #47, pose-articulation #62, pointmap-depth #58, matting-alpha #59, face-geometry #60, object-relations #61, scene-category #69, gaze-head-orientation #68, apparent-age #73, camera-viewing-angle #74, image-focus-depth-of-field #75, affordance-contact #76, iris-eye-color #80, facial-expression #81, hairstyle #82, body-configuration #83, face-visibility #84, environment-clearance #85, image-quality #95),
+  **1 active (garment-type #97), 2 proposals (hair-texture #94, body-volume #96)**,
   0 blocked. `dimension-sweep-status`: `exhausted: false`, `next_action: none`
   (research-pending on the active arm), `goal_unreachable: false`
-  (floor 4001, gap 512; the VLM evidence part + deterministic record together clear it).
+  (floor 4001, gap 512; `any_max_honest_floor_reached=true` 24/24 under the reframed structural floor).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
   InternVL3-78B) + local capability probe of `qwen3-vl:32b` (already installed on 4090 + Strix): 4090 is
   27% CPU-offload / ~280s per 2048-token block — too slow for a 96-item batch; Strix (100GB usable) runs
@@ -164,8 +164,8 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Apparent-age (#73, `research:active`, NEW model class MiVOLO-V2 — needs open-world sourcing + qualification on the local stack first; image-focus-depth-of-field #75 VALIDATED BETTER this cycle) is the sole `research:active` arm; sweep `exhausted: false`, next action research-pending.**
-Per the open-world sourcing directive, the next arm's first step is the **model capability probe**: verify MiVOLO-V2 (age+gender regression, Apache-2.0, arXiv 2307.04616) runs on owned hardware (local 4090 CPU or Strix) on a non-sensitive synthetic image BEFORE any real-corpus commitment — the #47 qwen3-vl lesson (downloadable ≠ usable on these GPUs). Then the frozen-cohort calibration probe (band-degeneracy rule: no band ≥ 75%), freeze the plan, run the standard 96-caption generation + independent review round-trip and `autonomous-tick`. 1 proposal remains in the menu (affordance-contact #76, deterministic).
+**Garment-type (#97, `research:active`, NEW deterministic part from seg2 DOME-29 clothing/skin split) is the sole `research:active` arm; its round-trip is frozen and the generation job is queued on the 4090 behind the user's 24h manual gaming-block (until ~2026-08-10 13:24Z); sweep `exhausted: false`, next action research-pending.**
+When the slot frees, the next tick runs `stage_b_launcher --poll-and-launch` (generation, 96 records), then the parameterized review wrapper (`stratum_review_poll_wrapper.py --run-root stage-b-garment-type-v1 --review-root stage-b-garment-type-v1-review`), then `autonomous-tick --review-dir-from tick-ready.json --write`, then label-sync + draft-PR. After #97 concludes, the deterministic selector's next pick is already computed: **hair-texture #94** (exploit, EIG 0.55, novelty +0.15, tie-broken by id over garment-type/body-volume). 2 proposals remain in the menu (hair-texture #94 deterministic from seg2 Hair region; body-volume #96 NEW model class — open-weight whole-body mesh regression, needs the open-world capability probe before commitment).
 
 ## Live research tree
 
@@ -187,8 +187,14 @@ Per the open-world sourcing directive, the next arm's first step is the **model 
   EXHAUSTED (17/17) → **Third widen (2026-08-07) registered #73 apparent-age, #74 camera-viewing-angle,
   #75 image-focus-dof, #76 affordance-contact** (all name a NEW evidence part / model class).
   **#74 camera-viewing-angle VALIDATED BETTER (2026-08-07); image-focus-depth-of-field #75 VALIDATED
-  BETTER (2026-08-07); apparent-age #73 is the sole
-  `research:active` arm** (selected_via exploit, selection_progress 15); #76 remains a proposal.
+  BETTER (2026-08-07); apparent-age #73 VALIDATED BETTER (2026-08-07)** (MiVOLO-V2 capability probe +
+  qualification passed on owned hardware); **#76 affordance-contact VALIDATED BETTER (2026-08-07)**.
+  **Fourth widen (2026-08-08): #80 iris-eye-color, #81 facial-expression, #82 hairstyle,
+  #83 body-configuration, #84 face-visibility, #85 environment-clearance — ALL VALIDATED BETTER;
+  sweep EXHAUSTED 27/27 → fifth widen registered #94 hair-texture, #95 image-quality, #96 body-volume,
+  #97 garment-type. #95 image-quality: strike-1 NOT_BETTER → honest revision (aspect-level band-degeneracy
+  recovery) → BETTER; #97 garment-type is the sole `research:active` arm** (round-trip frozen, GPU-queued
+  behind the user's 24h gaming-block; plan/manifest validated).
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -220,7 +226,13 @@ The **VLM dense-description marginal is BETTER** (0.7376→0.9581 support ratio,
 10/10 sweep was exhausted, the **brainstorm-widen registered 5 new candidate arms (#58–#62)**, and
 **pose-articulation (#62), pointmap-depth (#58), matting-alpha (#59), face-geometry (#60), and
 object-relations (#61) ALL VALIDATED (2026-08-07)**. A **second widen registered #68 gaze-head-orientation
-and #69 scene-category — both ALL 17 validated, then a THIRD widen registered #73/#74/#75/#76**; **Arm #68
-gaze-head-orientation VALIDATED BETTER (p=1e-06, ratio 0.3219→0.9673) and Arm #74 camera-viewing-angle
+and #69 scene-category — both ALL 17 validated, then a THIRD widen registered #73/#74/#75/#76**; **Arm #68 gaze-head-orientation VALIDATED BETTER (p=1e-06, ratio 0.3219→0.9673) and Arm #74 camera-viewing-angle
 VALIDATED BETTER (p=0.000772, ratio 0.3219→0.9796)** — two more arms completed this session. Menu now
 18 validated + 1 active (#75 image-focus-dof) + 2 proposals.
+**2026-08-08: arms #80–#85 + #95 ALL VALIDATED BETTER** (iris-eye-color 0.3219→0.9776 p=0.000428;
+facial-expression 0.3219→0.9689 p=0.0013; hairstyle 0.3219→0.8063 p=0.003305; body-configuration
+0.3219→0.8966 p=0.000772; face-visibility 0.3219→0.9767 p=0.000244; environment-clearance 0.3219→0.9158
+p=0.000111; image-quality 0.3219→0.7111 p=0.024521 after the program's first strike-1 NOT_BETTER →
+honest revision). Every one of the 26 goal-feeder dimensions + the goal arm + reconstruction is now
+validated; **garment-type #97 is active** (round-trip frozen; GPU queued), hair-texture #94 and
+body-volume #96 remain proposals. Goal inputs 89.7% validated; `goal_unreachable: false`.
