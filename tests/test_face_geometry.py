@@ -12,6 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pathlib import Path
+
 from research_harness.face_geometry import (
     EYE_CLOSE,
     EYE_WIDE,
@@ -29,6 +31,12 @@ from research_harness.face_geometry import (
     render_face_geometry,
     validate_rgb_array,
     validate_seg2_array,
+)
+
+FACE_MODEL_TASK = "/mnt/nas-ai-models/research/stratum/models/face-geometry/face_landmarker.task"
+requires_staged_model = pytest.mark.skipif(
+    not Path(FACE_MODEL_TASK).is_file(),
+    reason="requires staged face-landmarker model on owned-hardware NAS (not present on neutral CI)",
 )
 
 
@@ -119,6 +127,7 @@ def test_render_bands() -> None:
     assert "close" in text and "wide" in text and "narrow" in text
 
 
+@requires_staged_model
 def test_compute_abstains_on_blank_frame(tmp_path) -> None:
     """Blank non-face frame must abstain cleanly (no nonsense landmarks)."""
     from research_harness.face_geometry import _FaceLandmarkerRuntime
