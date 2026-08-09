@@ -47,6 +47,7 @@ test = [
     "pytest>=8.0.0",
     "opencv-python-headless>=4.5.0",
     "scipy>=1.10.0",
+    "mediapipe>=0.10.14",
 ]
 all = [
     "stratum-hq[gpu,pose,sapiens,publish]",
