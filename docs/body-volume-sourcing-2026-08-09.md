@@ -23,7 +23,7 @@ the sourcing pre-scan comment on issue #96 (2026-08-09T00:2xZ).
 |---|---|---|
 | 4D-Humans code (`LICENSE.md` @ main) | **MIT** (UC Regents, Shubham Goel) | ✅ fetched raw, text read |
 | HMR2.0 checkpoint / `hmr2_data.tar.gz` | Distributed from the repo's own host (`https://www.cs.utexas.edu/~pavlakos/4dhumans/hmr2_data.tar.gz`), NOT HF-gated; no click-through | ✅ URL pinned in `hmr2/models/__init__.py` `download_models()` |
-| SMPL body asset (`SMPL_NEUTRAL.pkl`) | SMPL is licensed for **non-commercial scientific research** (MPI/ps-iz; ~mpg.de). The qualification gate requires license verification for research use before freezing — this program's frozen-cohort measurement round-trips are non-commercial research, consistent. | ⏳ content check pending: the official tarball may bundle `data/smpl/SMPL_NEUTRAL.pkl` (that path is `check_smpl_exists`'s first candidate) — if so, NO registration click-through is needed and the 00:2xZ caveat is downgraded from "owner decision" to "record license note at freeze" |
+| SMPL body asset (`SMPL_NEUTRAL.pkl`) | SMPL is licensed for **non-commercial scientific research** (MPI-IS; smpl.is.tue.mpg.de). The qualification gate requires license verification for research use before freezing — this program's frozen-cohort measurement round-trips are non-commercial research, consistent. **Bundling hypothesis FALSIFIED 2026-08-09:** the official `hmr2_data.tar.gz` was downloaded (sha256 `0fdf9e66ec97503fe1b995f4942e021a6df748f4ccbc5574718742d975a6e19b`, 2.7GB, plain tar mislabeled `.tar.gz`) and extracted on Strix — `data/smpl/` is **EMPTY**; the tarball ships only the HMR2.0 checkpoint (`logs/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt`, exactly `DEFAULT_CHECKPOINT`). The SMPL asset must come from the SMPL project site (registration/license-gated click-through — a human action; mirror sourcing is license-gray since SMPL's license restricts redistribution). | ✅ (falsified-bundle verified by extraction) |
 
 ## Local-asset recon (owned hardware)
 
@@ -66,7 +66,14 @@ the sourcing pre-scan comment on issue #96 (2026-08-09T00:2xZ).
 ## Routing
 
 - Arm #96 stays `proposal`; **no registry change** in this cycle.
-- Next decision point: when the selector reaches body-volume (after hair-texture #94),
-  the capability-probe result determines activate-vs-mark-blocked. If the probe covers
-  ≥18/24 items, proceed to band calibration; else open `research:needs-human` with the
-  measured coverage and the exact decision needed (model swap vs arm falsification).
+- **Exact decision needed at activation time (pre-registered):** every probe input except
+  one is now ready on Strix (venv, source, checkpoint). The missing input is
+  `SMPL_NEUTRAL.pkl` — SMPL's non-commercial-research license permits this program's
+  use, but the download is a registration/click-through (human action). Either the
+  owner places it at `~/.cache/4DHumans/data/smpl/SMPL_NEUTRAL.pkl` on Strix (or
+  declares the local path) and the next tick runs the probe, or the arm is
+  `mark-blocked` (`research:needs-human`) with this exact ruling when the selector
+  approaches it (after hair-texture #94). Mirror sourcing is NOT pursued (license-gray).
+- If the probe runs and covers ≥18/24 items, proceed to band calibration; else open
+  `research:needs-human` with the measured coverage and the exact decision needed
+  (model swap vs arm falsification).
