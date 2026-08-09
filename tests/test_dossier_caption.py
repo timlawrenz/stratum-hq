@@ -136,6 +136,18 @@ def test_render_caption2_keeps_scale_invariant_content() -> None:
     assert "px" not in text.lower()
 
 
+def test_render_caption2_re_prefixes_stripped_section_fragments() -> None:
+    """Claims that began with their section word keep a subject in prose."""
+    hair_first = _dossier()["sections"]["hair"][0]
+    assert (hair_first.get("text") or "").startswith("hair:"), "fixture must start with a stripped prefix"
+    text = render_caption2(_dossier())["text"]
+    # the fragment "present, covering ..." must not dangle: the noun returns
+    assert "Hair: " in text
+    sent = next(s for s in text.split(". ") if "Hair:" in s)
+    assert sent.lstrip().startswith("Hair:")
+    assert not sent.lstrip().startswith("Hair: Hair:")
+
+
 def test_render_caption2_raises_on_empty() -> None:
     empty_dossier = {"sections": {}, "evidence_ids": []}
     with pytest.raises(DossierCaptionError, match="empty"):

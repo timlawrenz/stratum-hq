@@ -111,10 +111,19 @@ def _join_claim_lines(dossier: Mapping[str, Any], *, exclude_evidence_ids: froze
             if eids and eids.issubset(exclude_evidence_ids):
                 continue
             sentence = text
+            stripped_prefix: str | None = None
             for prefix in _SECTION_PREFIXES:
                 if sentence.startswith(prefix):
+                    stripped_prefix = prefix
                     sentence = sentence[len(prefix) :]
                     break
+            if stripped_prefix is not None and sentence:
+                # The claim line began with its section word (e.g. "hair: present,
+                # covering 0.26 of the frame"). Re-apply the noun so the prose
+                # sentence keeps its subject instead of degrading into a fragment
+                # ("present, covering 0.26 of the frame.").
+                noun = stripped_prefix.rstrip(": ").strip()
+                sentence = f"{noun.capitalize()}: {sentence}"
             # The render lines are independent declaratives; end each with '.'
             # so the joined caption reads as prose, not a list.
             lines.append(sentence.rstrip(".").strip() + ".")
