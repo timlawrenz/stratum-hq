@@ -65,7 +65,10 @@ def workflow(prompt: str, seed: int, prefix: str) -> dict:
         "5": {"class_type": "EmptyLatentImage", "inputs": {"batch_size": 1, "height": HEIGHT, "width": WIDTH}},
         "6": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["7", 1], "text": ""}},
         "7": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT}},
-        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["7", 2]}},
+        "8": {"class_type": "VAEDecodeTiled", "inputs": {
+            "samples": ["3", 0], "vae": ["7", 2],
+            "tile_size": 512, "overlap": 64,
+            "temporal_size": 64, "temporal_overlap": 8}},
         "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": prefix, "images": ["8", 0]}},
     }
 
