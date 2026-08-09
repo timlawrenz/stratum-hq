@@ -40,7 +40,7 @@ class OllamaCaptionBackend:
         self.url = url
         self.model_name = model_name
 
-    def generate(self, image: Image.Image, max_tokens: int = 500) -> str:
+    def generate(self, image: Image.Image, max_tokens: int = 500, prompt: str = CAPTION_PROMPT) -> str:
         """Send *image* (as base64 JPEG) to Ollama and return the caption."""
         buf = BytesIO()
         image.save(buf, format="JPEG")
@@ -48,7 +48,7 @@ class OllamaCaptionBackend:
 
         payload = {
             "model": self.model_name,
-            "prompt": CAPTION_PROMPT,
+            "prompt": prompt,
             "images": [image_b64],
             "stream": False,
             "options": {
