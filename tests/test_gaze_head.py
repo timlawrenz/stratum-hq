@@ -13,6 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pathlib import Path
+
 from research_harness.gaze_head import (
     GAZE_HEAD_MODEL_ASSET,
     GazeHeadError,
@@ -27,6 +29,12 @@ from research_harness.gaze_head import (
     render_gaze_head,
     validate_rgb_array,
     validate_seg2_array,
+)
+
+FACE_MODEL_TASK = "/mnt/nas-ai-models/research/stratum/models/face-geometry/face_landmarker.task"
+requires_staged_model = pytest.mark.skipif(
+    not Path(FACE_MODEL_TASK).is_file(),
+    reason="requires staged face-landmarker model on owned-hardware NAS (not present on neutral CI)",
 )
 
 
@@ -130,6 +138,7 @@ def test_render_bands() -> None:
     assert "facing the camera" in " ".join(lines2)
 
 
+@requires_staged_model
 def test_compute_abstains_on_blank_frame() -> None:
     """Blank non-face frame must abstain cleanly (no nonsense landmarks)."""
     from research_harness.face_geometry import _FaceLandmarkerRuntime
