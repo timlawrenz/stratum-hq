@@ -3536,6 +3536,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "eye-color"
     elif "context-raw-facial-expression" in condition_ids:
         rebuild_kind = "facial-expression"
+    elif "context-raw-garment-type" in condition_ids:
+        rebuild_kind = "garment-type"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
