@@ -1066,7 +1066,7 @@
       "id": "hand-gesture",
       "name": "Hand pose / gesture (open palm, fist, pointing, relaxed curl) via MediaPipe Hands",
       "arm_issue": 109,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A hand-pose measurement (NEW MODEL CLASS: open-weight MediaPipe Hands 21-point-per-hand mesh, Apache-2.0, local CPU on owned hardware; NEW evidence part hand-gesture) that reads the hand's own gesture class instead of hand-body contact reduces unsupported 'she makes a peace sign / open palm / hand gesture' hand-articulation claims that the deterministic affordance-contact #76 axis (contact vs grazing) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The hand-gesture evidence condition does not reduce unsupported hand-articulation claims or increase supported claims versus its matched no-evidence baseline, or the gesture bands collapse (a single band >=75% of measured items), or the axis is redundant with affordance-contact #76 (same evidence), or the hand detector covers too few frozen items (coverage below the pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
@@ -1186,7 +1186,7 @@
       "id": "eye-openness",
       "name": "Eye openness / eyelid state (open, lidded, closed)",
       "arm_issue": 113,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "An eyelid-state measurement (NEW evidence part eye-openness, deterministic from the already-validated MediaPipe FaceLandmarker eye contours + iris-visibility via the validated iris-eye-color #80 iris keypoint presence, local CPU) that emits a scale-invariant eyes-open / lidded / eyes-closed band reduces unsupported 'eyes closed / eyes shut / lids lowered' eyelid claims that the validated iris-eye-color #80 (iris hue) and facial-expression #81 cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The eye-openness evidence condition does not reduce unsupported eyelid/closed-eye claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (e.g. 24/24 eyes-open — a single band >=75%), or the axis is redundant with iris-eye-color #80 or facial-expression #81 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
@@ -1224,7 +1224,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 32,
+  "selection_progress": 33,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1393,6 +1393,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 28
+    },
+    {
+      "arm_id": "eye-openness",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 29
     }
   ]
 }
