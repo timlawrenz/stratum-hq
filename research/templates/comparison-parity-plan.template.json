@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "kind": "comparison-parity-plan",
+  "template_status": "fill_before_validation",
+  "program_id": "<program-id>",
+  "status": "PENDING",
+  "parent_issue": 0,
+  "hypothesis": "<falsifiable comparison hypothesis>",
+  "falsified_if": "<outcome that disproves the comparison hypothesis>",
+  "metric_version": "<versioned-rubric-id>",
+  "pilot_manifest": {
+    "id": "<immutable-pilot-manifest-id>",
+    "source_root": "<canonical-source-root>",
+    "frozen": true,
+    "selection_rationale": "<why this fixed pilot is informative without imposing a closed taxonomy>",
+    "coverage_notes": "<coverage gaps and artifact-availability limitations>",
+    "items": [
+      {
+        "image_id": "<stable-image-id>",
+        "source_relative_path": "<normalized-posix-path-relative-to-source-root-without-dotdot>",
+        "source_sha256": "<64-lowercase-hex-source-hash>",
+        "artifact_availability": {
+          "<open-world-artifact-role>": true
+        }
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "<condition-id>",
+      "pilot_manifest_id": "<immutable-pilot-manifest-id>",
+      "input_view": {
+        "id": "<view-id>",
+        "fingerprint": "<64-lowercase-hex-transform-fingerprint>"
+      },
+      "prompt": {
+        "id": "<prompt-id>",
+        "fingerprint": "<64-lowercase-hex-prompt-fingerprint>"
+      },
+      "evidence": {
+        "kind": "specialist_bundle",
+        "id": "<evidence-bundle-or-no-specialist-evidence>",
+        "fingerprint": "<sha256-of-utf8-canonical-json-evidence-excluding-fingerprint>",
+        "specialists": [
+          {
+            "id": "<stable-specialist-id>",
+            "scope": "<observable-domain-and-explicit-limits>",
+            "inputs": "<frozen-input-artifacts-and-view-policy>",
+            "output_semantics": "<what-the-output-means-and-does-not-mean>",
+            "provenance": "<model-code-config-or-deterministic-method-provenance>",
+            "abstention_policy": "<when-and-how-the-specialist-abstains>",
+            "known_failure_modes": "<known-input-data-model-or-view-failure-modes>",
+            "qualification_gate": "<pre-registered-specialist-qualification-gate>"
+          }
+        ]
+      },
+      "aggregator": {
+        "model_id": "<local-model-id>",
+        "provenance": "<model-code-config-provenance>",
+        "generation_fingerprint": "<64-lowercase-hex-fixed-generation-settings>",
+        "local_only": true
+      }
+    }
+  ],
+  "contrasts": [
+    {
+      "id": "<one-axis-contrast-id>",
+      "baseline_condition": "<condition-id>",
+      "variant_condition": "<condition-id>",
+      "changed_axes": [
+        "input_view"
+      ]
+    }
+  ],
+  "review_protocol": {
+    "human_review_required": true,
+    "sequence": [
+      "selected_input_view",
+      "provenance_evidence",
+      "candidate_output_or_context",
+      "decision_rubric"
+    ],
+    "fields": [
+      "supported_claims",
+      "unsupported_claims",
+      "omissions",
+      "contradictions",
+      "abstentions"
+    ],
+    "detector_disagreement_handling": "quality_anomaly_not_caption_content"
+  },
+  "metric_self_audit": {
+    "before_comparative_inference": true,
+    "known_case_item_id": "<stable-image-id>",
+    "null_output_id": "<predeclared-null-or-degenerate-output>",
+    "evaluator_version": "<versioned-evaluator-id>"
+  },
+  "adversarial_review": {
+    "planned": true,
+    "checks": [
+      "metric_definition_stable",
+      "fresh_process_or_second_review",
+      "edge_case_inspection"
+    ]
+  },
+  "representation_boundary": {
+    "legacy_text_encoder_max_tokens": 0,
+    "compact_context_routing": "out_of_scope",
+    "no_silent_legacy_routing": true
+  }
+}
