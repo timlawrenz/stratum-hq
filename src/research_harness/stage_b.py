@@ -2200,13 +2200,13 @@ def _serialize_garment_type(config: Mapping[str, Any] | None) -> str:
         return "\n".join(lines)
     band = config.get("garment_type_band")
     if band == "upper-lower-covered":
-        lines.append("- subject is dressed (upper and lower body covered)")
+        lines.append("- upper AND lower body garment-covered (subject dressed); do NOT describe specific garment colors, materials, or items the evidence does not name")
     elif band == "upper-only":
-        lines.append("- upper body clothed, lower body exposed (e.g. wearing a top, legs uncovered)")
+        lines.append("- upper body garment-covered; NO lower-body garment present (lower body exposed); do NOT describe any lower-body garment")
     elif band == "lower-only":
-        lines.append("- lower body covered, upper body exposed")
+        lines.append("- lower body garment-covered; NO upper-body garment present (upper body exposed); do NOT describe any upper-body garment")
     elif band == "skin-dominant":
-        lines.append("- skin-dominant (no garment region cleared; exposed skin dominates)")
+        lines.append("- NO upper-body garment present AND NO lower-body garment present (exposed skin dominates); do NOT describe any garment")
     return "\n".join(lines)
 
 

@@ -216,11 +216,11 @@ def render_garment_type(config: Mapping[str, Any]) -> list[str]:
         return ["garment-type: abstain (no foreground subject)"]
     band = config.get("garment_type_band")
     if band == "upper-lower-covered":
-        return ["garment-type: subject is dressed (upper and lower body covered)"]
+        return ["garment-type: upper AND lower body garment-covered (subject dressed)"]
     if band == "upper-only":
-        return ["garment-type: upper body clothed, lower body exposed (e.g. wearing a top, legs uncovered)"]
+        return ["garment-type: upper body garment-covered; NO lower-body garment present (lower body exposed)"]
     if band == "lower-only":
-        return ["garment-type: lower body covered, upper body exposed"]
+        return ["garment-type: lower body garment-covered; NO upper-body garment present (upper body exposed)"]
     if band == "skin-dominant":
-        return ["garment-type: skin-dominant (no garment region cleared; exposed skin dominates)"]
+        return ["garment-type: NO upper-body garment present AND NO lower-body garment present (exposed skin dominates)"]
     return []

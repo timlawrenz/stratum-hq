@@ -130,12 +130,28 @@ def test_render_dressed() -> None:
     r = compute_garment_type(_seg_with_garments(upper=30000, lower=30000))
     lines = render_garment_type(r)
     assert any("dressed" in ln for ln in lines)
+    assert any("upper AND lower body garment-covered" in ln for ln in lines)
 
 
 def test_render_upper_only() -> None:
     r = compute_garment_type(_seg_with_garments(upper=30000, lower=0))
     lines = render_garment_type(r)
-    assert any("upper body clothed" in ln for ln in lines)
+    assert any("upper body garment-covered" in ln for ln in lines)
+    # The measured absence must be verbalized (v2 honesty fix): the caption
+    # model must never be left to invent a lower-body garment.
+    assert any("NO lower-body garment present" in ln for ln in lines)
+
+
+def test_render_lower_only_absence_verbalized() -> None:
+    r = compute_garment_type(_seg_with_garments(upper=0, lower=30000))
+    lines = render_garment_type(r)
+    assert any("NO upper-body garment present" in ln for ln in lines)
+
+
+def test_render_skin_dominant_absence_verbalized() -> None:
+    r = compute_garment_type(_seg_with_garments(upper=0, lower=0))
+    lines = render_garment_type(r)
+    assert any("NO upper-body garment present AND NO lower-body garment present" in ln for ln in lines)
 
 
 def test_render_not_measured_empty() -> None:
