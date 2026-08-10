@@ -245,5 +245,7 @@ facial-expression 0.3219→0.9689 p=0.0013; hairstyle 0.3219→0.8063 p=0.003305
 p=0.000111; image-quality 0.3219→0.7111 p=0.024521 after the program's first strike-1 NOT_BETTER →
 honest revision). **2026-08-10: garment-type #97 VALIDATED BETTER after a strike-1 NOT_BETTER →
 honest absence-verbalization revision-2** (0.4624→0.9557 p=0.005311). Every one of the 27 goal-feeder
-dimensions + the goal arm + reconstruction is now validated; **hair-texture #94 is active**
-(round-trip to be frozen next), body-volume #96 remains a proposal. Goal inputs 89.7% validated; `goal_unreachable: false`.
+dimensions + the goal arm + reconstruction is now validated; after the decision-boundary resolution
+(PR #108, 2026-08-10), **hair-texture #94 (CLIP ViT-L/14 zero-shot re-scope) is the sole `research:active` arm**
+(round-trip to be frozen next), body-volume #96 (Anny re-scope) remains a proposal, and the brainstorm
+arms #105/#106/#107 are blocked with measured degeneracy. Goal inputs 93.1% validated; `goal_unreachable: false`.

@@ -63,6 +63,7 @@ from .eye_color import EyeColorError, compute_eye_color
 from .facial_expression import FacialExpressionError, compute_facial_expression
 from .garment_type import GarmentTypeError, compute_garment_type
 from .scene_category import SceneCategoryError, compute_scene_category
+from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_MODEL_ASSET
 from .image_quality import ImageQualityError, compute_image_quality
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
@@ -1326,6 +1327,109 @@ def _serialize_scene_category(scene: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _hair_texture_evidence() -> dict[str, Any]:
+    """Declared open-weight CLIP ViT-L/14 zero-shot hair-texture specialist
+    (arm #94, LEARNED RE-SCOPE 2026-08-10 under the open-world sourcing
+    directive)."""
+    module_path = Path(compute_hair_texture.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_dir = Path(HAIR_TEXTURE_MODEL_ASSET)
+    model_sha = (
+        _sha256((model_dir / "model.safetensors").read_bytes())
+        if (model_dir / "model.safetensors").exists() else "MISSING"
+    )
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-hair-texture-v1",
+        "specialists": [
+            {
+                "id": "in-memory-hair-texture-v1",
+                "scope": ("Scale-invariant hair-texture / curl-waviness band (straight / wavy / "
+                          "curly / coily) from the open-weight CLIP ViT-L/14 zero-shot classifier "
+                          "over the seg2 DOME-29 Hair-region crop with a closed curl vocabulary at "
+                          "the calibrated confidence floor (0.35). Re-scoped 2026-08-10 from the "
+                          "degenerate deterministic gradient axis (11/24 all one band) to a NEW "
+                          "MODEL CLASS per the open-world sourcing directive. Emits ONE coarse "
+                          "band or a surfaced abstention; never color, length, or identity claims; "
+                          "only the scale-invariant band in prose."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Hair mask, crop region) + the "
+                           "already-decoded source RGB (SHA-bound via the item's source_sha256); "
+                           "local open-weight openai/clip-vit-large-patch14 (MIT, CPU, "
+                           "model.safetensors sha256 {model_sha}). Recomputed in memory during "
+                           "this bounded run with no crawlr/stratum write; model run on owned "
+                           "hardware only.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant hair-texture band with a "
+                                     "surfaced abstention on low confidence or model/input failure, "
+                                     "not semantic ground truth or caption claims; only the band is "
+                                     "verbalized (raw probabilities/logits stay in the "
+                                     "machine-readable payload)."),
+                "provenance": (
+                    "research_harness.hair_texture.compute_hair_texture "
+                    f"SHA-256 {code_hash}; model openai/clip-vit-large-patch14 (MIT, "
+                    f"HF Transformers path) sha256 {model_sha}, run locally on owned hardware "
+                    "(CPU, no VRAM contention with the caption model); computed in memory during "
+                    "this bounded run with no crawlr/stratum write, no hosted third-party "
+                    "inference of the sensitive corpus. Re-scoped 2026-08-10 (deterministic "
+                    "gradient axis measured degenerate)."
+                ).format(model_sha=model_sha),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing or detector count is not exactly one; "
+                                      "abstain (emit None/band with a surfaced reason) when the Hair "
+                                      "region is absent/tiny/cropped or the argmax softmax confidence "
+                                      "falls below the calibrated floor (0.35). Never overwrite an "
+                                      "ambiguous texture with a confident-looking guess. Detector "
+                                      "disagreement remains a quality anomaly, never prompt content."),
+                "known_failure_modes": ("CLIP zero-shot is a closed-set classifier: curl states "
+                                        "outside the frozen straight/wavy/curly/coily vocabulary are "
+                                        "forced onto the nearest class (addressed by cohort-checking "
+                                        "the frozen vocabulary before freeze); confidence is not "
+                                        "calibrated across domains (floor 0.35 calibrated on this "
+                                        "frozen cohort: 24/24 measured, max top-1 share 54.2%, "
+                                        "argmax conf median 0.632 / min 0.373); wavy/curly/coily "
+                                        "distinctions are coarse semantic bands, not strand-level "
+                                        "measurements."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is permitted "
+                                       "until the frozen comparison receives completed rubric and "
+                                       "adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_hair_texture(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a hair-texture dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. Raw CLIP probabilities /
+    logits stay in the machine-readable evidence_payload JSON and are not
+    caption claims.
+    """
+    lines = [
+        "HAIR-TEXTURE (CLIP ViT-L/14 zero-shot, closed curl set, scale-invariant):"
+    ]
+    if not config:
+        lines.append("- hair texture not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "hair texture not confident"
+        lines.append(f"- hair-texture abstained ({reason})")
+        return "\n".join(lines)
+    if not config.get("hair_present"):
+        lines.append("- hair-texture abstained (no hair region present)")
+        return "\n".join(lines)
+    band = config.get("hair_texture_band")
+    if band == "straight":
+        lines.append("- hair is straight (no curl wave pattern)")
+    elif band == "wavy":
+        lines.append("- hair is wavy (gentle wave pattern)")
+    elif band == "curly":
+        lines.append("- hair is curly (distinct curl pattern)")
+    elif band == "coily":
+        lines.append("- hair is coily (tightly coiled texture)")
+    return "\n".join(lines)
+
+
 def _image_quality_evidence() -> dict[str, Any]:
     """Declared open-weight zero-shot CLIP-IQA quality specialist (arm #95)."""
     module_path = Path(compute_image_quality.__code__.co_filename)
@@ -2373,6 +2477,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # category from seg2 DOME-29 clothing classes (Apparel + Upper/Lower
     # Clothing + skin); scale-invariant coarse band.
     "garment-type": ("seg2.npy",),
+    # Arm #94 hair-texture (LEARNED RE-SCOPE 2026-08-10): CLIP ViT-L/14
+    # zero-shot curl classifier consumes the seg2 DOME-29 Hair mask (crop
+    # region) + the already-decoded source RGB (SHA-bound via the item's
+    # source_sha256). seg2 is the only derived evidence input.
+    "hair-texture": ("seg2.npy",),
 }
 
 
@@ -2467,7 +2576,7 @@ def build_stage_b_plan(
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
-        "facial-expression", "image-quality", "garment-type",
+        "facial-expression", "image-quality", "garment-type", "hair-texture",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3231,6 +3340,40 @@ def build_stage_b_plan(
             "distribution upper-lower-covered 7 / upper-only 3 / lower-only 4 / skin-dominant 10 "
             "(max_share 0.42, no band >= 75%)."
         )
+    elif evidence_kind == "hair-texture":
+        evidence = _hair_texture_evidence()
+        evidence_condition_id = "context-raw-hair-texture"
+        comparison_plan_id = "stage-b-first500-hair-texture-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared LEARNED hair-texture "
+            "measurement (scale-invariant straight/wavy/curly/coily band from the open-weight CLIP "
+            "ViT-L/14 zero-shot classifier over the seg2 DOME-29 Hair-region crop at a calibrated "
+            "confidence floor; NEW MODEL CLASS re-scope 2026-08-10 under the open-world sourcing "
+            "directive, local CPU) may reduce unsupported 'curly / wavy / straight hair' textural "
+            "claims that hairstyle #82 (length/arrangement) and hair #30 (color/coverage) cannot "
+            "ground, versus the matched no-evidence baseline when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The hair-texture evidence condition does not reduce unsupported hair-texture/curl claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the texture bands "
+            "collapse (a single band taking >=75% of measured items), or the axis is redundant with "
+            "hairstyle #82 / hair #30 / vlm-dense-description #47 (degenerate), or the learned "
+            "specialist fails qualification on the frozen cohort, or an apparent difference is "
+            "attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 "
+            "files are not used as evidence inputs. Hair texture is computed in memory from the frozen "
+            "selected seg2.npy (DOME-29 Hair crop) + the already-decoded source RGB via the local "
+            "open-weight CLIP ViT-L/14 zero-shot classifier (openai/clip-vit-large-patch14, MIT, owned "
+            "hardware, CPU; model.safetensors bound by sha256) over a frozen closed "
+            "straight/wavy/curly/coily vocabulary at the calibrated confidence floor (0.35). Only the "
+            "scale-invariant coarse band is verbalized; raw probabilities/logits stay in "
+            "evidence_payload and are never caption claims. Band calibration (measured 2026-08-10 "
+            "frozen-cohort CLIP probe): 24/24 measured, distribution straight 3 / wavy 13 / coily 6 / "
+            "curly 2 (max_share 0.542, no band >= 75%), argmax confidence median 0.632 / min 0.373."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3538,6 +3681,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "facial-expression"
     elif "context-raw-garment-type" in condition_ids:
         rebuild_kind = "garment-type"
+    elif "context-raw-hair-texture" in condition_ids:
+        rebuild_kind = "hair-texture"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3620,6 +3765,7 @@ def _load_selected_item(
     include_eye_color: bool = False,
     include_facial_expression: bool = False,
     include_garment_type: bool = False,
+    include_hair_texture: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -3854,6 +4000,17 @@ def _load_selected_item(
             raise StageBRunError(
                 f"garment-type abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    hair_texture = None
+    if include_hair_texture:
+        rgb = np.asarray(image.convert("RGB"), dtype=np.uint8)
+        try:
+            hair_texture = compute_hair_texture(
+                seg2, rgb, model_asset_dir=HAIR_TEXTURE_MODEL_ASSET
+            )
+        except HairTextureError as exc:
+            raise StageBRunError(
+                f"hair-texture abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -3898,6 +4055,7 @@ def _load_selected_item(
         "eye_color": eye_color,
         "facial_expression": facial_expression,
         "garment_type": garment_type,
+        "hair_texture": hair_texture,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -4138,6 +4296,10 @@ def _render_condition(
         garment_type = prepared.get("garment_type")
         evidence_text = _serialize_garment_type(garment_type)
         return raw.copy(), _context_prompt(evidence_text), garment_type
+    if condition_id == "context-raw-hair-texture":
+        hair_texture = prepared.get("hair_texture")
+        evidence_text = _serialize_hair_texture(hair_texture)
+        return raw.copy(), _context_prompt(evidence_text), hair_texture
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4417,6 +4579,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-garment-type"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #94 (learned re-scope): only the hair-texture run computes the CLIP
+    # ViT-L/14 zero-shot curl band (NEW MODEL CLASS, local CPU) — gate on the
+    # frozen plan's conditions.
+    include_hair_texture = any(
+        str(condition.get("id")) == "context-raw-hair-texture"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4442,6 +4611,7 @@ def execute_stage_b(
             include_eye_color=include_eye_color,
             include_facial_expression=include_facial_expression,
             include_garment_type=include_garment_type,
+            include_hair_texture=include_hair_texture,
         )
         for item in items
     ]
