@@ -1,0 +1,109 @@
+{
+  "schema_version": 2,
+  "policy_profile": "stratum-single-woman-v1",
+  "program_id": "stratum-contextual-specialist-research",
+  "title": "Open-world specialist evidence to contextual representation",
+  "canonical_source": {
+    "path": "/mnt/nas-ai-models/training-data/crawlr/approved",
+    "derived_tree": "/mnt/nas-ai-models/training-data/crawlr/stratum",
+    "subject_invariant": "exactly_one_curated_woman",
+    "detector_disagreement": "quality_anomaly_not_semantic_content"
+  },
+  "content_policy": {
+    "model_execution": "local_first",
+    "model_sourcing": "open_world",
+    "autonomous_external_image_model_allowed": false,
+    "reason": "The corpus may include swimwear or nudity; silent refusal, evasive output, or unexplained omission is a data-quality failure. Sensitive-image inference stays on owned hardware by default. Model SOURCING is open-world: the researcher may discover, download, install, and qualify new candidate models (open weights, fine-tunes, deterministic or learned specialists) from papers/literature and hubs when local options are exhausted or a materially better model exists for a task or a new evidence part.",
+    "external_model_requirement": "Hosted third-party inference of the sensitive canonical corpus requires an explicit hold and reviewed qualification. Open-weight models downloaded and executed on owned accelerators (via the scheduler) do NOT require that hold — only their qualification gate and scheduler lifecycle."
+  },
+  "artifact_policy": {
+    "approved_output_roots": [
+      "/mnt/nas-ai-models/research"
+    ],
+    "canonical_source_write_allowed": false
+  },
+  "representation": {
+    "expanded_dossier_target_tokens": 100000,
+    "expanded_dossier_target_role": "aspiration",
+    "expanded_dossier_min_tokens": 4001,
+    "compact_context_target_tokens": 4000,
+    "compact_context_min_tokens": 4000,
+    "legacy_text_encoder_max_tokens": 512,
+    "compact_artifacts": {
+      "structured": "context4k.json",
+      "human_readable": "context4k.md",
+      "provenance": "compression.json"
+    },
+    "rule": "The compact context is a first-class provenance-bearing artifact bounded by the downstream consumer budget (<=4000 tokens, >512 legacy-encoder). The expanded dossier grows honestly with the evidence supply; 100000 is an aspiration metadata target, not a pass gate. The only hard expanded-dossier floor is structural: it must exceed the 4000-token compact ceiling it compresses into. The anti-fabrication gate is the claim->evidence path, not a token count. It must not be silently truncated into the legacy 512-token T5 contract."
+  },
+  "specialists": {
+    "policy": "open_world",
+    "required_declaration_fields": [
+      "scope",
+      "inputs",
+      "output_semantics",
+      "provenance",
+      "abstention_policy",
+      "known_failure_modes",
+      "qualification_gate"
+    ],
+    "rule": "A specialist may be deterministic code, a foundation model, a fine-tune, an ensemble, an embedding, or another measurable process. Candidate models are not an exhaustive or privileged roster."
+  },
+  "research_tree": {
+    "require_program_root": true,
+    "require_parent_issue": true,
+    "require_selection_rationale": true
+  },
+  "gpu_scheduler": {
+    "command": "/mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py",
+    "execution_mode": "observer_only",
+    "max_job_duration_hours": 24,
+    "scheduler_project": "stratum-contextual-specialist-research",
+    "allowed_launchers": [
+      "registered-research-launcher"
+    ],
+    "resources": {
+      "4090": {
+        "host_route": "local",
+        "total_vram_gb": 24,
+        "usable_vram_gb": 24,
+        "notes": "Use the shared scheduler lifecycle before every GPU action."
+      },
+      "strix": {
+        "host_route": "ssh:max395",
+        "total_vram_gb": 110,
+        "usable_vram_gb": 100,
+        "evergreen_reserved_vram_gb": 10,
+        "notes": "The Crawlr labeling process is evergreen. Scheduler state, not a transient utilization snapshot, determines availability."
+      }
+    }
+  },
+  "autonomy": {
+    "mode": "draft_pr_only",
+    "autonomous_merge_allowed": false,
+    "autonomous_direct_main_push_allowed": false,
+    "autonomous_gpu_execution_allowed": false,
+    "autonomous_model_installation_allowed": true,
+    "autonomous_canonical_source_write_allowed": false,
+    "authorized_without_new_human_approval": [
+      "research documentation",
+      "unit tests",
+      "synthetic fixtures",
+      "branches",
+      "commits",
+      "draft pull requests",
+      "GitHub issue-tree maintenance",
+      "literature / arXiv / hub model discovery and evaluation",
+      "new open-weight model download, installation, and local qualification"
+    ],
+    "requires_hold": [
+      "GPU request, claim, launch, heartbeat, or release",
+      "dataset mutation or corpus-wide backfill",
+      "hosted third-party inference of the sensitive canonical corpus",
+      "sending canonical source images to an external hosted image service",
+      "metric or policy uncertainty",
+      "scope-changing specialist or architecture opportunity",
+      "merge or direct push to main"
+    ]
+  }
+}

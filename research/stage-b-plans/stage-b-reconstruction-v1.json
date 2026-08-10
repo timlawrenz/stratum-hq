@@ -1,0 +1,540 @@
+{
+ "schema_version": 1,
+ "kind": "reconstruction",
+ "program_id": "stratum-contextual-specialist-research",
+ "plan_id": "stage-b-reconstruction-v1",
+ "parent_issue": 37,
+ "status": "preregistered",
+ "hypothesis": "Generative reconstruction is a valid, non-LLM measure of per-asset information preserved by the evidence-linked compact context: images generated from context4k.md via a frozen SDXL checkpoint score higher in CLIP ViT-L/14 similarity against the source than images generated from an item-independent degraded baseline prompt.",
+ "falsified_if": "Reconstruction similarity does not correlate with information content (mean per-item CLIP delta <= 0 over the frozen 24-item cohort with paired seeds), or the diffusion checkpoint fails to decode the relevant attributes at all (degenerate ceiling where both conditions saturate).",
+ "deterministic_signal": "CLIP ViT-L/14 cosine similarity (source vs generated-from-context4k, and source vs generated-from-degraded-baseline) via local ComfyUI over one frozen SDXL checkpoint",
+ "metric_version": "reconstruction-clip-v1",
+ "data_snapshot": "first-500 core-covered cohort (24 frozen items); local ComfyUI /mnt/fscache/essdee/ComfyUI; checkpoint Juggernaut_XL_v1759168.safetensors; CLIP openai/clip-vit-large-patch14",
+ "conditions": [
+  {
+   "id": "recon-ctx4k",
+   "role": "variant",
+   "prompt_source": "dossier-context4k-v2/<image_id>/context4k.md verbatim",
+   "prompt_text_sha256_fingerprint": "94766d62d2a13c10100082b100962038a5398257da851d9d077b88ef7cf1cb79"
+  },
+  {
+   "id": "recon-baseline",
+   "role": "baseline",
+   "prompt_source": "fixed item-independent degraded prompt (no context)"
+  },
+  {
+   "id": "recon-null",
+   "role": "calibration",
+   "prompt_source": "meaningless tokens ('zzzzzzzzzz'), 2 images"
+  }
+ ],
+ "contrasts": [
+  {
+   "id": "reconstruction-delta",
+   "baseline_condition": "recon-baseline",
+   "variant_condition": "recon-ctx4k",
+   "changed_axes": [
+    "prompt"
+   ],
+   "delta_rule": "mean over 24 items of CLIP(ctx4k) - CLIP(baseline); paired same-seed"
+  }
+ ],
+ "pilot_manifest": {
+  "id": "first500-coverage-balanced-candidate-v1",
+  "frozen": true,
+  "source_root": "/mnt/nas-ai-models/training-data/crawlr/approved",
+  "items": [
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0yo0gxbfflugqp205k128kktigl5",
+    "source_relative_path": "0yo0gxbfflugqp205k128kktigl5.jpg",
+    "source_sha256": "380ea071346fd398680fc60adf2c2a1f4d6fc2baf0346cec69a19441ae3d0326"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0yruw87yrt13y2x34cd9axa30rpf",
+    "source_relative_path": "0yruw87yrt13y2x34cd9axa30rpf.jpg",
+    "source_sha256": "0b033f7a98ce9f754b504c881d4f6a223587762150252c6d9adb35f01c432260"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "18lqopa4mhwrj0abx8dehy4zka60",
+    "source_relative_path": "18lqopa4mhwrj0abx8dehy4zka60.jpg",
+    "source_sha256": "ecec0dcd7c17bf647cfc6cc6c447f2d65c2af81202304d0d031cd55a14158e0a"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0wl1eel9qnbqryxdc9mnsug2tl1h",
+    "source_relative_path": "0wl1eel9qnbqryxdc9mnsug2tl1h.jpg",
+    "source_sha256": "990d1ec8a5c5b68f2a3e6f370084e3a1f603bd4025ed48ce9f186c138f47277e"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0qubde29fvqxk0409yyob0n1gzt6",
+    "source_relative_path": "0qubde29fvqxk0409yyob0n1gzt6.jpg",
+    "source_sha256": "0045f59cc433cbdf18cd879464aba5e50ecc1d402e3944c8a9dc337911d32ab0"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0fcfqt21vy71t8ab83m6ger5qa51",
+    "source_relative_path": "0fcfqt21vy71t8ab83m6ger5qa51.jpg",
+    "source_sha256": "920cbf9211ef1719f1fe6464a7e2c7afc361a56fa26506a82b4b4fc20da0179c"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0sfwjiibx5au08096c1q2hm7b3b0",
+    "source_relative_path": "0sfwjiibx5au08096c1q2hm7b3b0.jpg",
+    "source_sha256": "1651ea76bf38a27c17323238d16ad84891dcf1a22bed445b6eab950b35aa1956"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0r8dpy33jjo3i1zy2cslr4hczcjc",
+    "source_relative_path": "0r8dpy33jjo3i1zy2cslr4hczcjc.jpg",
+    "source_sha256": "439e0a0f9e63c2718e5a614558ba1ac476714d96029e651bf44d5c13bced8619"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "1528uwbe625j5vxxawhj1kl3xehq",
+    "source_relative_path": "1528uwbe625j5vxxawhj1kl3xehq.jpg",
+    "source_sha256": "51b4d0c3d4c4a0332d70d539dc576a05007a94f5aebdce2aa1000691fe2bb6c1"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0yoko8kx3qlne0zvyj6n6xio5ybk",
+    "source_relative_path": "0yoko8kx3qlne0zvyj6n6xio5ybk.jpg",
+    "source_sha256": "80d5d7adb4049d2c0166a32a7b8faacf1b02a008775ace44d404d8771abef4d0"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "13geqw0wbpj5xn7s039s19b3nr8c",
+    "source_relative_path": "13geqw0wbpj5xn7s039s19b3nr8c.jpg",
+    "source_sha256": "91bc0b097e1dfb0803f5c34a8e6fae08c237ce26223e36fabf3b604b09d309cd"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0unynvnbmepp7i2eluidlex23ljv",
+    "source_relative_path": "0unynvnbmepp7i2eluidlex23ljv.webp",
+    "source_sha256": "0fd6f019ed648d5270805a78ea803862c575f488ae54c27186fd292979f50321"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "1dkimn0kiybqt81w9apn0on6ccuq",
+    "source_relative_path": "1dkimn0kiybqt81w9apn0on6ccuq.jpg",
+    "source_sha256": "d38cc34667d2e9d995702f8b1e8740fbd4e4a97eea46009b8b3006fcb4c91c32"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0g2l5m9heji4toxrgg3r97h1nvtx",
+    "source_relative_path": "0g2l5m9heji4toxrgg3r97h1nvtx.jpg",
+    "source_sha256": "4c621a00472827c33477a8a4f7edcaf767c0879a30a8bd21c3fbc2fe23af9b95"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0f3fdmh6iackl6049wmrm9n2p4i5",
+    "source_relative_path": "0f3fdmh6iackl6049wmrm9n2p4i5.jpg",
+    "source_sha256": "ddf160ef122e097203887482486a31fa22cbe013241b4304e249eec8a2f43f58"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0pz1w3vec9zjl6j5lfvksmweylfi",
+    "source_relative_path": "0pz1w3vec9zjl6j5lfvksmweylfi.jpg",
+    "source_sha256": "4dff8a8cdf742331dfcb2146701c06b0ed2626ad357f765d812be3dae69debee"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "03r1r5psuxprfkhomitcz5vh9w1c",
+    "source_relative_path": "03r1r5psuxprfkhomitcz5vh9w1c.jpg",
+    "source_sha256": "39f9451b09205c8d35b476bfb0d3cfdd984b7908b05965f21c8bc49213b28694"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0g8kxl6udr09ikglg4c10kop6tpk",
+    "source_relative_path": "0g8kxl6udr09ikglg4c10kop6tpk.jpg",
+    "source_sha256": "4c18447bc66ab8467b175baae60304a3b215edbd7b25b1312cab38574d16e4a1"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "07hyx5wjk5rc339v2s3e2orcoorr",
+    "source_relative_path": "07hyx5wjk5rc339v2s3e2orcoorr.jpg",
+    "source_sha256": "ee09ef63f813f94fdf043dd7add86f4fd4dd6dfc35d236312e693ba34c02a8d6"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "058v0mg1bbxthvatdw324k8j4b0s",
+    "source_relative_path": "058v0mg1bbxthvatdw324k8j4b0s.png",
+    "source_sha256": "eb1eb7d2d297a0891fc4b01bc992d62c19a66067233a7f236af3a2f5e8f3527c"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "16sig69gmpxqhj6etqmacae9wy6m",
+    "source_relative_path": "16sig69gmpxqhj6etqmacae9wy6m.jpg",
+    "source_sha256": "e249dd4aee84d27d32f0bc36ee1ce0020ba37e94b0665872da426d00f87f2e36"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0mel7e9c4295kqblhq2t1m3tapia",
+    "source_relative_path": "0mel7e9c4295kqblhq2t1m3tapia.jpg",
+    "source_sha256": "24a99681bf2f93a17fdaf48281cb4cdfdccc1826eb791b535443c793131ed0be"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "08v25q5524t2u0zl0xtnzi6bd22f",
+    "source_relative_path": "08v25q5524t2u0zl0xtnzi6bd22f.jpg",
+    "source_sha256": "ed7dc84715512457ddab6b36643f02272ecda1fd23e9dbbf5c78d10bd07c2a93"
+   },
+   {
+    "artifact_availability": {
+     "caption.txt": true,
+     "caption2.txt": false,
+     "determinations.json": false,
+     "matting.npy": true,
+     "normal2.npy": true,
+     "pointmap.npy": true,
+     "pose2.npy": true,
+     "seg2.npy": true,
+     "t52_hidden.npy": false,
+     "t52_mask.npy": false,
+     "t5_hidden.npy": true,
+     "t5_mask.npy": true
+    },
+    "image_id": "0kan9rng11ac89ydvwn2dvkdhhc0",
+    "source_relative_path": "0kan9rng11ac89ydvwn2dvkdhhc0.jpg",
+    "source_sha256": "2b8b56b714c003216359f22d98389fe31512004471f3ace902c8422534c0b4b1"
+   }
+  ]
+ },
+ "generation_settings": {
+  "checkpoint_name": "Juggernaut_XL_v1759168.safetensors",
+  "checkpoint_sha256": "dd08fa32f98d05a2443ca1419e46df1575a0811f6e3b246d9dd47ff20f5eb66a",
+  "sampler_name": "dpmpp_2m",
+  "scheduler_name": "karras",
+  "steps": 28,
+  "cfg": 7.0,
+  "width": 832,
+  "height": 1216,
+  "negative_prompt": "",
+  "seed_per_item": "sha256(image_id) truncated to 32 bits; identical across conditions"
+ },
+ "scoring": {
+  "model": "openai/clip-vit-large-patch14",
+  "preprocess": "224px center-crop both images",
+  "similarity": "cosine of [CLS] embeddings"
+ },
+ "null_case": {
+  "prompt": "zzzzzzzzzz",
+  "expectation": "low similarity floor",
+  "images": 2
+ },
+ "statistical_rule": "BETTER iff reconstruction_delta > 0.0 (harness verdict method=reconstruction); NOT_BETTER otherwise. delta reported as mean; paired positive count and median also recorded.",
+ "review_protocol": "protocol independently reviewable: frozen plan, checkpoint sha256, per-item seeds and prompts hashes, outputs archived under /mnt/nas-ai-models/research/stratum/stage-b-reconstruction-v1; verdict advisory until human spot-check (PENDING_HUMAN_SPOT_CHECK stamp).",
+ "representation_boundary": [
+  "CLIP ViT-L/14 similarity is a non-LLM generative proxy, not identity verification",
+  "scores depend on the single frozen checkpoint and sampler; changed settings invalidate the comparison",
+  "only same-seed paired differences are interpreted; absolute similarity values are not evidence"
+ ],
+ "metric_self_audit": [
+  "one frozen checkpoint; no seed search; no cherry-picking",
+  "null-case generated under identical settings to bound the floor",
+  "source images read-only; outputs additive under the approved research root"
+ ],
+ "repo_root": "/home/tim/source/activity/stratum-hq-stage-b-experiment"
+}
