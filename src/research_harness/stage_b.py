@@ -65,6 +65,7 @@ from .facial_expression import FacialExpressionError, compute_facial_expression
 from .garment_type import GarmentTypeError, compute_garment_type
 from .scene_category import SceneCategoryError, compute_scene_category
 from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_MODEL_ASSET
+from .jewelry import JewelryError, compute_jewelry, render_jewelry, JEWELRY_MODEL_ASSET
 from .image_quality import ImageQualityError, compute_image_quality
 from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
 from .eye_openness import EyeOpennessError, compute_eye_openness
@@ -1526,6 +1527,93 @@ def _serialize_hair_texture(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _jewelry_evidence() -> dict[str, Any]:
+    """Declared open-weight CLIP ViT-L/14 zero-shot jewelry-presence specialist
+    (arm #112, NEW evidence part + NEW MODEL CLASS registered 2026-08-10 via
+    the gated propose-dimensions channel)."""
+    module_path = Path(compute_jewelry.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_dir = Path(JEWELRY_MODEL_ASSET)
+    model_sha = (
+        _sha256((model_dir / "model.safetensors").read_bytes())
+        if (model_dir / "model.safetensors").exists() else "MISSING"
+    )
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-jewelry-v1",
+        "specialists": [
+            {
+                "id": "in-memory-jewelry-v1",
+                "scope": ("Scale-invariant jewelry-presence band (jewelry-present / no-jewelry, "
+                          "merged earrings-OR-necklace) from the open-weight CLIP ViT-L/14 "
+                          "zero-shot classifier over the seg2 DOME-29 Face_Neck crop (DOME-29 "
+                          "has NO Ear/Neck class — Face_Neck is the declared honest proxy, "
+                          "recorded in the capability probe) at the calibrated confidence floor "
+                          "(0.45). Registered 2026-08-10 as a NEW evidence part + NEW MODEL "
+                          "CLASS per the open-world sourcing directive. Emits ONE coarse band "
+                          "or a surfaced abstention; never material, brand, or identity claims; "
+                          "only the scale-invariant band in prose."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask, crop "
+                           "region) + the already-decoded source RGB (SHA-bound via the item's "
+                           "source_sha256); local open-weight openai/clip-vit-large-patch14 "
+                           "(MIT, CPU, model.safetensors sha256 {model_sha}). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write; model "
+                           "run on owned hardware only.").format(model_sha=model_sha),
+                "output_semantics": ("Provenance-bearing scale-invariant jewelry-presence band "
+                                     "with a surfaced abstention on low confidence or "
+                                     "model/input failure, not semantic ground truth or caption "
+                                     "claims; only the merged band is verbalized (raw "
+                                     "probabilities/logits and the per-sub-axis earrings / "
+                                     "necklace bands stay in the machine-readable payload — the "
+                                     "necklace sub-band measured DEGENERATE on the frozen cohort "
+                                     "(max_share 0.783 >= 0.75) and is silenced to payload-only "
+                                     "per the arm-#74 precedent)."),
+                "provenance": (
+                    "research_harness.jewelry.compute_jewelry "
+                    f"SHA-256 {code_hash}; model openai/clip-vit-large-patch14 (MIT, "
+                    f"HF Transformers path) sha256 {model_sha}, run locally on owned hardware "
+                    "(CPU, no VRAM contention with the caption model); computed in memory during "
+                    "this bounded run with no crawlr/stratum write, no hosted third-party "
+                    "inference of the sensitive corpus."
+                ).format(model_sha=model_sha),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing or detector count is not "
+                                      "exactly one; abstain (emit None/band with a surfaced "
+                                      "reason) when the Face_Neck region is absent/tiny/cropped "
+                                      "or the sub-band argmax softmax confidences fall below the "
+                                      "calibrated floor (0.45). Never overwrite an ambiguous "
+                                      "presence with a confident-looking guess. Detector "
+                                      "disagreement remains a quality anomaly, never prompt "
+                                      "content."),
+                "known_failure_modes": ("CLIP zero-shot is a closed-set classifier: jewelry "
+                                        "states outside the frozen vocabulary are forced onto "
+                                        "the nearest class; the ear/neck regions are PROXIED by "
+                                        "the Face_Neck mask (DOME-29 has no Ear/Neck class), so "
+                                        "a close-up face crop includes the ear area while a "
+                                        "neck-dominant crop may not; confidence is not "
+                                        "calibrated across domains (floor 0.45 calibrated on "
+                                        "this frozen cohort: 23/24 measured, merged band "
+                                        "max_share 0.652, sub-band confidence min 0.5058)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives "
+                                       "completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_jewelry(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a jewelry dict.
+
+    Verbalizes ONLY the coarse merged scale-invariant band. Raw CLIP
+    probabilities / logits and the per-sub-axis bands stay in the
+    machine-readable evidence_payload JSON and are not caption claims.
+    """
+    return render_jewelry(config)
+
+
 def _bangs_forehead_evidence() -> dict[str, Any]:
     """Declared deterministic bangs / forehead-hair-coverage specialist
     (arm #110, NEW evidence part, no new model, CPU)."""
@@ -2858,6 +2946,12 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # source RGB (SHA-bound via source_sha256); pose2.npy supplies the
     # wrist/shoulder body reference for the hand-raised flag.
     "hand-gesture": ("pose2.npy",),
+    # Arm #112 jewelry: CLIP ViT-L/14 zero-shot over the seg2 Face_Neck crop
+    # (DOME-29 has NO Ear/Neck class — Face_Neck is the declared honest proxy,
+    # recorded in the capability probe) + the already-decoded source RGB
+    # (SHA-bound via source_sha256). Only seg2 shows as a named evidence
+    # artifact; the source RGB is decoded in-memory during the run.
+    "jewelry": ("seg2.npy",),
 }
 
 
@@ -2954,7 +3048,7 @@ def build_stage_b_plan(
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
-        "bangs-forehead", "eye-openness", "hand-gesture",
+        "bangs-forehead", "eye-openness", "hand-gesture", "jewelry",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3918,6 +4012,51 @@ def build_stage_b_plan(
             "SILENCED (payload-only) because its probe max_share (one-hand 13/14 = 0.929) "
             "fails the 75% degeneracy gate."
         )
+    elif evidence_kind == "jewelry":
+        evidence = _jewelry_evidence()
+        evidence_condition_id = "context-raw-jewelry"
+        comparison_plan_id = "stage-b-first500-jewelry-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared learned jewelry-"
+            "presence determinations (scale-invariant merged jewelry-present / no-jewelry band "
+            "— earrings OR necklace — from the local open-weight CLIP ViT-L/14 zero-shot "
+            "classifier over the seg2 Face_Neck crop (DOME-29 has NO Ear/Neck class; Face_Neck "
+            "is the declared honest proxy), NEW evidence part + NEW MODEL CLASS registered "
+            "2026-08-10 via the gated propose-dimensions channel; CPU, owned hardware) may "
+            "reduce unsupported 'wearing earrings / a necklace / jewelry' accessory claims that "
+            "the validated object-relations #61 axis (closed-scene vocab) cannot ground, or "
+            "increase supported accessory claims in captions versus its matched no-evidence "
+            "baseline when the source item, view, prompt template, local model, and generation "
+            "settings are controlled."
+        )
+        falsified_if = (
+            "The jewelry evidence condition does not reduce unsupported accessory claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the bands "
+            "collapse (a single band taking >=75% of measured items), or the axis is redundant "
+            "with object-relations #61 or garment-type #97 (degenerate), or the CLIP specialist "
+            "fails qualification, or an apparent difference is attributable to an uncontrolled "
+            "change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence inputs "
+            "(pose2 stays a validation-only read for the exactly-one-subject invariant). "
+            "Jewelry presence is computed in memory from the frozen selected seg2.npy (DOME-29 "
+            "Face_Neck mask, crop region) + the already-decoded source RGB via the local "
+            "open-weight CLIP ViT-L/14 zero-shot classifier (openai/clip-vit-large-patch14, "
+            "MIT, owned hardware, CPU; model.safetensors sha256 a2bf730a0c..., the same "
+            "staged checkpoint as scene-category #69) over a frozen closed vocabulary at the "
+            "calibrated confidence floor (0.45). Capability probe (2026-08-10, "
+            "/mnt/nas-ai-models/research/stratum/jewelry-calibration-probe.json): 23/24 "
+            "measured (1 honest abstention — Face_Neck below the 200px floor), earrings "
+            "sub-band 6/17 (max_share 0.739 < 0.75 NON-degenerate), necklace sub-band 5/18 "
+            "(max_share 0.783 >= 0.75 DEGENERATE -> silenced to payload-only per the arm-#74 "
+            "precedent), VERBALIZED merged band 8/23 (max_share 0.652 NON-degenerate), "
+            "coverage floor 8/24 MET (pre-registered >=8/24 with any jewelry so the axis isn't "
+            "all-null). Only the merged scale-invariant band is verbalized; raw "
+            "probabilities/logits and the per-sub-axis bands stay in evidence_payload and are "
+            "never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -4235,6 +4374,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "eye-openness"
     elif "context-raw-hand-gesture" in condition_ids:
         rebuild_kind = "hand-gesture"
+    elif "context-raw-jewelry" in condition_ids:
+        rebuild_kind = "jewelry"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -4322,6 +4463,7 @@ def _load_selected_item(
     include_bangs_forehead: bool = False,
     include_eye_openness: bool = False,
     include_hand_gesture: bool = False,
+    include_jewelry: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4609,6 +4751,18 @@ def _load_selected_item(
             raise StageBRunError(
                 f"hand-gesture abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    jewelry = None
+    if include_jewelry:
+        try:
+            jewelry = compute_jewelry(
+                seg2,
+                np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8)),
+                model_asset_dir=JEWELRY_MODEL_ASSET,
+            )
+        except JewelryError as exc:
+            raise StageBRunError(
+                f"jewelry abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4658,6 +4812,7 @@ def _load_selected_item(
         "bangs_forehead": bangs_forehead,
         "eye_openness": eye_openness,
         "hand_gesture": hand_gesture,
+        "jewelry": jewelry,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -4918,6 +5073,10 @@ def _render_condition(
         hand_gesture = prepared.get("hand_gesture")
         evidence_text = _serialize_hand_gesture(hand_gesture)
         return raw.copy(), _context_prompt(evidence_text), hand_gesture
+    if condition_id == "context-raw-jewelry":
+        jewelry = prepared.get("jewelry")
+        evidence_text = _serialize_jewelry(jewelry)
+        return raw.copy(), _context_prompt(evidence_text), jewelry
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -5232,6 +5391,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-hand-gesture"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #112 jewelry: only the jewelry run computes the CLIP ViT-L/14
+    # zero-shot jewelry-presence band (NEW MODEL CLASS + NEW evidence part,
+    # local CPU) — gate on the frozen plan's conditions.
+    include_jewelry = any(
+        str(condition.get("id")) == "context-raw-jewelry"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -5262,6 +5428,7 @@ def execute_stage_b(
             include_bangs_forehead=include_bangs_forehead,
             include_eye_openness=include_eye_openness,
             include_hand_gesture=include_hand_gesture,
+            include_jewelry=include_jewelry,
         )
         for item in items
     ]
