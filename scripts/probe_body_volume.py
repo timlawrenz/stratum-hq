@@ -97,6 +97,7 @@ def main() -> int:
     raw_norm: list[float] = []
     weights: list[float] = []
     n_detected = 0
+    n_band_eligible = 0
     n_abstained = 0
     for item in items:
         image_id = item["image_id"]
@@ -115,23 +116,31 @@ def main() -> int:
             r = {"abstained": True, "abstention_reason": f"unexpected error: {exc!r}"}
         r["image_id"] = image_id
         rows.append(r)
-        if not r.get("abstained") or r.get("normalized_volume") is not None:
-            if r.get("normalized_volume") is not None:
-                raw_norm.append(float(r["normalized_volume"]))
+        # n_detected_plausible: any item where the model produced a mesh with a
+        # computed normalized_volume (REGARDLESS of the whole-body plausibility
+        # gate). coverage_eligible == n_band_eligible: items actually verbalizing
+        # a band (pass the height + norm_vol plausibility gates too). The
+        # pre-registered floor is on WHOLE-BODY plausible meshes ->
+        # coverage_eligible, which is the honest floor gate.
+        if r.get("normalized_volume") is not None:
+            raw_norm.append(float(r["normalized_volume"]))
             n_detected += 1
-            if r.get("shape_weight") is not None:
-                weights.append(float(r["shape_weight"]))
-            print(f"{image_id[:12]}  mesh_verts={r.get('mesh_vertices')}  "
-                  f"norm_vol={r.get('normalized_volume')}  "
-                  f"weight={r.get('shape_weight')}  abstained={r.get('abstained')} "
-                  f"({r.get('abstention_reason') or ''})")
-        else:
+        if r.get("body_volume_band"):
+            n_band_eligible += 1
+        if r.get("shape_weight") is not None:
+            weights.append(float(r["shape_weight"]))
+        print(f"{image_id[:12]}  mesh_verts={r.get('mesh_vertices')}  "
+              f"norm_vol={r.get('normalized_volume')}  "
+              f"weight={r.get('shape_weight')}  band={r.get('body_volume_band')}  "
+              f"{'ABSTAIN: ' + str(r.get('abstention_reason')) if r.get('abstained') else ''}")
+        if not r.get("body_volume_band"):
             n_abstained += 1
-            print(f"{image_id[:12]}  ABSTAIN: {r.get('abstention_reason')}")
 
     print("\n=== COVERAGE (pre-registered floor >= %d/24) ===" % COVERAGE_FLOOR)
-    print(f"plausible meshes: {n_detected}/{len(items)}  (abstained {n_abstained})")
-    coverage_ok = n_detected >= COVERAGE_FLOOR
+    print(f"meshes produced: {n_detected}/{len(items)}; whole-body band-eligible: "
+          f"{n_band_eligible}/{len(items)}  (abstained {n_abstained})")
+    # The floor is on WHOLE-BODY plausible meshes -> band-eligible.
+    coverage_ok = n_band_eligible >= COVERAGE_FLOOR
 
     print("\n=== NORMALIZED VOLUME (volume/height^3) ===")
     sv = sorted(raw_norm)
@@ -164,6 +173,7 @@ def main() -> int:
     summary = {
         "items": len(items),
         "n_detected_plausible_mesh": n_detected,
+        "n_band_eligible": n_band_eligible,
         "n_abstained": n_abstained,
         "coverage_floor": COVERAGE_FLOOR,
         "coverage_ok": coverage_ok,
