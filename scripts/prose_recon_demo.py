@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 COMFY_URL = "http://127.0.0.1:8188"
-OUTPUT_DIR = Path("/home/tim/activity/ComfyUI/output")
+OUTPUT_DIR = Path(os.environ.get("PROSE_OUTPUT_DIR", "/home/tim/activity/ComfyUI/output"))
 RUN_ROOT = Path("/mnt/nas-ai-models/research/stratum/prose-caption2-demo-v1")
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 
