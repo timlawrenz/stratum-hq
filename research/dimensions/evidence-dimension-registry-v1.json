@@ -846,34 +846,34 @@
     },
     {
       "id": "hair-texture",
-      "name": "hair texture / curl-waviness state",
+      "name": "hair texture / curl-waviness state (learned specialist re-scope)",
       "arm_issue": 94,
-      "hypothesis": "A deterministic hair-texture measurement (scale-invariant curl/straight state from the seg2 DOME-29 Hair region's local gradient orientation distribution, computed in memory; CPU, no new model) reduces unsupported 'curly / wavy / straight hair' textural claims in captions on the frozen 24-item cohort.",
-      "falsified_if": "The hair-texture evidence condition does not reduce unsupported hair-texture/curl claims or increase supported claims versus its matched no-evidence baseline, or the texture bands collapse (a single band >=75% of measured items), or the axis is redundant with hairstyle #82 / hair #30 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
-      "deterministic_signal": "NEW EVIDENCE PART: hair-texture band (straight / wavy / curly) from seg2 Hair-region gradient-orientation distribution; scale-invariant, deterministic",
+      "hypothesis": "A LEARNED hair-texture measurement (open-weight CLIP ViT-L/14 zero-shot curl/wave classifier over the seg2 DOME-29 Hair-region crop; NEW MODEL CLASS under the open-world sourcing directive 2026-08-05, run locally on owned hardware) emits a scale-invariant curl band (straight / wavy / curly / coily / abstain) that reduces unsupported 'curly / wavy / straight hair' textural claims that hairstyle #82 (length/arrangement) and hair #30 (color/coverage) cannot ground. It replaces the deterministic gradient-orientation specialist that measured DEGENERATE on the frozen cohort (2026-08-10 capability probe: 11/24 all one band).",
+      "falsified_if": "The hair-texture evidence condition does not reduce unsupported hair-texture/curl claims or increase supported claims versus its matched no-evidence baseline, or the texture bands collapse (a single band >=75% of measured items), or the axis is redundant with hairstyle #82 / hair #30 / vlm-dense-description #47, or the learned specialist fails qualification (coverage below the pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (hair-texture) + NEW MODEL CLASS (open-weight CLIP ViT-L/14 zero-shot hair-texture classifier): scale-invariant curl/wave band from a local zero-shot classifier over the seg2 Hair crop (closed straight/wavy/curly/coily vocabulary + abstention floor)",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; seg2 Hair mask (24/24); local CPU, in-memory",
-      "selection_rationale": "hairstyle #82 validates length + arrangement; hair #30 color + coverage. Curl/wave texture ('curly', 'wavy', 'straight') has NO validated support. Genuinely-NEW part (hair-texture).",
-      "scope": "Deterministic hair-texture / curl state from the seg2 Hair region: local-gradient dominant orientation variance + waviness proxy; coarse band (straight / wavy / curly / abstain); never color, length, or identity claims; only scale-invariant bands in prose.",
-      "inputs": "Frozen seg2.npy (DOME-29 Hair mask); local CPU, in-memory, no new model",
-      "output_semantics": "Coarse scale-invariant hair-texture band per item (or abstain when the Hair region is absent/tiny); raw gradient-orientation statistics stay in evidence_payload, never prose",
-      "provenance": "research_harness.hair_texture deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
-      "abstention_policy": "Abstain when the Hair region is absent, tiny, or texture is unresolvable (cropped / too smooth); never fabricate a curl state",
-      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "selection_rationale": "The deterministic hair-texture axis measured DEGENERATE (2026-08-10: 11/24 all one band, max_share 1.00; 13/24 honest abstains). Open-world sourcing directive 2026-08-05 authorizes re-scoping to a NEW MODEL CLASS; CLIP ViT-L/14 is already staged locally. Curl/wave texture ('curly','wavy','straight') has NO validated support.",
+      "scope": "Learned hair-texture / curl state: CLIP ViT-L/14 zero-shot classification over the seg2 Hair-region crop with a closed straight/wavy/curly/coily vocabulary; coarse band or abstain when confidence < floor; never color, length, or identity claims; only scale-invariant bands in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Hair mask crop) + already-decoded source RGB crop; open-weight CLIP ViT-L/14 staged locally; owned hardware only",
+      "output_semantics": "Coarse scale-invariant hair-texture band per item (or abstain when the Hair region is absent/tiny/cropped or zero-shot confidence below the calibrated floor); raw CLIP logits/SIM stay in evidence_payload, never prose",
+      "provenance": "research_harness.hair_texture module over openai/clip-vit-large-patch14 (model.safetensors sha256 pinned on freeze), staged at /mnt/nas-ai-models/research/stratum/models/; computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the Hair region is absent, tiny, cropped, or the calibrated zero-shot confidence floor is not met (near-tie); never fabricate a curl state",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered, e.g. >=18/24 hair regions measurable), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
       "evidence_parts": [
         "hair-texture"
       ],
-      "model_candidates": [],
-      "prior_evidence_strength": 0.4,
-      "measurability": "high",
+      "model_candidates": [
+        "CLIP ViT-L/14 zero-shot hair-texture classifier (openai/clip-vit-large-patch14, MIT, local CPU)"
+      ],
+      "prior_evidence_strength": 0.35,
+      "measurability": "medium",
       "cost_bucket": "low",
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "blocked",
-      "valid_non_improving_experiments": 0,
-      "blocked_reason": "Deterministic gradient-orientation hair-texture specialist measured DEGENERATE on the frozen cohort (2026-08-10 capability probe: 11/24 measured all in one 'curly' band, max_share 1.00 vs 0.75 degeneracy gate; 13/24 honest abstains 'too smooth'; cohort captions genuinely span straight/wavy/curly so axis NOT cohort-degenerate). Five alternative deterministic discriminators (boundary roughness, structure-tensor coherence, convexity peri/fill, radius dispersion) equally non-separating. Deterministic axis EXHAUSTED without threshold-fitting — requires decision: re-scope hair-texture to a NEW MODEL CLASS (learned/open-weight hair-texture specialist per open-world sourcing directive) or downgrade the axis.",
-      "blocked_by_issue": 94
+      "state": "active",
+      "valid_non_improving_experiments": 0
     },
     {
       "id": "image-quality",
@@ -909,26 +909,25 @@
     },
     {
       "id": "body-volume",
-      "name": "3D body volume / bulk via open-weight whole-body mesh regression",
+      "name": "3D body volume / bulk via SMPL-free whole-body mesh HMR (Anny)",
       "arm_issue": 96,
-      "hypothesis": "An open-weight whole-body mesh-regression measurement (candidate HMR2.0 / 4D-Humans, NEW model class, run locally on owned hardware) that lifts the subject to a 3D body mesh and emits a scale-invariant normalized body-volume / bulk band (slim / average / fuller) reduces unsupported 'slim / curvy / full-figured' body-mass claims that 2D body-type #32 ratios cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
-      "falsified_if": "The body-volume evidence condition does not reduce unsupported body-bulk claims or increase supported claims versus its matched no-evidence baseline, or the volume bands collapse (a single band >=75% of measured items), or the axis is redundant with body-type #32 (degenerate), or the 3D mesh regressor fails on too many frozen items (coverage below a pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
-      "deterministic_signal": "NEW EVIDENCE PART (body-volume) + NEW MODEL CLASS (open-weight whole-body mesh regression HMR2.0/4D-Humans): normalized 3D body-volume band from a locally-run mesh regressor on the SHA-bound source RGB",
+      "hypothesis": "An open-weight whole-body mesh-regression measurement (Anny body model + Multi-HMR, NEW MODEL CLASS; Apache-2.0 code, CC0 MakeHuman assets, SCAN-FREE and SMPL-FREE, run locally on owned hardware) that lifts the subject to a 3D body mesh and emits a scale-invariant normalized body-volume / bulk band (slim / average / fuller) reduces unsupported 'slim / curvy / full-figured' body-mass claims that 2D body-type #32 ratios cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The body-volume evidence condition does not reduce unsupported body-bulk claims or increase supported claims versus its matched no-evidence baseline, or the volume bands collapse (a single band >=75% of measured items), or the axis is redundant with body-type #32 (degenerate), or the SMPL-free HMR covers too few frozen items (coverage below the pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (body-volume) + NEW MODEL CLASS (Anny SMPL-free whole-body mesh + Multi-HMR): normalized 3D body-volume band from a locally-run mesh regressor on the SHA-bound source RGB",
       "metric_version": "claim-support-rubric-v1",
       "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local owned hardware only",
-      "selection_rationale": "body-type #32 validates 2D proportions; 'curvy / slim / full-figured' mass claims have no 3D support. Whole-body mesh regression is a genuinely-NEW model class (open-world sourcing, local owned hardware only; SMPL-X license check before freeze).",
-      "scope": "Scale-invariant normalized body-volume/bulk band from an open-weight 3D whole-body mesh regression (HMR2.0/SMPL-X), run locally on owned hardware; coarse band (slim / average / fuller) or abstain when the mesh regression is unreliable; never identity or absolute-volume claims.",
-      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight mesh model staged locally; run on owned CPU/GPU hardware only",
+      "selection_rationale": "body-type #32 validates 2D proportions; 'curvy / slim / full-figured' mass claims have no 3D support. The SMPL/SMPL-X license gate is RESOLVED by choosing option (b): Anny is genuinely SMPL-free (Apache-2.0 code, CC0 MakeHuman assets, scan-free) so no non-commercial license is needed. Open-world sourcing is a standing directive authority.",
+      "scope": "Scale-invariant normalized body-volume/bulk band from an open-weight 3D whole-body mesh regression (Anny body model + Multi-HMR regressor), run locally on owned hardware; coarse band (slim / average / fuller) or abstain when mesh regression is unreliable; never identity or absolute-volume claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight Anny + Multi-HMR models staged locally; run on owned CPU/GPU hardware only",
       "output_semantics": "Coarse scale-invariant body-volume band (slim / average / fuller); raw normalized volume/bulk stats stay in evidence_payload, never prose",
-      "provenance": "open-weight HMR2.0/4D-Humans whole-body mesh regressor (checkpoint sha256 pinned on freeze) + research_harness.body_volume module; computed in memory, no corpus write",
+      "provenance": "naver/anny body model (Apache-2.0, CC0 MakeHuman assets, sha256-pinned on freeze) + Multi-HMR regressor weights; research_harness.body_volume module; computed in memory, no corpus write",
       "abstention_policy": "Abstain on mesh-regression failure, degenerate mesh, or model/input failure; never fabricate a body-volume class",
-      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept (SMPL-X license note: non-commercial — verify license for research use before freezing).",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered, e.g. >=18/24 plausible whole-body meshes), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept. No SMPL/SMPL-X needed (Anny native topology is free/open); the optional smplx interop topology is deliberately NOT used.",
       "evidence_parts": [
         "body-volume"
       ],
       "model_candidates": [
-        "HMR2.0 / 4D-Humans (shubham-goel/4dhumans, open weights)",
-        "PyMAF-X (whole-body SMPL-X regression)"
+        "Anny (naver/anny) SMPL-free whole-body body model + Anny Multi-HMR (open weights, Apache-2.0 code, CC0 assets)"
       ],
       "prior_evidence_strength": 0.5,
       "measurability": "medium",
@@ -936,10 +935,8 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "blocked",
-      "valid_non_improving_experiments": 0,
-      "blocked_reason": "Open-world sourcing survey (2026-08-10): candidate whole-body mesh regressors are HMR2.0/4D-Humans (MIT code) and PyMAF-X, but BOTH require the SMPL/SMPL-X model files, distributed only via the official SMPL website under a NON-COMMERCIAL RESEARCH license requiring registration + license agreement (arm's pre-registered gate: 'SMPL-X license note: non-commercial — verify license for research use before freezing'). This is a policy/authority (license) ruling, not a measurement: decision needed = (a) user accepts SMPL/SMPL-X non-commercial research license + stages the models locally, (b) authorize a non-SMPL whole-body volume regressor, or (c) downgrade the axis.",
-      "blocked_by_issue": 96
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     },
     {
       "id": "garment-type",
@@ -969,6 +966,99 @@
       ],
       "state": "validated",
       "valid_non_improving_experiments": 1
+    },
+    {
+      "id": "eyewear",
+      "name": "eyewear / glasses presence (NEW deterministic part from seg2 Eyeglass class)",
+      "arm_issue": 105,
+      "hypothesis": "A deterministic eyewear measurement (scale-invariant glasses/sunglasses presence band from the seg2 DOME-29 Eyeglass class region + frame coverage over the Face_Neck crop; CPU, no new model) reduces unsupported 'wearing glasses / in sunglasses / rimless frames' eyewear claims that face-visibility #84 (occlusion of the face) and object-relations #61 (open-vocab accessory detection) do not deterministically ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The eyewear evidence condition does not reduce unsupported eyewear claims or increase supported claims versus its matched no-evidence baseline, or the eyewear bands collapse on the frozen cohort (single band >=75%), or the axis is redundant with face-visibility #84 / object-relations #61 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: eyewear-presence green band from seg2 Eyeglass class coverage over the Face_Neck region; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Eyeglass + Face_Neck classes (24/24); local CPU, in-memory",
+      "selection_rationale": "Eyeglasses are a recurring caption claim ('wearing glasses','sunglasses') with no deterministic support; seg2 has an Eyeglass class unbound by any validated arm. Genuinely-NEW part (eyewear).",
+      "scope": "Deterministic eyewear presence band from seg2 DOME-29 Eyeglass class coverage over the Face_Neck crop (absent / glasses / sunglasses / abstain); never identity or prescription claims; only scale-invariant bands in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Eyeglass + Face_Neck classes); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse scale-invariant eyewear band per item (or abstain when the face region is absent/cropped); raw class-coverage ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.eyewear deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the Face_Neck region is absent/cropped or the Eyeglass class is ambiguous (low coverage); never fabricate eyewear presence",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "eyewear"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.3,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Frozen-cohort capability probe (2026-08-10) measured the eyewear axis DEGENERATE by BOTH independent signals: (1) deterministic seg2 DOME-29 Eyeglass class = 0 px on all 24/24 frozen items (raw-pixel floor 200 never met); (2) learned CLIP ViT-L/14 zero-shot specialist over the Face_Neck crop (openai/clip-vit-large-patch14, staged locally) resolved 23/23 measured items to 'no glasses' (max_share 1.00 vs 0.75 degeneracy gate), with glasses confidence median 0.024 / p25 0.009 / max 0.296 -- no usable floor separates any item. The frozen-cohort subjects genuinely contain no glasses-wearers, so the axis cannot pass its pre-registered no-band>=75% capability gate and a GPU round-trip would be guaranteed-failing. Decision needed: (a) downgrade the eyewear axis to payload-only (cohort lacks positive examples), or (b) authorize a DIFFERENT evaluation cohort/manifest with glasses-wearers (data authority), or (c) drop the axis. Recorded on issue #105.",
+      "blocked_by_issue": 105
+    },
+    {
+      "id": "waist-shape",
+      "name": "waist-shape / hip-waist ratio (NEW deterministic part from seg2-based waist estimator)",
+      "arm_issue": 106,
+      "hypothesis": "A deterministic waist-shape measurement (hip:waist and waist:shoulder ratio bands from a seg2-based waist estimator that locates the waist between the ribcage/lower-torso and upper-leg clothing or skin rows; CPU, no new model; GOLIATH-308 has no waist keypoint so this is a genuinely-new estimate) reduces unsupported 'hourglass / straight / pear-shaped body' waist-proportion claims that body-type #32 (shoulder:hip only) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The waist-shape evidence condition does not reduce unsupported waist-proportion claims or increase supported claims versus its matched no-evidence baseline, or the ratio bands collapse or fail a plane-gate (segments not sharing an imaging plane / width outside the human-plausible band), or the axis is redundant with body-type #32 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: waist-shape hip:waist + waist:shoulder ratio bands from a seg2-based waist estimator; scale-invariant ratios only, plane-gated, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 clothing/skin rows + pose2 for segment orientation (24/24); local CPU, in-memory",
+      "selection_rationale": "Owner directive notes GOLIATH-308 has no waist keypoint; hip:waist/waist:shoulder requires a seg2-based waist estimator. body-type #32 covers shoulder:hip but not the waist chain. Genuinely-NEW part (waist-shape).",
+      "scope": "Deterministic scale-invariant waist-shape bands (hip:waist, waist:shoulder) from a plane-gated seg2-based waist estimator; coarse band (hourglass / straight / wider-hips / abstain); only scale-invariant ratios verbalized; raw width px stays in evidence_payload per the owner px-in-payload-only rule.",
+      "inputs": "Frozen seg2.npy (DOME-29 torso/clothing rows) + pose2.npy (segment orientation gating); local CPU, in-memory, no new model",
+      "output_semantics": "Coarse waist-shape band per item (or abstain when the waist is not locatable / plane gate fails / ratio outside the human-plausible band); raw px widths stay in evidence_payload, never prose",
+      "provenance": "research_harness.waist_shape deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the waist row is unlocatable (occluded/cropped), either segment is not within ~45 deg of horizontal, or the ratio falls outside the human-plausible band; never fabricate a waist class",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%, honest abstains); (c) plane-gate + plausibility gate enforced (research_harness.proportions gate semantics); (d) controlled claim-support round-trip; (e) calibration on known cases + null; (f) independent adversarial review + abstention audit; (g) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "waist-shape"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Frozen-cohort capability probe (2026-08-10) measured the seg2-based waist estimator NON-SEPARATING: only 10/24 items measurable (7 hip/shoulder low-conf, 6 plane-gated out, 1 too-short), and of the 10 measured only 4 cleared the human-plausible band [0.7,2.4] — the plausible ratios are ALL in one 'hourglass' band (4/4, max_share 1.00 vs 0.75 gate) with median 2.86 / max 6.13 (row-width minima corrupted by arm/hand pixels in the seg2 torso span). The owner-flagged waist-estimator gap (GOLIATH-308 has no waist keypoint) remains an open method problem, but THIS deterministic estimator fails its own pre-registered gate and a GPU round-trip would be guaranteed-failing. Decision needed: (a) develop a better waist estimator (limb-excluded torso profile / learned parser — new model class per open-world directive), (b) authorize a different cohort, or (c) drop until the estimator exists. Recorded on issue #106.",
+      "blocked_by_issue": 106
+    },
+    {
+      "id": "lip-color",
+      "name": "lip-color / lip makeup (NEW deterministic part from seg2 lip region + source RGB)",
+      "arm_issue": 107,
+      "hypothesis": "A deterministic lip-color measurement (dominant hue band over the seg2 DOME-29 Lower_Lip/Upper_Lip region from source RGB, contrasted against adjacent skin tone; CPU, no new model) reduces unsupported 'red lips / bold lipstick / natural lips' cosmetic claims that facial-expression #81 (mouth geometry only) and skin-color #31 (tone) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The lip-color evidence condition does not reduce unsupported lip/cosmetic claims or increase supported claims versus its matched no-evidence baseline, or the hue bands collapse (single band >=75%), or the axis is redundant with facial-expression #81 / skin-color #31 (degenerate), or lip-region coverage is too low on the frozen cohort, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART: lip-color band (natural / tinted pink / tinted red / dark / abstain) from seg2 lip-region dominant hue + skin-tone contrast; scale-invariant, deterministic",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; seg2 DOME-29 Lower_Lip/Upper_Lip + Face_Neck + source RGB (24/24); local CPU, in-memory",
+      "selection_rationale": "Cosmetic lip claims ('lipstick','bold lips') recur with no support; seg2 lip classes are bound by depth-ordering (pointmap-depth) but never by a hue/cosmetic specialist. Genuinely-NEW part (lip-color).",
+      "scope": "Deterministic lip-color band from the seg2 lip-region dominant hue + skin-tone contrast (natural / tinted pink / tinted red / dark / abstain); never identity or texture claims; only scale-invariant bands in prose.",
+      "inputs": "Frozen seg2.npy (DOME-29 Lower_Lip + Upper_Lip + Face_Neck) + source RGB; local CPU, in-memory, no new model",
+      "output_semantics": "Coarse lip-color band per item (or abstain when the lip region is absent/tiny/cropped or the hue is ambiguous); raw HSL statistics stay in evidence_payload, never prose",
+      "provenance": "research_harness.lip_color deterministic module (new, code-sha256 pinned); computed in memory, no corpus write",
+      "abstention_policy": "Abstain when the lip region is absent/tiny/cropped or the hue contrast is ambiguous (e.g. monochrome/sepia grade); never fabricate a cosmetic claim",
+      "qualification_gate": "PASS only after: (a) thresholds/prompt pinned; (b) capability + band-calibration probe on the frozen cohort (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "lip-color"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.3,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ],
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Frozen-cohort capability probe (2026-08-10) measured the lip-color axis DEGENERATE on the honest natural/tinted band: 22/24 lip regions present (2 below the 200px floor), 22/22 measured resolved to a saturated natural-red/pink lip (saturation median 0.504, p25 0.456; ZERO low-saturation 'no-makeup/natural' items), max_share 1.00 vs 0.75 degeneracy gate. Even a two-way hue split (natural red-orange 19/22 vs pink-magenta 3/22) keeps max_share 0.86 > 0.75. The frozen cohort's lips are homogeneous; a non-degenerate band only appears via threshold-fitting, which the harness forbids. Decision needed: (a) downgrade lip-color to payload-only (cohort lacks makeup diversity), (b) authorize a different evaluation cohort with bold-makeup examples (data authority), or (c) drop the axis. Recorded on issue #107.",
+      "blocked_by_issue": 107
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -983,7 +1073,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 26,
+  "selection_progress": 29,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
