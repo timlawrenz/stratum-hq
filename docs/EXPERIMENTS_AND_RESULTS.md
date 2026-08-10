@@ -2,6 +2,16 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## 2026-08-10 — arm #97 garment-type — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER (strike-1 → honest revision-2)]`
+
+**Date:** 2026-08-10 (frozen-cohort calibration probe → freeze v1 → 96-caption generation → independent review → strike-1 NOT_BETTER → freeze v2 (absence-verbalization recovery) → 96-caption generation → independent review → deterministic tick BETTER)
+**Arm:** #97 — garment-type / silhouette-category (NEW deterministic part from seg2 DOME-29 clothing/skin classes, no new model; option-B dossier growth → feeds `dossier-context4k`)
+**Code / PR:** `exp/stage-b-garment-type-arm97-20260808` (draft PR #100)
+**Measurement (scale-invariant, calibrated on the frozen 24-item cohort):** upper/lower garment presence from seg2 Upper_Clothing/Lower_Clothing/Apparel + skin classes (min_px 200, min_coverage 0.01, upper_skin_floor 0.02); coarse band upper-lower-covered / upper-only / lower-only / skin-dominant; probe 24/24 measured, 0 abstentions, bands 7/3/10/4 (max 42% — non-degenerate). Coverage ratios stay payload-only.
+**Round-trip v1 (harness-computed):** baseline context-raw-no-evidence 80 supported / 93 unsupported (ratio 0.4624) → evidence **173 / 29 (ratio 0.8564)**, Δ+0.394, paired positive 15/23, **sign-test p=0.10502 → NOT_BETTER (inconclusive, strike 1/3)**. Independent-review contradictions (7) showed the caption model invented garments the evidence marks ABSENT ("low-rise pink bottoms" on skin-dominant, "pale blue button-down shirt" on lower-only, "black one-piece swimsuit" on upper-only) because the v1 rendering left the measured presence booleans payload-only.
+**Round-trip v2 (harness-computed):** honest absence-verbalization recovery — renderers now verbalize "NO lower-body garment present" / "NO upper-body garment present AND NO lower-body garment present" + do-NOT-fabricate instructions (measurement/bands/cohort/model unchanged). Baseline 80/93 → evidence **194 supported / 9 unsupported (ratio 0.9557)**, Δ+0.4932, paired positive **18/23**, **sign-test p=0.005311 → BETTER**. Contradictions 7→2. Registry: garment-type → validated (cycle 26); hair-texture #94 → active (exploit, EIG 0.55, novelty +0.15, selection_progress 25).
+**Validation:** full pytest suite 744 passed; validate-program/validate-dimension-registry/validate-comparison-plan/validate-gpu-manifest valid. Label-sync: #97 `research:validated`, #94 `research:active`, #96 `research:proposal`.
+
 ## 2026-08-08 wave — arms #80–#85 + #95 — `[ALL EMPIRICAL RUNS COMPLETE — VERDICT: BETTER]` (incl. the program's first strike-1 → honest revision)
 
 **Round-trips (harness-computed, all on the frozen 24-item cohort, 96-record generation + independent review each):**
