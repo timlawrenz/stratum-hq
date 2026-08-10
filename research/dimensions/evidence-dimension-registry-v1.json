@@ -964,7 +964,7 @@
         "dossier-context4k"
       ],
       "state": "active",
-      "valid_non_improving_experiments": 0
+      "valid_non_improving_experiments": 1
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -1124,6 +1124,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 24
+    },
+    {
+      "arm_id": "garment-type",
+      "verdict": "NOT_BETTER",
+      "state": "active",
+      "cycle": 25
     }
   ]
 }
