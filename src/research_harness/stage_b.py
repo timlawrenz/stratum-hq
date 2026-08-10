@@ -66,6 +66,7 @@ from .scene_category import SceneCategoryError, compute_scene_category
 from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_MODEL_ASSET
 from .image_quality import ImageQualityError, compute_image_quality
 from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
+from .eye_openness import EyeOpennessError, compute_eye_openness
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
     CameraViewingAngleError,
@@ -1513,6 +1514,83 @@ def _serialize_bangs_forehead(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _eye_openness_evidence() -> dict[str, Any]:
+    """Declared deterministic eyelid-state specialist (arm #113)."""
+    module_path = Path(compute_eye_openness.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-eye-openness-v1",
+        "specialists": [
+            {
+                "id": "in-memory-eye-openness-v1",
+                "scope": ("Deterministic eye-openness measurement from pose2 GOLIATH-308 "
+                          "eyelid-line keypoints (8 upper + 8 lower per eye) normalized by the "
+                          "interpupillary distance (left_eye/right_eye): the MAX upper-lower lid "
+                          "pair gap / IPD, banded to eyes-open / lidded / eyes-closed, with a "
+                          "closed-eye keypoint-dropped signature (eyelid line + iris + face-side "
+                          "eye center all absent) and honest abstention (turned-away/occluded "
+                          "face, too-small face). Never identity, eye-color, or gaze claims; only "
+                          "the coarse scale-invariant band in prose; raw ratios stay payload-only."),
+                "inputs": ("Frozen selected-item pose2.npy (GOLIATH-308 eyelid-line + "
+                           "left_eye/right_eye + iris keypoints); recomputed in memory during "
+                           "this bounded run with no crawlr/stratum write; no new model (CPU)."),
+                "output_semantics": ("Provenance-bearing scale-invariant eye-openness band "
+                                     "(open / lidded / closed) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse "
+                                     "band is verbalized; raw normalized ratios / per-eye state "
+                                     "stay in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.eye_openness.compute_eye_openness "
+                    f"SHA-256 {code_hash}; computed in memory during this bounded run with no "
+                    "crawlr/stratum write."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing or unreadable; abstain "
+                                      "when neither eye has usable eyelid geometry (turned-away, "
+                                      "occluded, or too-small face); never fabricate an eyelid "
+                                      "state; detector disagreement remains a quality anomaly, "
+                                      "never prompt content."),
+                "known_failure_modes": ("1/24 frozen items abstain (08v25q...: whole-face "
+                                        "keypoint drop). The max-gap/IPD ratio is pose-sensitive: "
+                                        "a profile/turned face can read low on one side; the "
+                                        "frontal gate (IPD >= 12px, eyelid line fully keypointed) "
+                                        "plus per-eye abstention bounds this. Median pair gap is "
+                                        "biased low by ~zero-gap canthus pairs and is NOT used."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_eye_openness(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an eye-openness dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. Raw ratios and per-eye
+    state stay in the machine-readable evidence_payload JSON.
+    """
+    lines = ["EYE-OPENNESS (eyelid aperture, scale-invariant):"]
+    if not config:
+        lines.append("- eye openness not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "eye openness not measurable"
+        lines.append(f"- eye openness abstained ({reason})")
+        return "\n".join(lines)
+    band = config.get("eye_openness_band")
+    if band == "open":
+        lines.append("- eyes are open")
+    elif band == "lidded":
+        lines.append("- eyelids are partially lowered (lidded)")
+    elif band == "closed":
+        lines.append("- eyes are closed")
+    return "\n".join(lines)
+
+
 def _image_quality_evidence() -> dict[str, Any]:
     """Declared open-weight zero-shot CLIP-IQA quality specialist (arm #95)."""
     module_path = Path(compute_image_quality.__code__.co_filename)
@@ -2569,6 +2647,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # the frozen seg2 DOME-29 Hair/Face_Neck masks + pose2 GOLIATH-308 eye
     # line (no new model, CPU).
     "bangs-forehead": ("seg2.npy", "pose2.npy"),
+    # Arm #113 eye-openness: deterministic eyelid-state band from the frozen
+    # pose2 GOLIATH-308 eyelid-line keypoints + left_eye/right_eye (IPD
+    # reference) + iris keypoints (no new model, CPU).
+    "eye-openness": ("pose2.npy",),
 }
 
 
@@ -2664,7 +2746,7 @@ def build_stage_b_plan(
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
-        "bangs-forehead",
+        "bangs-forehead", "eye-openness",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3496,6 +3578,47 @@ def build_stage_b_plan(
             "partial-fringe 9 / swept-back 9 (max_share 0.409, no band >= 75%), coverage "
             "min 0.0 / median 0.177 / max 0.483."
         )
+    elif evidence_kind == "eye-openness":
+        evidence = _eye_openness_evidence()
+        evidence_condition_id = "context-raw-eye-openness"
+        comparison_plan_id = "stage-b-first500-eye-openness-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "eye-openness / eyelid-state measurement (scale-invariant max lid-aperture / "
+            "interpupillary-distance band from the pose2 GOLIATH-308 eyelid-line keypoints, "
+            "eyes-open / lidded / eyes-closed, plus the closed-eye keypoint-dropped "
+            "signature; NEW evidence part registered 2026-08-10 via the gated "
+            "propose-dimensions channel, epsilon-greedy EXPLORE selection; CPU, no new "
+            "model) may reduce unsupported 'eyes closed / eyes shut / lids lowered' "
+            "eyelid claims that iris-eye-color #80 (iris hue) and facial-expression #81 "
+            "(mouth-corner) cannot ground, versus the matched no-evidence baseline when "
+            "the source item, view, prompt template, local model, and generation settings "
+            "are controlled."
+        )
+        falsified_if = (
+            "The eye-openness evidence condition does not reduce unsupported eyelid/closed-eye "
+            "claims or increase supported claims versus its matched no-evidence baseline, or "
+            "the eye-openness bands collapse (a single band taking >=75% of measured items), "
+            "or the axis is redundant with iris-eye-color #80 / facial-expression #81 "
+            "(degenerate), or an apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files are not used as evidence inputs. Eye openness "
+            "is computed in memory from the frozen selected pose2.npy (GOLIATH-308 eyelid-line "
+            "keypoints 8 upper + 8 lower per eye, left_eye/right_eye IPD reference, iris "
+            "keypoints) — no new model, CPU only. The MAX upper-lower lid pair gap is "
+            "normalized by the interpupillary distance (scale-invariant; the eyelid line "
+            "spans only the outer half of the eye and median pair gap is biased low by "
+            "~zero-gap canthus pairs, so neither is used as the reference). Only the coarse "
+            "band (open / lidded / closed) is verbalized; raw ratios and per-eye state stay "
+            "in evidence_payload and are never caption claims. Band calibration (measured "
+            "2026-08-10 frozen-cohort probe): 23/24 measured, distribution open 13 / lidded 10 "
+            "/ closed 0-1 (max_share 0.565, no band >= 75%), ratio min 0.041 / median 0.129 "
+            "/ max 0.460; the single whole-face keypoint-drop item (08v25q...) abstains "
+            "honestly; the closed band fires on the keypoint-dropped closed-signature which "
+            "the cohort's measurable items do not exhibit."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3807,6 +3930,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "hair-texture"
     elif "context-raw-bangs-forehead" in condition_ids:
         rebuild_kind = "bangs-forehead"
+    elif "context-raw-eye-openness" in condition_ids:
+        rebuild_kind = "eye-openness"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3891,6 +4016,7 @@ def _load_selected_item(
     include_garment_type: bool = False,
     include_hair_texture: bool = False,
     include_bangs_forehead: bool = False,
+    include_eye_openness: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4145,6 +4271,15 @@ def _load_selected_item(
             raise StageBRunError(
                 f"bangs-forehead abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    eye_openness = None
+    if include_eye_openness:
+        assert pose2 is not None
+        try:
+            eye_openness = compute_eye_openness(pose2)
+        except EyeOpennessError as exc:
+            raise StageBRunError(
+                f"eye-openness abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4191,6 +4326,7 @@ def _load_selected_item(
         "garment_type": garment_type,
         "hair_texture": hair_texture,
         "bangs_forehead": bangs_forehead,
+        "eye_openness": eye_openness,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -4439,6 +4575,10 @@ def _render_condition(
         bangs_forehead = prepared.get("bangs_forehead")
         evidence_text = _serialize_bangs_forehead(bangs_forehead)
         return raw.copy(), _context_prompt(evidence_text), bangs_forehead
+    if condition_id == "context-raw-eye-openness":
+        eye_openness = prepared.get("eye_openness")
+        evidence_text = _serialize_eye_openness(eye_openness)
+        return raw.copy(), _context_prompt(evidence_text), eye_openness
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4732,6 +4872,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-bangs-forehead"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #113 eye-openness: only the eye-openness run computes the
+    # deterministic eyelid-state band (NEW evidence part, CPU, no new model) —
+    # gate on the frozen plan's conditions.
+    include_eye_openness = any(
+        str(condition.get("id")) == "context-raw-eye-openness"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4759,6 +4906,7 @@ def execute_stage_b(
             include_garment_type=include_garment_type,
             include_hair_texture=include_hair_texture,
             include_bangs_forehead=include_bangs_forehead,
+            include_eye_openness=include_eye_openness,
         )
         for item in items
     ]
