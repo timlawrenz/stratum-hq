@@ -264,6 +264,7 @@ honest revision). **2026-08-10: garment-type #97 VALIDATED BETTER after a strike
 honest absence-verbalization revision-2** (0.4624→0.9557 p=0.005311); hair-texture #94 (CLIP re-scope,
 0.4624→0.7251 p=0.017345), bangs-forehead #110 (p=0.00845), eye-openness #113 (p=0.026239) and
 **hand-gesture #109 (MediaPipe Hands, p=0.017345, 0.4624→0.8562) ALL VALIDATED BETTER (2026-08-10)**.
-33 validated / 1 active (eyebrow-position #111, exploit, selection 34) / 4 blocked with measured numbers
+After hand-gesture validated, **eyebrow-position #111 is the sole `research:active` arm**
+(exploit, EIG 0.39, novelty +0.15, selection_progress 34). 33 validated / 4 blocked with measured numbers
 (#105/#106/#107/#96; their downgrade/drop/cohort decisions are recorded on the issues) / 1 proposal
 (#112 jewelry). Goal inputs 93.1% validated; `goal_unreachable: false`.
