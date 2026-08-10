@@ -870,8 +870,10 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
-      "valid_non_improving_experiments": 0
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Deterministic gradient-orientation hair-texture specialist measured DEGENERATE on the frozen cohort (2026-08-10 capability probe: 11/24 measured all in one 'curly' band, max_share 1.00 vs 0.75 degeneracy gate; 13/24 honest abstains 'too smooth'; cohort captions genuinely span straight/wavy/curly so axis NOT cohort-degenerate). Five alternative deterministic discriminators (boundary roughness, structure-tensor coherence, convexity peri/fill, radius dispersion) equally non-separating. Deterministic axis EXHAUSTED without threshold-fitting — requires decision: re-scope hair-texture to a NEW MODEL CLASS (learned/open-weight hair-texture specialist per open-world sourcing directive) or downgrade the axis.",
+      "blocked_by_issue": 94
     },
     {
       "id": "image-quality",
@@ -934,7 +936,7 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0
     },
     {
@@ -979,7 +981,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 25,
+  "selection_progress": 26,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
