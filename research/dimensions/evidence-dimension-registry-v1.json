@@ -936,8 +936,10 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
-      "valid_non_improving_experiments": 0
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Open-world sourcing survey (2026-08-10): candidate whole-body mesh regressors are HMR2.0/4D-Humans (MIT code) and PyMAF-X, but BOTH require the SMPL/SMPL-X model files, distributed only via the official SMPL website under a NON-COMMERCIAL RESEARCH license requiring registration + license agreement (arm's pre-registered gate: 'SMPL-X license note: non-commercial — verify license for research use before freezing'). This is a policy/authority (license) ruling, not a measurement: decision needed = (a) user accepts SMPL/SMPL-X non-commercial research license + stages the models locally, (b) authorize a non-SMPL whole-body volume regressor, or (c) downgrade the axis.",
+      "blocked_by_issue": 96
     },
     {
       "id": "garment-type",
