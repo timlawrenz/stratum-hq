@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 import time
@@ -46,7 +47,11 @@ PILOTS = [
     "058v0mg1bbxthvatdw324k8j4b0s",
     "08v25q5524t2u0zl0xtnzi6bd22f",
 ]
-AGG_IDS = {"03r1r5psuxprfkhomitcz5vh9w1c", "07hyx5wjk5rc339v2s3e2orcoorr"}
+AGG_IDS = (
+    set()
+    if os.environ.get("PROSE_SKIP_AGG")
+    else {"03r1r5psuxprfkhomitcz5vh9w1c", "07hyx5wjk5rc339v2s3e2orcoorr"}
+)
 
 
 def item_seed(image_id: str) -> int:
@@ -80,6 +85,12 @@ def post_json(url: str, payload: dict, timeout: int = 60) -> dict:
         return json.loads(r.read())
 
 
+def get_json(url: str, timeout: int = 30) -> dict:
+    """GET (ComfyUI /history is a GET endpoint; POST raises 405)."""
+    with urllib.request.urlopen(url, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
 def wait_server(timeout_s: int = 240) -> None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -97,7 +108,7 @@ def generate(prompt: str, seed: int, prefix: str) -> Path:
     deadline = time.time() + 1500  # ROCm first-pass kernel tuning can exceed 10 min
     while time.time() < deadline:
         try:
-            hist = post_json(f"{COMFY_URL}/history/{pid}", {}, timeout=30)
+            hist = get_json(f"{COMFY_URL}/history/{pid}", timeout=30)
         except Exception:
             hist = {}
         if pid in hist:
