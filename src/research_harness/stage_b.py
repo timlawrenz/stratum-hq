@@ -53,6 +53,7 @@ from .pose_articulation import PoseArticulationError, compute_pose_articulation
 from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
+from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
@@ -1153,6 +1154,94 @@ def _serialize_face_geometry(face_geometry: Mapping[str, Any]) -> str:
 
     if len(lines) == 1:
         lines.append("- (no distinctive facial ratio outside the typical band)")
+    return "\n".join(lines)
+
+
+def _eyebrow_position_evidence() -> dict[str, Any]:
+    """Declared deterministic eyebrow-position specialist (arm #111)."""
+    module_path = Path(compute_eyebrow_position.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-eyebrow-position-v1",
+        "specialists": [
+            {
+                "id": "in-memory-eyebrow-position-v1",
+                "scope": ("Scale-invariant eyebrow-position / elevation band of the single "
+                          "subject from the already-qualified MediaPipe FaceLandmarker 478-point "
+                          "mesh (same model as face-geometry #60 / gaze-head #68): mean brow-arc "
+                          "height above the eye line normalized by the ipsilateral eye width, "
+                          "banded to neutral / raised / furrowed-low, with honest abstention on "
+                          "no-face / degenerate detection. Never identity, eye-color, or "
+                          "facial-expression claims; only the coarse band in prose; raw ratios stay "
+                          "payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory "
+                           "during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant eyebrow-position band "
+                                     "(neutral / raised / furrowed-low) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse band "
+                                     "is verbalized; raw normalized ratios / per-side values stay in "
+                                     "the machine-readable payload."),
+                "provenance": (
+                    "research_harness.eyebrow_position.compute_eyebrow_position "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no crawlr/stratum "
+                    "write, no hosted third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if required "
+                                      "artifacts are missing; abstain (emit None with a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full frame or "
+                                      "the seg2 Face_Neck crop (measured union policy) or the "
+                                      "ipsilateral eye width is degenerate; never fabricate a brow "
+                                      "state; detector disagreement remains a quality anomaly, never "
+                                      "prompt content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection bounds it); "
+                                        "turned heads / extreme DOF / occlusion abstain; band "
+                                        "thresholds are calibrated to this frozen cohort and may "
+                                        "shift on other cohorts; the inner-brow elevation is a "
+                                        "corroborating payload signal, NOT a separate verbalized "
+                                        "axis (the inner-arch composite furrow rule was rejected on "
+                                        "probe review as threshold-fitting)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_eyebrow_position(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an eyebrow-position dict.
+
+    Verbalizes ONLY the coarse calibrated band. Raw per-side ratios stay in the
+    machine-readable evidence_payload JSON and are never caption claims.
+    """
+    lines = ["EYEBROW-POSITION (brow elevation vs the eye line, scale-invariant):"]
+    if not config:
+        lines.append("- eyebrow-position not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "brow position not measurable"
+        lines.append(f"- brow position abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- brow position measured but not banded (payload)")
+        return "\n".join(lines)
+    band = config.get("eyebrow_position_band")
+    if band == "raised":
+        lines.append("- eyebrows are raised (elevated well above the eye line)")
+    elif band == "furrowed":
+        lines.append("- eyebrows are furrowed / drawn low toward the eye line")
+    elif band == "neutral":
+        lines.append("- eyebrows are neutral (at a typical height above the eye line)")
     return "\n".join(lines)
 
 
@@ -2685,6 +2774,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     "pointmap-depth": ("pointmap.npy", "seg2.npy"),
     "matting-alpha": ("matting.npy", "seg2.npy"),
     "face-geometry": ("seg2.npy",),
+    # Arm #111 eyebrow-position: deterministic brow-arch elevation band from
+    # the LOCAL MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "eyebrow-position": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
     # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
     # full-frame source RGB (SHA-bound via the item's source_sha256). No
@@ -2853,6 +2949,7 @@ def build_stage_b_plan(
     if evidence_kind not in (
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
+        "eyebrow-position",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
@@ -3167,6 +3264,48 @@ def build_stage_b_plan(
             "CPU, tasks API; model face_landmarker.task bound by sha256). Only scale-invariant facts are "
             "verbalized: eye-spacing / mouth / jaw / mid-face bands. Landmark coordinates and the pixel "
             "bbox stay in evidence_payload and are never caption claims."
+        )
+    elif evidence_kind == "eyebrow-position":
+        evidence = _eyebrow_position_evidence()
+        evidence_condition_id = "context-raw-eyebrow-position"
+        comparison_plan_id = "stage-b-first500-eyebrow-position-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "eyebrow-position / elevation measurement (scale-invariant mean brow-arch height "
+            "above the eye line / ipsilateral eye width from the local open-weight MediaPipe "
+            "FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck crop, union "
+            "detection policy, banded neutral / raised / furrowed-low at cohort-calibrated "
+            "cuts; NEW evidence part registered 2026-08-10 via the gated propose-dimensions "
+            "channel, exploitative selection; CPU, reuses the already-qualified arm #60 model) "
+            "may reduce unsupported 'raised eyebrows / furrowed brow' brow-position claims that "
+            "the mouth-corner facial-expression #81 axis cannot ground, versus the matched "
+            "no-evidence baseline when the source item, view, prompt template, local model, and "
+            "generation settings are controlled."
+        )
+        falsified_if = (
+            "The eyebrow-position evidence condition does not reduce unsupported brow claims or "
+            "increase supported claims versus its matched no-evidence baseline, or the "
+            "eyebrow-position bands collapse (a single band taking >=75% of measured items), or "
+            "the axis is redundant with facial-expression #81 (degenerate), or an apparent "
+            "difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence inputs for the "
+            "eyebrow-position measurement (pose2 stays a validation-only read for the "
+            "exactly-one-subject invariant). Brow position is computed in memory from the frozen "
+            "selected seg2.npy (DOME-29 Face_Neck mask) + the already-decoded source RGB via the "
+            "local open-weight MediaPipe FaceLandmarker (Apache-2.0, owned hardware, CPU, tasks "
+            "API; model face_landmarker.task sha256 64184e229b..., the same model as arm #60). "
+            "Only the coarse scale-invariant band (neutral / raised / furrowed-low) is verbalized; "
+            "raw per-side arch/inner ratios stay in evidence_payload and are never caption claims. "
+            "Band calibration (measured 2026-08-10 frozen-cohort probe): 21/24 measured, "
+            "distribution neutral 13 / raised 5 / furrowed-low 3 (max_share 0.619, no band >= "
+            "75%), arch_elevation min 0.017 / p25 0.672 / median 0.745 / p75 0.946 / max 1.691; "
+            "the 3 abstains are the same turned-head / no-face-region items the facemesh cohort "
+            "already reports. The inner-brow (furrow) composite rule was rejected on probe review "
+            "as threshold-fitting; the inner-brow elevation remains a corroborating payload "
+            "signal."
         )
     elif evidence_kind == "object-relations":
         evidence = _object_relations_evidence()
@@ -4056,6 +4195,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "matting-alpha"
     elif "context-raw-face-geometry" in condition_ids:
         rebuild_kind = "face-geometry"
+    elif "context-raw-eyebrow-position" in condition_ids:
+        rebuild_kind = "eyebrow-position"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
@@ -4161,6 +4302,7 @@ def _load_selected_item(
     expected_evidence_hashes: Mapping[str, str],
     *,
     include_face_geometry: bool = False,
+    include_eyebrow_position: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_image_quality: bool = False,
@@ -4296,6 +4438,17 @@ def _load_selected_item(
             )
         except FaceGeometryError as exc:
             raise StageBRunError(f"face-geometry abort for frozen selected item {image_id}: {exc}") from exc
+    eyebrow_position = None
+    if include_eyebrow_position:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            eyebrow_position = compute_eyebrow_position(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except EyebrowPositionError as exc:
+            raise StageBRunError(
+                f"eyebrow-position abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     object_relations = None
     if include_object_relations:
         rgb = np.ascontiguousarray(np.array(image.convert("RGB"), dtype=np.uint8)).copy()
@@ -4485,6 +4638,7 @@ def _load_selected_item(
         "pointmap_depth": pointmap_depth,
         "matting_alpha": matting_alpha,
         "face_geometry": face_geometry,
+        "eyebrow_position": eyebrow_position,
         "object_relations": object_relations,
         "scene_category": scene_category,
         "image_quality": image_quality,
@@ -4684,6 +4838,10 @@ def _render_condition(
         face_geometry = prepared["face_geometry"]
         evidence_text = _serialize_face_geometry(face_geometry)
         return raw.copy(), _context_prompt(evidence_text), face_geometry
+    if condition_id == "context-raw-eyebrow-position":
+        eyebrow_position = prepared.get("eyebrow_position")
+        evidence_text = _serialize_eyebrow_position(eyebrow_position)
+        return raw.copy(), _context_prompt(evidence_text), eyebrow_position
     if condition_id == "context-raw-object-relations":
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
@@ -4942,6 +5100,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-face-geometry"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #111: only the eyebrow-position run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_eyebrow_position = any(
+        str(condition.get("id")) == "context-raw-eyebrow-position"
+        for condition in (plan.get("conditions") or [])
+    )
     include_object_relations = any(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
@@ -5077,6 +5242,7 @@ def execute_stage_b(
             derived_root,
             evidence_hashes[_safe_output_segment(item.get("image_id"), "candidate item image_id")],
             include_face_geometry=include_face_geometry,
+            include_eyebrow_position=include_eyebrow_position,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_image_quality=include_image_quality,
