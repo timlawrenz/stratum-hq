@@ -1066,7 +1066,7 @@
       "id": "hand-gesture",
       "name": "Hand pose / gesture (open palm, fist, pointing, relaxed curl) via MediaPipe Hands",
       "arm_issue": 109,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A hand-pose measurement (NEW MODEL CLASS: open-weight MediaPipe Hands 21-point-per-hand mesh, Apache-2.0, local CPU on owned hardware; NEW evidence part hand-gesture) that reads the hand's own gesture class instead of hand-body contact reduces unsupported 'she makes a peace sign / open palm / hand gesture' hand-articulation claims that the deterministic affordance-contact #76 axis (contact vs grazing) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The hand-gesture evidence condition does not reduce unsupported hand-articulation claims or increase supported claims versus its matched no-evidence baseline, or the gesture bands collapse (a single band >=75% of measured items), or the axis is redundant with affordance-contact #76 (same evidence), or the hand detector covers too few frozen items (coverage below the pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
@@ -1126,7 +1126,7 @@
       "id": "eyebrow-position",
       "name": "Eyebrow elevation / position (neutral, raised, furrowed)",
       "arm_issue": 111,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A deterministic eyebrow-position measurement (NEW evidence part eyebrow-position, from the already-validated open-weight MediaPipe FaceLandmarker 478-point mesh eyebrow landmarks, local CPU, normalized to the eye-line) that emits a scale-invariant neutral / raised / furrowed band reduces unsupported 'raised eyebrows / furrowed brow' expression-adjacent claims that the validated facial-expression #81 axis (mouth-corner based) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The eyebrow-position evidence condition does not reduce unsupported brow claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with facial-expression #81 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
@@ -1224,7 +1224,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 33,
+  "selection_progress": 34,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1399,6 +1399,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 29
+    },
+    {
+      "arm_id": "hand-gesture",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 30
     }
   ]
 }

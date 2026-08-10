@@ -1,7 +1,9 @@
 # Project Status — Stratum Contextual Specialist Research
 
-**Last updated:** 2026-08-10 (eye-openness #113 ROUND-TRIP **BETTER** — harness-computed, cycle 32; **hand-gesture #109 active** via exploit, selection_progress 33; 32 validated; body-volume #96 blocked with measured coverage numbers)
-**Phase / status:** ACTIVE — empirical Stage-B loop running; **32 validated** (28 goal feeders + goal arm dossier-context4k + reconstruction + hair-texture #94 + bangs-forehead #110 + eye-openness #113) + **1 active (hand-gesture #109)** + **4 blocked (eyewear #105, waist-shape #106, lip-color #107, body-volume #96)** + **2 proposals (#111/#112)**; goal inputs 90.6% validated, `goal_unreachable: false` (floor 4001, `any_max_honest_floor_reached` 24/24).
+**Last updated:** 2026-08-10 (hand-gesture #109 ROUND-TRIP **BETTER** — harness-computed, cycle 33; **eyebrow-position #111 active** via exploit, selection_progress 34; 33 validated; body-volume #96 blocked with measured coverage numbers)
+
+**2026-08-10 — HAND-GESTURE #109 ROUND-TRIP BETTER (harness-computed, cycle 33).** NEW MODEL CLASS (open-weight MediaPipe HandLandmarker 21-point-per-hand mesh, Apache-2.0, local CPU via tasks API, `hand_landmarker.task` sha256 fbc2a300… staged on owned hardware) + NEW evidence part (hand-gesture): per-visible-hand gesture class (open-palm / fist / pointing / relaxed-curl) from scale-invariant within-hand finger-extension segment ratios (tip-PIP > 1.25× PIP-MCP; thumb chain 1.10×), greedy-distinct pose2 GOLIATH-308 wrist side matching, hand-raised flag gated on wrist ≥ 0.5 shoulder-widths above the shoulder line (per-hand honest abstention). Capability/band probe PASS: coverage 14/24 with a visible hand (pre-registered ≥14/24 floor; full-frame-then-2x-upscale union policy is load-bearing — full-frame alone 12/24), gesture distribution fist 11 / relaxed-curl 4 (max_share 0.733 < 0.75), open-palm/pointing fire 0 on this cohort and remain declared, hand-raised 2/14 rare-positive, one-vs-two-hands count axis SILENCED payload-only (max_share 0.929 ≥ 0.75 degeneracy gate). Frozen plan `stage-b-first500-hand-gesture-v1` (96 = 24×4) generated on the 4090 via the scheduler (`stratum-stage-b-hand-gesture-v1`, 96 records) + independent adversarial review (96 rows, `stage-b-hand-gesture-v1-review`). `autonomous-tick` (marker-driven) computed **BETTER** — baseline 80 supported / 93 unsupported (ratio 0.4624) → evidence **131 supported / 22 unsupported (ratio 0.8562, Δ+0.3938), 17/23 paired positives, sign-test p=0.017345** (inconclusive:false). Registry: hand-gesture → **validated** (cycle 33), **eyebrow-position #111 → active** (selected_via EXPLOIT, selection_progress 34). 816 tests + all validations green. Label-sync: #109 research:validated, #111 research:active.
+**Phase / status:** ACTIVE — empirical Stage-B loop running; **33 validated** (28 goal feeders + goal arm dossier-context4k + reconstruction + hair-texture #94 + bangs-forehead #110 + eye-openness #113 + hand-gesture #109) + **1 active (eyebrow-position #111)** + **4 blocked (eyewear #105, waist-shape #106, lip-color #107, body-volume #96)** + **1 proposal (#112 jewelry)**; goal inputs 90.6% validated, `goal_unreachable: false` (floor 4001, `any_max_honest_floor_reached` 24/24).
 
 **2026-08-10 — EYE-OPENNESS #113 ROUND-TRIP BETTER (harness-computed, cycle 32).** Deterministic NEW-part arm (pose2 GOLIATH-308 eyelid-line keypoints, max lid-aperture / interpupillary-distance band; registered via the gated propose-dimensions channel; selected by the ε-greedy EXPLORE slot). Capability probe PASS (23/24 measured, open 13 / lidded 10 / closed 0 measurable, max_share 0.565; cross-module corroboration: eye-color #80's 3 abstainees are exactly the 3 lowest lid apertures; whole-face keypoint-drop item 08v25q abstains honestly). Measurement design honesty note: eyelid lines span only the outer half of the eye and median pair gap is biased low by ~zero-gap canthus pairs — neither used as reference; IPD (the eye-color/facial-expression reference) is the scale-invariant normalizer. Frozen plan `stage-b-first500-eye-openness-v1` (96 = 24×4) generated on the 4090 via the scheduler (`stratum-stage-b-eye-openness-v1`, 96 records) + independent adversarial review (96 rows, `stage-b-eye-openness-v1-review`). `autonomous-tick` (marker-driven) computed **BETTER** — baseline 80 supported / 93 unsupported (ratio 0.4624) → evidence **188 supported / 15 unsupported (ratio 0.9261, Δ+0.4637), 16/22 paired positives, sign-test p=0.026239** (inconclusive:false). Registry: eye-openness → **validated** (cycle 32), **hand-gesture #109 → active** (selected_via EXPLOIT, selection_progress 33). 795 tests + all validations green. Label-sync: #113 research:validated, #109 research:active.
 
@@ -170,8 +172,8 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   active → validated** (runs: `stage-b-vlm-dense-v1` blocks, `stage-b-vlm-dense-captions-v1` 120
   records, `-review` 120 rows). Cohort block abstention rate 0/578 flagged for the abstention audit.
   **Sweep now EXHAUSTED (10/10 validated) — next action brainstorm-new-data.**
-- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **32 validated** (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35, reconstruction #37, vlm-dense-description #47, pose-articulation #62, pointmap-depth #58, matting-alpha #59, face-geometry #60, object-relations #61, scene-category #69, gaze-head-orientation #68, apparent-age #73, camera-viewing-angle #74, image-focus-depth-of-field #75, affordance-contact #76, iris-eye-color #80, facial-expression #81, hairstyle #82, body-configuration #83, face-visibility #84, environment-clearance #85, image-quality #95, garment-type #97, hair-texture #94, bangs-forehead #110, eye-openness #113),
-  **1 active (hand-gesture #109) + 4 blocked (eyewear #105, waist-shape #106, lip-color #107, body-volume #96 — all measured degenerate/coverage-fail) + 2 proposals (#111 eyebrow-position, #112 jewelry)**.
+- **Registry** (`research/dimensions/evidence-dimension-registry-v1.json`): **33 validated** (body-type, clothing, hair, skin-color, lighting, dossier-context4k #36, setting #34, texture #35, reconstruction #37, vlm-dense-description #47, pose-articulation #62, pointmap-depth #58, matting-alpha #59, face-geometry #60, object-relations #61, scene-category #69, gaze-head-orientation #68, apparent-age #73, camera-viewing-angle #74, image-focus-depth-of-field #75, affordance-contact #76, iris-eye-color #80, facial-expression #81, hairstyle #82, body-configuration #83, face-visibility #84, environment-clearance #85, image-quality #95, garment-type #97, hair-texture #94, bangs-forehead #110, eye-openness #113, hand-gesture #109),
+  **1 active (eyebrow-position #111) + 4 blocked (eyewear #105, waist-shape #106, lip-color #107, body-volume #96 — all measured degenerate/coverage-fail) + 1 proposal (#112 jewelry)**.
   `dimension-sweep-status`: `exhausted: false`, `next_action: none`, `goal_unreachable: false`
   (floor 4001, gap 512; `any_max_honest_floor_reached=true` 24/24 under the reframed structural floor).
 - **Arm #47 sourcing verification** (2026-08-06, draft PR #48): open-world scan (Molmo-72B, Qwen2.5-VL,
@@ -181,7 +183,7 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
 
 ## Immediate next action
 
-**Execute the active arm: hand-gesture #109 (`research:active`, selected via EXPLOIT at selection_progress 33).** NEW model class (open-weight MediaPipe Hands 21-point-per-hand mesh, Apache-2.0, local CPU) + NEW evidence part (hand-gesture): per-visible-hand gesture class (open-palm / fist / pointing / relaxed-curl), hand-raised flag, one-vs-two-hands from the already-decoded source RGB. First verify the `hand_landmarker.task` model asset is staged (face-geometry #60 staged `face_landmarker.task`; the Hands model must be sourced under the open-world directive if absent), build `research_harness/hand_gesture.py`, run the capability/band probe on the frozen cohort (no band >= 75%; coverage floor pre-registered), then freeze plan + manifest + GPU round-trip (4090 scheduler-managed) + independent review + `autonomous-tick`. Proposals #111 (eyebrow-position), #112 (jewelry) follow. Non-blocking: the small decisions on blocked arms #96/#105/#106/#107 (downgrade / different cohort / drop) are pending on their issues.
+**Execute the active arm: eyebrow-position #111 (`research:active`, selected via EXPLOIT at selection_progress 34).** NEW deterministic part (facemesh brow elevation) from the already-validated MediaPipe FaceLandmarker 478-point mesh (face-geometry #60's staged `face_landmarker.task`): brow-elevation band (neutral / raised / furrowed) normalized by the interpupillary/face reference (scale-invariant). First the capability/band probe on the frozen cohort (no band >= 75%; coverage floor pre-registered), then freeze plan + manifest + GPU round-trip (4090 scheduler-managed) + independent review + `autonomous-tick`. Proposal #112 (jewelry, CLIP zero-shot on ear/neck crops) follows. Non-blocking: the small decisions on blocked arms #96/#105/#106/#107 (downgrade / different cohort / drop) are pending on their issues.
 
 ## Live research tree
 
@@ -215,6 +217,10 @@ The canonical corpus is `crawlr/approved` (immutable); `crawlr/stratum` remains 
   0.542) → ROUND-TRIP BETTER (cycle 27, p=0.017345); #96 body-volume re-scoped to Anny (non-SMPL) and
   ACTIVE; sixth widen registered #105 eyewear, #106 waist-shape, #107 lip-color via the gated channel —
   all three capability-probed DEGENERATE on the frozen cohort and BLOCKED with measured numbers.**
+  **Seventh widen #109–#113 (2026-08-10): hand-gesture #109 (MediaPipe Hands NEW MODEL CLASS) ROUND-TRIP
+  BETTER (cycle 33, p=0.017345, ratio 0.4624→0.8562) → validated; bangs-forehead #110 and eye-openness
+  #113 also ROUND-TRIP BETTER (cycles 31/32); eyebrow-position #111 → active (exploit, selection 34);
+  #112 jewelry remains a proposal.**
 - #46 is CLOSED: ruling LANDED via owner-merged PR #50 (Option A: structural floor + aspiration metadata).
 
 ## Automation and authority
@@ -233,7 +239,8 @@ of the sensitive canonical corpus requires a hold.
 Arm #34: BETTER; Arm #35: BETTER; Arm #36 (goal): BETTER; Arm #37 (reconstruction): BETTER; Arm #47 (VLM dense): BETTER;
 Arm #62 (pose-articulation): BETTER; Arm #58 (pointmap-depth): BETTER; Arm #59 (matting-alpha): BETTER;
 Arm #60 (face-geometry): BETTER; Arm #61 (object-relations): BETTER; Arm #69 (scene-category): BETTER;
-Arm #68 (gaze-head-orientation): BETTER; Arm #74 (camera-viewing-angle): BETTER.**
+Arm #68 (gaze-head-orientation): BETTER; Arm #74 (camera-viewing-angle): BETTER;
+Arm #109 (hand-gesture): BETTER (2026-08-10, MediaPipe Hands, p=0.017345).**
 Declared deterministic evidence (geometry; body-type proportions; DOME-29 clothing coverage + dominant
 colors; hair region + color; exposed-skin tone; lighting luma/DR/shadow/direction; setting background
 coverage/color/bands; texture fabric/skin surface+pattern bands) each significantly improves supported
@@ -254,8 +261,9 @@ facial-expression 0.3219→0.9689 p=0.0013; hairstyle 0.3219→0.8063 p=0.003305
 0.3219→0.8966 p=0.000772; face-visibility 0.3219→0.9767 p=0.000244; environment-clearance 0.3219→0.9158
 p=0.000111; image-quality 0.3219→0.7111 p=0.024521 after the program's first strike-1 NOT_BETTER →
 honest revision). **2026-08-10: garment-type #97 VALIDATED BETTER after a strike-1 NOT_BETTER →
-honest absence-verbalization revision-2** (0.4624→0.9557 p=0.005311). Every one of the 27 goal-feeder
-dimensions + the goal arm + reconstruction is now validated; after the decision-boundary resolution
-(PR #108, 2026-08-10), **hair-texture #94 (CLIP ViT-L/14 zero-shot re-scope) is the sole `research:active` arm**
-(round-trip to be frozen next), body-volume #96 (Anny re-scope) remains a proposal, and the brainstorm
-arms #105/#106/#107 are blocked with measured degeneracy. Goal inputs 93.1% validated; `goal_unreachable: false`.
+honest absence-verbalization revision-2** (0.4624→0.9557 p=0.005311); hair-texture #94 (CLIP re-scope,
+0.4624→0.7251 p=0.017345), bangs-forehead #110 (p=0.00845), eye-openness #113 (p=0.026239) and
+**hand-gesture #109 (MediaPipe Hands, p=0.017345, 0.4624→0.8562) ALL VALIDATED BETTER (2026-08-10)**.
+33 validated / 1 active (eyebrow-position #111, exploit, selection 34) / 4 blocked with measured numbers
+(#105/#106/#107/#96; their downgrade/drop/cohort decisions are recorded on the issues) / 1 proposal
+(#112 jewelry). Goal inputs 93.1% validated; `goal_unreachable: false`.
