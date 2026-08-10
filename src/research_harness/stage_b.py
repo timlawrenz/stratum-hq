@@ -65,6 +65,7 @@ from .garment_type import GarmentTypeError, compute_garment_type
 from .scene_category import SceneCategoryError, compute_scene_category
 from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_MODEL_ASSET
 from .image_quality import ImageQualityError, compute_image_quality
+from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
     CameraViewingAngleError,
@@ -1430,6 +1431,88 @@ def _serialize_hair_texture(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _bangs_forehead_evidence() -> dict[str, Any]:
+    """Declared deterministic bangs / forehead-hair-coverage specialist
+    (arm #110, NEW evidence part, no new model, CPU)."""
+    module_path = Path(compute_bangs_forehead.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-bangs-forehead-v1",
+        "specialists": [
+            {
+                "id": "in-memory-bangs-forehead-v1",
+                "scope": ("Scale-invariant bangs / forehead-hair-coverage band (bangs / "
+                          "partial-fringe / swept-back) from the seg2 DOME-29 Hair mask "
+                          "over a forehead band anchored to the pose2 GOLIATH-308 eye line "
+                          "(0.20 face-heights above the eyes; no new model, CPU). Registered "
+                          "2026-08-10 via the gated propose-dimensions channel (brainstorm-"
+                          "new-data). Emits ONE coarse band or a surfaced abstention; never "
+                          "color, length, or identity claims; only the scale-invariant band "
+                          "in prose."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Hair + Face_Neck masks) "
+                           "+ pose2.npy (GOLIATH-308 eye line); computed in memory during "
+                           "this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant bangs band with a "
+                                     "surfaced abstention on an unusable forehead/eye-line, "
+                                     "not semantic ground truth or caption claims; only the "
+                                     "band is verbalized (raw normalized forehead coverage "
+                                     "ratio stays in the machine-readable payload)."),
+                "provenance": (
+                    "research_harness.bangs_forehead.compute_bangs_forehead "
+                    f"SHA-256 {code_hash}; deterministic from frozen seg2 + pose2, computed "
+                    "in memory during this bounded run with no crawlr/stratum write, no "
+                    "hosted third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abstain (emit None/band with a surfaced reason) when "
+                                      "the Face_Neck or Hair region is absent/tiny, the "
+                                      "eye-line landmarks are unreliable, or the forehead "
+                                      "band is too small. Never fabricate a bangs state; "
+                                      "detector disagreement remains a quality anomaly, never "
+                                      "prompt content."),
+                "known_failure_modes": ("The forehead band is a geometric proxy (hairline "
+                                        "position not directly measured): very low vs very "
+                                        "high hairlines shift the coverage reading, so "
+                                        "near-floor items are coarse; the bangs/partial/"
+                                        "swept-back floors are calibrated on the frozen "
+                                        "cohort (2026-08-10 probe: 22/24 measured, max "
+                                        "band share 40.9%, coverage min 0.0 / median 0.177 / "
+                                        "max 0.483)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives "
+                                       "completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_bangs_forehead(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a bangs-forehead dict.
+
+    Verbalizes ONLY the coarse scale-invariant band. The raw normalized
+    coverage ratio stays in the machine-readable evidence_payload JSON.
+    """
+    lines = ["BANGS / FOREHEAD-HAIR (seg2 Hair over the eye-line-anchored "
+             "forehead band, scale-invariant):"]
+    if not config:
+        lines.append("- bangs not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "bangs not confident"
+        lines.append(f"- bangs-forehead abstained ({reason})")
+        return "\n".join(lines)
+    band = config.get("bangs_band")
+    if band == "bangs":
+        lines.append("- hair falls across the forehead as bangs/fringe")
+    elif band == "partial-fringe":
+        lines.append("- a partial fringe frames the forehead")
+    elif band == "swept-back":
+        lines.append("- hair is swept back revealing the forehead")
+    return "\n".join(lines)
+
+
 def _image_quality_evidence() -> dict[str, Any]:
     """Declared open-weight zero-shot CLIP-IQA quality specialist (arm #95)."""
     module_path = Path(compute_image_quality.__code__.co_filename)
@@ -2482,6 +2565,10 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # region) + the already-decoded source RGB (SHA-bound via the item's
     # source_sha256). seg2 is the only derived evidence input.
     "hair-texture": ("seg2.npy",),
+    # Arm #110 bangs-forehead: deterministic forehead-hair-coverage band from
+    # the frozen seg2 DOME-29 Hair/Face_Neck masks + pose2 GOLIATH-308 eye
+    # line (no new model, CPU).
+    "bangs-forehead": ("seg2.npy", "pose2.npy"),
 }
 
 
@@ -2577,6 +2664,7 @@ def build_stage_b_plan(
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
+        "bangs-forehead",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3374,6 +3462,40 @@ def build_stage_b_plan(
             "frozen-cohort CLIP probe): 24/24 measured, distribution straight 3 / wavy 13 / coily 6 / "
             "curly 2 (max_share 0.542, no band >= 75%), argmax confidence median 0.632 / min 0.373."
         )
+    elif evidence_kind == "bangs-forehead":
+        evidence = _bangs_forehead_evidence()
+        evidence_condition_id = "context-raw-bangs-forehead"
+        comparison_plan_id = "stage-b-first500-bangs-forehead-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic bangs / "
+            "forehead-hair-coverage measurement (scale-invariant bangs / partial-fringe / "
+            "swept-back band from the seg2 DOME-29 Hair mask over a forehead band anchored to "
+            "the pose2 GOLIATH-308 eye line; NEW evidence part registered 2026-08-10 via the "
+            "gated propose-dimensions channel; CPU, no new model) may reduce unsupported "
+            "'she has bangs / a fringe / hair swept across her forehead' styling claims that "
+            "hairstyle #82 (length/arrangement) and hair #30 (color/coverage) cannot ground, "
+            "versus the matched no-evidence baseline when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The bangs-forehead evidence condition does not reduce unsupported bangs/fringe "
+            "claims or increase supported claims versus its matched no-evidence baseline, or "
+            "the bangs bands collapse (a single band taking >=75% of measured items), or the "
+            "axis is redundant with hairstyle #82 / hair #30 / vlm-dense-description #47 "
+            "(degenerate), or an apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files are not used as evidence inputs. Bangs / "
+            "forehead coverage is computed in memory from the frozen selected seg2.npy (DOME-29 "
+            "Hair + Face_Neck masks) + pose2.npy (GOLIATH-308 eye line) — no new model, CPU "
+            "only. Only the scale-invariant coarse band (bangs / partial-fringe / swept-back) "
+            "is verbalized; the raw normalized forehead-hair-coverage ratio stays in "
+            "evidence_payload and is never a caption claim. Band calibration (measured "
+            "2026-08-10 frozen-cohort probe): 22/24 measured, distribution bangs 4 / "
+            "partial-fringe 9 / swept-back 9 (max_share 0.409, no band >= 75%), coverage "
+            "min 0.0 / median 0.177 / max 0.483."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3683,6 +3805,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "garment-type"
     elif "context-raw-hair-texture" in condition_ids:
         rebuild_kind = "hair-texture"
+    elif "context-raw-bangs-forehead" in condition_ids:
+        rebuild_kind = "bangs-forehead"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -3766,6 +3890,7 @@ def _load_selected_item(
     include_facial_expression: bool = False,
     include_garment_type: bool = False,
     include_hair_texture: bool = False,
+    include_bangs_forehead: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4011,6 +4136,15 @@ def _load_selected_item(
             raise StageBRunError(
                 f"hair-texture abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    bangs_forehead = None
+    if include_bangs_forehead:
+        assert pose2 is not None
+        try:
+            bangs_forehead = compute_bangs_forehead(seg2, pose2)
+        except BangsForeheadError as exc:
+            raise StageBRunError(
+                f"bangs-forehead abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4056,6 +4190,7 @@ def _load_selected_item(
         "facial_expression": facial_expression,
         "garment_type": garment_type,
         "hair_texture": hair_texture,
+        "bangs_forehead": bangs_forehead,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -4300,6 +4435,10 @@ def _render_condition(
         hair_texture = prepared.get("hair_texture")
         evidence_text = _serialize_hair_texture(hair_texture)
         return raw.copy(), _context_prompt(evidence_text), hair_texture
+    if condition_id == "context-raw-bangs-forehead":
+        bangs_forehead = prepared.get("bangs_forehead")
+        evidence_text = _serialize_bangs_forehead(bangs_forehead)
+        return raw.copy(), _context_prompt(evidence_text), bangs_forehead
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4586,6 +4725,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-hair-texture"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #110 bangs-forehead: only the bangs run computes the deterministic
+    # forehead-hair-coverage band (NEW evidence part, CPU, no new model) —
+    # gate on the frozen plan's conditions.
+    include_bangs_forehead = any(
+        str(condition.get("id")) == "context-raw-bangs-forehead"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4612,6 +4758,7 @@ def execute_stage_b(
             include_facial_expression=include_facial_expression,
             include_garment_type=include_garment_type,
             include_hair_texture=include_hair_texture,
+            include_bangs_forehead=include_bangs_forehead,
         )
         for item in items
     ]

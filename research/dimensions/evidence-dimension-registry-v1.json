@@ -935,8 +935,10 @@
       "feeds": [
         "dossier-context4k"
       ],
-      "state": "active",
-      "valid_non_improving_experiments": 0
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "Capability + model-qualification probe (2026-08-10, Multi-HMR-Anny multiHMR_672_L_anny, local 4090 via the scheduler) measured WHOLE-BODY VOLUME COVERAGE BELOW the pre-registered >=18/24 floor. The model stack is verified and runs on owned hardware (state_dict 0/0, deterministic), and it DETECTS a person on 21/24 frozen items at calibrated det_thresh 0.1 (27x lower than the 0.3 checkpoint default, disclosed in probe). But on this PORTRAIT/CROP-HEAVY frozen cohort only 16/24 meshes clear a whole-body height >=0.8m and only 11/24 clear >=1.2m — the rest are upper-body/close-up crops where the reconstructed mesh spans 0.50-0.96m and whole-body bulk is genuinely not measurable. The norm_vol (volume/height^3) band is CONFOUNED WITH FRAMING: the 'fuller' class (0.062-0.099, n=3) is composed of the shortest meshes (0.80-0.96m). Bands 11 slim / 2 average / 3 fuller (max_share 0.6875) but the credible whole-body subset is ~11/24 (46%). Probe artifact: /mnt/nas-ai-models/research/stratum/body-volume-calibration-probe.json; module research_harness/body_volume.py + staged stack at /mnt/nas-ai-models/research/stratum/body-volume. Decision needed: (a) relax the whole-body coverage floor and accept a framing-confounded band (NOT honest for whole-body bulk claims), (b) authorize a DIFFERENT evaluation cohort with full-body photos (data authority), or (c) drop the axis until a full-body cohort exists. Recorded on issue #96.",
+      "blocked_by_issue": 96
     },
     {
       "id": "garment-type",
@@ -1059,6 +1061,155 @@
       "valid_non_improving_experiments": 0,
       "blocked_reason": "Frozen-cohort capability probe (2026-08-10) measured the lip-color axis DEGENERATE on the honest natural/tinted band: 22/24 lip regions present (2 below the 200px floor), 22/22 measured resolved to a saturated natural-red/pink lip (saturation median 0.504, p25 0.456; ZERO low-saturation 'no-makeup/natural' items), max_share 1.00 vs 0.75 degeneracy gate. Even a two-way hue split (natural red-orange 19/22 vs pink-magenta 3/22) keeps max_share 0.86 > 0.75. The frozen cohort's lips are homogeneous; a non-degenerate band only appears via threshold-fitting, which the harness forbids. Decision needed: (a) downgrade lip-color to payload-only (cohort lacks makeup diversity), (b) authorize a different evaluation cohort with bold-makeup examples (data authority), or (c) drop the axis. Recorded on issue #107.",
       "blocked_by_issue": 107
+    },
+    {
+      "id": "hand-gesture",
+      "name": "Hand pose / gesture (open palm, fist, pointing, relaxed curl) via MediaPipe Hands",
+      "arm_issue": 109,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "A hand-pose measurement (NEW MODEL CLASS: open-weight MediaPipe Hands 21-point-per-hand mesh, Apache-2.0, local CPU on owned hardware; NEW evidence part hand-gesture) that reads the hand's own gesture class instead of hand-body contact reduces unsupported 'she makes a peace sign / open palm / hand gesture' hand-articulation claims that the deterministic affordance-contact #76 axis (contact vs grazing) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The hand-gesture evidence condition does not reduce unsupported hand-articulation claims or increase supported claims versus its matched no-evidence baseline, or the gesture bands collapse (a single band >=75% of measured items), or the axis is redundant with affordance-contact #76 (same evidence), or the hand detector covers too few frozen items (coverage below the pre-registered floor), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW MODEL CLASS (MediaPipe Hands 21-point hand mesh) + NEW EVIDENCE PART (hand-gesture): per-visible-hand gesture class (open-palm / fist / pointing / relaxed-curl), hand-raised flag, and one-vs-two-hands from the already-decoded source RGB",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256); local owned hardware only",
+      "selection_rationale": "Affordance-contact #76 and pose-articulation #62 measure hand placement relative to the body, not the hand's own articulation. 'She flashes a peace sign / points / shows an open palm' are recurring caption claims with no evidence axis. MediaPipe Hands is a genuinely-new model class, Apache-2.0, open-weight, runs locally.",
+      "scope": "Scale-invariant hand-gesture class (open-palm / fist / pointing / relaxed-curl) per visible hand plus a hand-raised flag, from a locally-run open-weight MediaPipe Hands 21-point mesh; coarse class or abstain when no hand is detectable; never identity claims.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); open-weight MediaPipe Hands model staged locally; run on owned CPU/GPU hardware only",
+      "output_semantics": "Coarse scale-invariant hand-gesture class per visible hand + hand-raised flag; raw per-hand landmark geometry / confidence stays in evidence_payload, never prose",
+      "provenance": "mediapipe tasks-api HandLandmarker (Apache-2.0, sha256-pinned on freeze) + research_harness.hand_gesture module; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on no-hand-detected, low-confidence hand mesh, occluded/degenerate hand, or model/input failure; never fabricate a gesture class",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack (verify BEFORE trust; coverage floor pre-registered, e.g. >=14/24 with a visible hand), thresholds/prompt pinned; (b) band-calibration probe (no band >= 75%, honest abstains); (c) controlled claim-support round-trip; (d) calibration on known cases + null; (e) independent adversarial review + abstention audit; (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "hand-gesture"
+      ],
+      "model_candidates": [
+        "MediaPipe Hands (HandLandmarker tasks API, Apache-2.0, open-weight, 21-point hand mesh)"
+      ],
+      "prior_evidence_strength": 0.5,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "bangs-forehead",
+      "name": "Bangs / hairstyle forehead coverage (bangs vs swept-back vs partial fringe)",
+      "arm_issue": 110,
+      "state": "active",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "A deterministic forehead-hair-coverage measurement (NEW evidence part bangs-forehead, from the existing seg2 DOME-29 Hair region + pose2 GOLIATH-308 face landmarks, CPU, no new model) that emits a scale-invariant bangs / swept-back / partial-fringe band reduces unsupported 'she has bangs / hair swept across her forehead / fringe' styling claims that the validated hairstyle #82 axis (length + down/kept-up arrangement) and hair #30 (color/coverage) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The bangs-forehead evidence condition does not reduce unsupported hair-styling claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with hairstyle #82 or hair #30 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (bangs-forehead): scale-invariant forehead-strip hair coverage ratio from seg2 Hair-forehead overlap + pose2 face landmarks, banded to bangs / swept-back / partial-fringe",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; frozen seg2.npy DOME-29 Hair + pose2.npy GOLIATH-308 landmarks; local CPU",
+      "selection_rationale": "Hairstyle #82 verbalizes length and down/kept-up arrangement, but 'bangs / fringe across the forehead' is a distinct styling claim undecidable from length alone. Forehead hair coverage is a new, cheap, cohort-discriminating measurement (portrait crop-heavy corpus keeps foreheads visible).",
+      "scope": "Scale-invariant forehead-hair-coverage band (bangs / swept-back / partial-fringe) from seg2 Hair overlap with the forehead strip defined by pose2 face landmarks, or abstain when the forehead is occluded/unavailable; never color/length/identity claims.",
+      "inputs": "Frozen selected seg2.npy (DOME-29 Hair mask) + pose2.npy (GOLIATH-308 face landmarks); CPU in memory",
+      "output_semantics": "Coarse scale-invariant bangs band; raw normalized forehead-hair-coverage ratio stays in evidence_payload, never prose",
+      "provenance": "research_harness.bangs_forehead module; deterministic from frozen seg2 + pose2; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on absent/occluded forehead, unreliable face landmarks, or tiny hair region; never fabricate a bangs state",
+      "qualification_gate": "PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "bangs-forehead"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "high",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "eyebrow-position",
+      "name": "Eyebrow elevation / position (neutral, raised, furrowed)",
+      "arm_issue": 111,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "A deterministic eyebrow-position measurement (NEW evidence part eyebrow-position, from the already-validated open-weight MediaPipe FaceLandmarker 478-point mesh eyebrow landmarks, local CPU, normalized to the eye-line) that emits a scale-invariant neutral / raised / furrowed band reduces unsupported 'raised eyebrows / furrowed brow' expression-adjacent claims that the validated facial-expression #81 axis (mouth-corner based) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The eyebrow-position evidence condition does not reduce unsupported brow claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with facial-expression #81 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (eyebrow-position): scale-invariant eyebrow-arch elevation vs the eye-line from the validated MediaPipe facemesh landmarks, banded to neutral / raised / furrowed",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; already-installed MediaPipe FaceLandmarker (face-geometry #60 validation) over source RGB; local CPU",
+      "selection_rationale": "Facial-expression #81 is mouth-corner based. Brows 'raised / furrowed' are distinct caption claims and a widely-discriminating portrait feature. Reuses the already-qualified facemesh model for a genuinely-new measurement part.",
+      "scope": "Scale-invariant eyebrow-elevation band (neutral / raised / furrowed) from the validated facemesh eyebrow landmarks normalized to the eye-line, or abstain when landmarks are low-confidence; never eye-color/identity claims.",
+      "inputs": "Already-decoded source RGB + the already-installed MediaPipe FaceLandmarker 478-point mesh (same model as face-geometry #60); local CPU",
+      "output_semantics": "Coarse scale-invariant brow-position band; raw normalized brow-elevation ratios stay in evidence_payload, never prose",
+      "provenance": "research_harness.eyebrow_position module; reuses the face-geometry #60 MediaPipe FaceLandmarker runtime (face_landmarker.task sha256 64184e229b...); computed in memory, no corpus write",
+      "abstention_policy": "Abstain on low-confidence / occluded brow landmarks or model failure; never fabricate a brow state",
+      "qualification_gate": "PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "eyebrow-position"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "jewelry",
+      "name": "Jewelry presence (earrings, necklace) via CLIP zero-shot on ear/neck crops",
+      "arm_issue": 112,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "A jewelry-presence measurement (NEW evidence part jewelry + NEW MODEL CLASS CLIP ViT-L/14 zero-shot over seg2-defined ear/neck crop regions, openai/clip-vit-large-patch14, MIT, local CPU) that emits a scale-invariant earrings/necklace present-or-absent band reduces unsupported 'wearing earrings / a necklace / jewelry' accessory claims that the validated object-relations #61 axis (closed-scene vocab) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The jewelry evidence condition does not reduce unsupported accessory claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (e.g. 0/24 earrings — a single band >=75%), or the axis is redundant with object-relations #61 or garment-type #97 (degenerate), or the CLIP specialist fails qualification, or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (jewelry) + NEW MODEL CLASS (CLIP ViT-L/14 zero-shot over ear/neck crops): scale-invariant earrings / necklace present-absent bands at a calibrated confidence floor",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; decoded source RGB (SHA-bound via source_sha256) + seg2.npy DOME-29 Hair/Face_Neck for crop regions; local CPU",
+      "selection_rationale": "Object-relations #61 binds scene-object presence, not worn accessories. 'Earrings / necklace' are common caption claims in this glamour-portrait corpus. CLIP zero-shot over tight ear/neck crops is a cheap, genuinely-new model usage already staged locally.",
+      "scope": "Scale-invariant earrings / necklace present-absent bands from a CLIP ViT-L/14 zero-shot classifier over seg2 ear/neck crop regions at a calibrated confidence floor, or abstain when the region is absent/tiny; never brand/material/identity claims.",
+      "inputs": "Already-decoded source RGB + seg2.npy (crop-region masks); openai/clip-vit-large-patch14 staged locally (same checkpoint as scene-category #69); local CPU",
+      "output_semantics": "Coarse earrings present-absent + necklace present-absent bands; raw CLIP probabilities stay in evidence_payload, never prose",
+      "provenance": "research_harness.jewelry module; CLIP ViT-L/14 model.safetensors sha256 a2bf730a0c... (same as scene-category #69); computed in memory, no corpus write",
+      "abstention_policy": "Abstain on absent/tiny ear or neck region, empty crop, or argmax confidence below the calibrated floor; never fabricate jewelry presence",
+      "qualification_gate": "PASS only after: (a) capability + model-qualification probe on the local stack AND the frozen cohort (coverage floor pre-registered, e.g. >=8/24 with any jewelry so the axis isn't all-null; no band >= 75%), (b) band-calibration probe, (c) controlled claim-support round-trip, (d) calibration on known cases + null, (e) independent adversarial review + abstention audit, (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "jewelry"
+      ],
+      "model_candidates": [
+        "openai/clip-vit-large-patch14 (MIT, already staged for scene-category #69)"
+      ],
+      "prior_evidence_strength": 0.4,
+      "measurability": "low",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ]
+    },
+    {
+      "id": "eye-openness",
+      "name": "Eye openness / eyelid state (open, lidded, closed)",
+      "arm_issue": 113,
+      "state": "proposal",
+      "valid_non_improving_experiments": 0,
+      "hypothesis": "An eyelid-state measurement (NEW evidence part eye-openness, deterministic from the already-validated MediaPipe FaceLandmarker eye contours + iris-visibility via the validated iris-eye-color #80 iris keypoint presence, local CPU) that emits a scale-invariant eyes-open / lidded / eyes-closed band reduces unsupported 'eyes closed / eyes shut / lids lowered' eyelid claims that the validated iris-eye-color #80 (iris hue) and facial-expression #81 cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The eye-openness evidence condition does not reduce unsupported eyelid/closed-eye claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (e.g. 24/24 eyes-open — a single band >=75%), or the axis is redundant with iris-eye-color #80 or facial-expression #81 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (eye-openness): scale-invariant eyelid aspect ratio + iris visibility, banded to eyes-open / lidded / eyes-closed",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "first-500 core-covered cohort; already-validated MediaPipe FaceLandmarker + pose2 iris keypoints over source RGB; local CPU",
+      "selection_rationale": "Iris-eye-color #80 verbalizes hue (requires an open eye); it cannot distinguish 'eyes closed' from 'open dark eye'. An explicit eyelid-state band is a new, caption-common, portrait-relevant axis. If the cohort is 24/24 open the probe will honestly degenerate it.",
+      "scope": "Scale-invariant eyelid-state band (eyes-open / lidded / eyes-closed) from eyelid landmarks normalized to eye width + iris visibility, or abstain when the eye region is occluded; never eye-color/identity claims.",
+      "inputs": "Already-decoded source RGB + already-installed MediaPipe FaceLandmarker (face-geometry #60) + pose2 GOLIATH-308 iris keypoints; local CPU",
+      "output_semantics": "Coarse scale-invariant eye-openness band; raw eyelid aspect ratio stays in evidence_payload, never prose",
+      "provenance": "research_harness.eye_openness module; reuses the validated facemesh + iris keypoint runtimes; computed in memory, no corpus write",
+      "abstention_policy": "Abstain on occluded eyes, low-confidence eye landmarks, or model failure; never fabricate an eyelid state",
+      "qualification_gate": "PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first.",
+      "evidence_parts": [
+        "eye-openness"
+      ],
+      "model_candidates": [],
+      "prior_evidence_strength": 0.4,
+      "measurability": "medium",
+      "cost_bucket": "low",
+      "feeds": [
+        "dossier-context4k"
+      ]
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -1073,7 +1224,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 30,
+  "selection_progress": 31,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
