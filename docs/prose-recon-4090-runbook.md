@@ -6,6 +6,33 @@ tiled decode hangs, `--cpu-vae` decodes but takes ~5-10 min/image single-issue (
 8 images ≈ 1 h+). The **4090 is the proven instrument** (arm #37: same checkpoint +
 settings, 5.4-6 s/gen). Intended for the ~04:00Z slot (after btnet + garment jobs).
 
+## ✅ VERIFIED WORKING on the 4090 (2026-08-09 22:00Z — full run, ~2 min)
+
+Runner bugs fixed on this branch (commit `…history-GET…`): (1) `generate()` polled
+ComfyUI `/history/{id}` with POST → **405** → every run hung at gen 1 while ComfyUI
+actually completed the images; the poll must be **GET**. (2) `OUTPUT_DIR` is now
+env-overridable (`PROSE_OUTPUT_DIR` — the 4090's ComfyUI outputs to
+`/mnt/fscache/essdee/ComfyUI/output`, not the strix path). (3) aggregator leg is
+skippable via `PROSE_SKIP_AGG=1` (use it when the strix ollama is contended).
+
+**Aggregator on the 4090 (Tim's steer):** ollama 0.32.6 with gemma3:27b is ALREADY
+running on the 4090 (`http://127.0.0.1:11434`) and coexists with ComfyUI in VRAM
+(~13 GB gemma + ~9 GB SDXL on 24 GB). The runner's `OLLAMA_URL` points there, so the
+aggregator captions generate locally — no dependence on the (often busy) strix.
+
+**Exact command (local 4090):**
+```bash
+python3 /mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py request --gpu 4090 --project stratum-contextual-specialist-research --vram 12 --duration 1 --job-id stratum-prose-recon-4090-v1
+python3 /mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py poll --gpu 4090 --job-id stratum-prose-recon-4090-v1
+# boot comfy (bg): /mnt/fscache/essdee/ComfyUI/.venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch
+python3 /mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py activate --gpu 4090 --job-id stratum-prose-recon-4090-v1
+env PROSE_OUTPUT_DIR=/mnt/fscache/essdee/ComfyUI/output /mnt/fscache/essdee/ComfyUI/.venv/bin/python scripts/prose_recon_demo.py
+python3 /mnt/nas-ai-models/gpu-scheduler/gpu_scheduler.py release --gpu 4090 --job-id stratum-prose-recon-4090-v1 --status completed
+```
+Result (22:00Z): 5× `recon-prose.png` + 2× `recon-prose-agg.png` + `_null.png` +
+`_recon-manifest.json` under `/mnt/nas-ai-models/research/stratum/prose-caption2-demo-v1/`.
+
+
 ## Prerequisites (all verified 2026-08-09)
 
 - ComfyUI at `/mnt/fscache/essdee/ComfyUI` (4090 local) — arm-37-proven.
