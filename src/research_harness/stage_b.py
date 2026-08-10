@@ -67,6 +67,11 @@ from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_M
 from .image_quality import ImageQualityError, compute_image_quality
 from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
 from .eye_openness import EyeOpennessError, compute_eye_openness
+from .hand_gesture import (
+    HAND_GESTURE_MODEL_ASSET,
+    HandGestureError,
+    compute_hand_gesture,
+)
 from .gaze_head import GazeHeadError, compute_gaze_head, GAZE_HEAD_MODEL_ASSET
 from .camera_viewing_angle import (
     CameraViewingAngleError,
@@ -1591,6 +1596,107 @@ def _serialize_eye_openness(config: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _hand_gesture_evidence() -> dict[str, Any]:
+    """Declared MediaPipe Hands hand-gesture specialist (arm #109)."""
+    module_path = Path(compute_hand_gesture.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-hand-gesture-v1",
+        "specialists": [
+            {
+                "id": "in-memory-hand-gesture-v1",
+                "scope": ("Deterministic hand-gesture measurement from the open-weight "
+                          "MediaPipe HandLandmarker (21-point-per-hand mesh, Apache-2.0, "
+                          "local CPU via the tasks API) over the already-decoded source "
+                          "RGB (SHA-bound via source_sha256): per-visible-hand gesture "
+                          "class (open-palm / fist / pointing / relaxed-curl) from "
+                          "within-hand finger-extension segment ratios (scale-invariant), "
+                          "one-vs-two-hands, and a hand-raised flag gated on the pose2 "
+                          "GOLIATH-308 wrist/shoulder reference (wrist >= 0.5 "
+                          "shoulder-widths above the shoulder line). Never identity or "
+                          "gaze claims; only the coarse categorical facts are verbalized; "
+                          "raw landmarks / extension vectors / confidence stay "
+                          "payload-only."),
+                "inputs": ("Frozen selected-item already-decoded source RGB (SHA-bound "
+                           "via source_sha256) + pose2.npy (GOLIATH-308 wrist/shoulder "
+                           "reference for the hand-raised flag); open-weight "
+                           "hand_landmarker.task (float16, sha256 fbc2a300…, Apache-2.0) "
+                           "staged locally, run on owned CPU hardware; computed in memory "
+                           "during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant hand-gesture "
+                                     "categorical facts (per-hand gesture class, "
+                                     "one-vs-two-hands, hand-raised flag) or an explicit "
+                                     "abstention (no hand detected / degenerate mesh), "
+                                     "not semantic ground truth or caption claims; only "
+                                     "the coarse categorical facts are verbalized; raw "
+                                     "landmark geometry and extension vectors stay in the "
+                                     "machine-readable payload."),
+                "provenance": (
+                    "research_harness.hand_gesture.compute_hand_gesture "
+                    f"SHA-256 {code_hash}; model hand_landmarker.task (MediaPipe Hands, "
+                    "Apache-2.0) sha256 fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1, "
+                    "run locally on owned hardware (CPU); computed in memory during this "
+                    "bounded run with no crawlr/stratum write, no hosted third-party "
+                    "inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing or unreadable; abstain "
+                                      "when no hand is detected on the full frame or the 2x "
+                                      "upscale (hands turned away, occluded, or out of "
+                                      "frame) or every detected hand is degenerate (bbox "
+                                      "below the size floor); the hand-raised flag abstains "
+                                      "per hand when the pose2 wrist/shoulder reference is "
+                                      "unreported; never fabricate a gesture class; detector "
+                                      "disagreement remains a quality anomaly, never prompt "
+                                      "content."),
+                "known_failure_modes": ("MediaPipe Hands is resolution-sensitive on "
+                                        "portrait crops; the full-frame-then-2x-upscale "
+                                        "policy bounds this but hands smaller than the "
+                                        "detection confidence floor still abstain. Finger "
+                                        "extension is a within-hand ratio: extreme "
+                                        "foreshortening (edge-on fingers) can misread one "
+                                        "finger, which shifts the class between pointing / "
+                                        "fist / relaxed-curl — the coarse class is the "
+                                        "claim, extension vectors stay payload-only. Pose2 "
+                                        "wrist matching gates the raised flag; no match "
+                                        "means the flag abstains, never a fabricated side."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives "
+                                       "completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_hand_gesture(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a hand-gesture dict.
+
+    Verbalizes ONLY the coarse scale-invariant categorical facts. Raw
+    landmark geometry / extension vectors stay in evidence_payload JSON.
+    """
+    lines = ["HAND-GESTURE (MediaPipe Hands, scale-invariant):"]
+    if not config:
+        lines.append("- hand gesture not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "hand gesture not measurable"
+        lines.append(f"- hand gesture abstained ({reason})")
+        return "\n".join(lines)
+    claim = config.get("gesture_claim")
+    if claim:
+        lines.append(f"- {claim}")
+    for f in config.get("raised_flags") or []:
+        if not f.get("measured"):
+            continue
+        side = f.get("side") or "a"
+        if f.get("hand_raised"):
+            lines.append(f"- the {side} hand is raised above the shoulder line")
+    return "\n".join(lines)
+
+
 def _image_quality_evidence() -> dict[str, Any]:
     """Declared open-weight zero-shot CLIP-IQA quality specialist (arm #95)."""
     module_path = Path(compute_image_quality.__code__.co_filename)
@@ -2651,6 +2757,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # pose2 GOLIATH-308 eyelid-line keypoints + left_eye/right_eye (IPD
     # reference) + iris keypoints (no new model, CPU).
     "eye-openness": ("pose2.npy",),
+    # Arm #109 hand-gesture: open-weight MediaPipe HandLandmarker
+    # (21-point-per-hand mesh, NEW model class) over the already-decoded
+    # source RGB (SHA-bound via source_sha256); pose2.npy supplies the
+    # wrist/shoulder body reference for the hand-raised flag.
+    "hand-gesture": ("pose2.npy",),
 }
 
 
@@ -2746,7 +2857,7 @@ def build_stage_b_plan(
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
-        "bangs-forehead", "eye-openness",
+        "bangs-forehead", "eye-openness", "hand-gesture",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -3619,6 +3730,55 @@ def build_stage_b_plan(
             "honestly; the closed band fires on the keypoint-dropped closed-signature which "
             "the cohort's measurable items do not exhibit."
         )
+    elif evidence_kind == "hand-gesture":
+        evidence = _hand_gesture_evidence()
+        evidence_condition_id = "context-raw-hand-gesture"
+        comparison_plan_id = "stage-b-first500-hand-gesture-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared hand-gesture "
+            "measurement (NEW MODEL CLASS open-weight MediaPipe HandLandmarker "
+            "21-point-per-hand mesh, Apache-2.0, local CPU via the tasks API: per-visible-hand "
+            "gesture class open-palm / fist / pointing / relaxed-curl from scale-invariant "
+            "within-hand finger-extension segment ratios, one-vs-two-hands, and a hand-raised "
+            "flag gated on the pose2 GOLIATH-308 wrist/shoulder reference; NEW evidence part "
+            "registered 2026-08-10 via the gated propose-dimensions channel, EXPLOIT "
+            "selection) may reduce unsupported 'she makes a peace sign / points / shows an "
+            "open palm / hand gesture' hand-articulation claims that the deterministic "
+            "affordance-contact #76 axis (contact vs grazing) cannot ground, versus the "
+            "matched no-evidence baseline when the source item, view, prompt template, local "
+            "model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The hand-gesture evidence condition does not reduce unsupported hand-articulation "
+            "claims or increase supported claims versus its matched no-evidence baseline, or "
+            "the gesture bands collapse (a single band taking >=75% of measured hands), or the "
+            "axis is redundant with affordance-contact #76 / pose-articulation #62 (same "
+            "evidence), or the hand detector covers too few frozen items (coverage below the "
+            "pre-registered 14/24 floor), or an apparent difference is attributable to an "
+            "uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files are not used as evidence inputs. Hand gesture "
+            "is computed in memory from the frozen selected source RGB (SHA-bound via "
+            "source_sha256) + pose2.npy (GOLIATH-308 wrist/shoulder reference for the "
+            "hand-raised flag) — open-weight MediaPipe HandLandmarker (hand_landmarker.task, "
+            "Apache-2.0, local CPU) on owned hardware only. Only the coarse categorical facts "
+            "(per-hand gesture class; hand-raised flag as a rare-positive claim) are "
+            "verbalized; raw landmark geometry / extension vectors / confidence and the "
+            "one-vs-two-hands count stay in evidence_payload and are never caption claims. "
+            "Capability + band calibration (measured 2026-08-10 frozen-cohort probe, "
+            "/mnt/nas-ai-models/research/stratum/hand-gesture-calibration-probe.json): "
+            "coverage PASS 14/24 items with a visible hand (pre-registered floor >= 14/24; "
+            "the full-frame-then-2x-upscale union policy is load-bearing — full-frame alone "
+            "measures 12/24); gesture distribution 15 hands: fist 11 / relaxed-curl 4 "
+            "(max_share 0.733, no band >= 75%); open-palm / pointing fire 0 in this cohort "
+            "and remain declared for items where they do occur; the hand-raised flag fired "
+            "2/14 measured (rare-positive claim, honest abstention when the pose2 "
+            "wrist/shoulder reference is unreported); the one-vs-two-hands count axis is "
+            "SILENCED (payload-only) because its probe max_share (one-hand 13/14 = 0.929) "
+            "fails the 75% degeneracy gate."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -3932,6 +4092,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "bangs-forehead"
     elif "context-raw-eye-openness" in condition_ids:
         rebuild_kind = "eye-openness"
+    elif "context-raw-hand-gesture" in condition_ids:
+        rebuild_kind = "hand-gesture"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -4017,6 +4179,7 @@ def _load_selected_item(
     include_hair_texture: bool = False,
     include_bangs_forehead: bool = False,
     include_eye_openness: bool = False,
+    include_hand_gesture: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4280,6 +4443,19 @@ def _load_selected_item(
             raise StageBRunError(
                 f"eye-openness abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    hand_gesture = None
+    if include_hand_gesture:
+        assert pose2 is not None
+        try:
+            hand_gesture = compute_hand_gesture(
+                np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8)),
+                pose2,
+                model_asset_path=HAND_GESTURE_MODEL_ASSET,
+            )
+        except HandGestureError as exc:
+            raise StageBRunError(
+                f"hand-gesture abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4327,6 +4503,7 @@ def _load_selected_item(
         "hair_texture": hair_texture,
         "bangs_forehead": bangs_forehead,
         "eye_openness": eye_openness,
+        "hand_gesture": hand_gesture,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -4579,6 +4756,10 @@ def _render_condition(
         eye_openness = prepared.get("eye_openness")
         evidence_text = _serialize_eye_openness(eye_openness)
         return raw.copy(), _context_prompt(evidence_text), eye_openness
+    if condition_id == "context-raw-hand-gesture":
+        hand_gesture = prepared.get("hand_gesture")
+        evidence_text = _serialize_hand_gesture(hand_gesture)
+        return raw.copy(), _context_prompt(evidence_text), hand_gesture
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -4879,6 +5060,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eye-openness"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #109 hand-gesture: only the hand-gesture run computes the MediaPipe
+    # Hands gesture bands (NEW MODEL CLASS, local CPU) — gate on the frozen
+    # plan's conditions.
+    include_hand_gesture = any(
+        str(condition.get("id")) == "context-raw-hand-gesture"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -4907,6 +5095,7 @@ def execute_stage_b(
             include_hair_texture=include_hair_texture,
             include_bangs_forehead=include_bangs_forehead,
             include_eye_openness=include_eye_openness,
+            include_hand_gesture=include_hand_gesture,
         )
         for item in items
     ]
