@@ -2,6 +2,16 @@
 
 This ledger records empirical findings and negative results permanently. A green implementation, readable artifact, or passing unit test is not an empirical PASS.
 
+## 2026-08-10 — arm #94 hair-texture (CLIP re-scope) — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER]`
+
+**Date:** 2026-08-10 (deterministic gradient axis measured DEGENERATE → re-scope to NEW MODEL CLASS under the open-world sourcing directive → CLIP capability probe non-degenerate → freeze → 96-caption generation → independent review → deterministic tick BETTER)
+**Arm:** #94 — hair-texture / curl-waviness (LEARNED re-scope: open-weight CLIP ViT-L/14 zero-shot over the seg2 DOME-29 Hair crop, NEW MODEL CLASS; option-B dossier growth → feeds `dossier-context4k`)
+**Code / PR:** `exp/resolve-decision-boundary-arm94-hair-texture-20260810` (draft PR #108)
+**Re-scope rationale (measured):** the deterministic gradient-orientation specialist was DEGENERATE on the frozen cohort (11/24 all one band, max_share 1.00 vs 0.75 gate; 13/24 honest abstains 'too smooth'; 5 alternative deterministic discriminators non-separating). The open-world sourcing directive (2026-08-05) authorizes re-scoping to a NEW MODEL CLASS rather than waiting for a human model-class ruling.
+**Measurement (scale-invariant, calibrated on the frozen 24-item CLIP probe):** closed straight/wavy/curly/coily vocabulary; argmax softmax confidence floor 0.35 (probe: 24/24 measured, bands 3/13/6/2, max_share 0.542 — non-degenerate; conf median 0.632 / min 0.373). Raw probabilities/logits stay payload-only.
+**Round-trip (harness-computed):** baseline context-raw-no-evidence 80 supported / 93 unsupported (ratio 0.4624) → evidence **124 supported / 47 unsupported (ratio 0.7251)**, Δ+0.2627, paired positive **17/23**, **sign-test p=0.017345 → BETTER** (inconclusive:false). 1 contradiction, 24 omissions (the CLIP band does not narrate length/arrangement — that lives on hairstyle #82). Runs: `stage-b-hair-texture-v1` (96) + `-review` (96).
+**Validation:** full pytest suite 756 passed; validate-program/validate-dimension-registry/validate-comparison-plan/validate-gpu-manifest valid. Label-sync: #94 `research:validated`, #96 `research:active`.
+
 ## 2026-08-10 — arm #97 garment-type — `[EMPIRICAL RUN COMPLETE — VERDICT: BETTER (strike-1 → honest revision-2)]`
 
 **Date:** 2026-08-10 (frozen-cohort calibration probe → freeze v1 → 96-caption generation → independent review → strike-1 NOT_BETTER → freeze v2 (absence-verbalization recovery) → 96-caption generation → independent review → deterministic tick BETTER)
