@@ -135,7 +135,7 @@ def main() -> int:
         "manifest_state": "approved",
         "maximum_duration": "2h",
         "output_root": str(OUTPUT_ROOT),
-        "requested_vram_gb": 22,
+        "requested_vram_gb": 21.0,
         "scheduler_lifecycle": ["request", "poll_and_claim", "launch", "verify",
                                 "activate", "heartbeat", "release"],
         "scheduler_project": "stratum-contextual-specialist-research",
