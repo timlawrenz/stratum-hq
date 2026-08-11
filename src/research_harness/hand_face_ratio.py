@@ -41,12 +41,12 @@ Measurement (scale-invariant, from the 2D meshes):
   confounded) — otherwise abstain with a surfaced reason.
 
 Verbalized band (item level, coarse): small / typical / large, read from the
-hand_face_ratio at PROVISIONAL canon-derived cuts (SMALL_MAX / LARGE_MIN
-below) pending the frozen-cohort calibration probe (deferred behind hold
-#132: 2 of 24 frozen sources are currently purged from approved/); the probe
-will set the authoritative cohort tercile cuts via set_band_floors(), exactly
-as nose-geometry #121 / lip-fullness #122 / eye-shape #123 do. No
-effectiveness claim is permitted (qualification gate unopened).
+hand_face_ratio at COHORT-CALIBRATED tercile cuts (SMALL_MAX / LARGE_MIN
+below, set 2026-08-11 from the frozen-cohort calibration probe artifact
+/mnt/nas-ai-models/research/stratum/hand-face-ratio-calibration-probe.json;
+10/24 measured — hands out of frame/occluded on the rest, honest abstention —
+split 3/3/4, max_share 0.40), exactly as nose-geometry #121 / lip-fullness
+#122 / eye-shape #123 did.
 
 Abstention: no face detected on full frame or the seg2 Face_Neck crop
 (mapped to full-frame px), no hand detected on the full frame or the 2x
@@ -352,16 +352,24 @@ def compute_hand_face_ratio(
 
 
 # ---------------------------------------------------------------------------
-# Band floors — PROVISIONAL canon-derived cuts (2026-08-11), disclosed as
-# placeholder pending the frozen-cohort calibration probe (deferred behind
-# hold #132: 2 of 24 frozen sources are purged from approved/, so the probe
-# cannot run on the full cohort yet). The probe will set the authoritative
-# cohort tercile cuts via set_band_floors() / a constant update, following
-# the nose-geometry #121 pattern. Until the probe runs, no effectiveness
-# claim is permitted (qualification gate unopened).
+# Band floors — COHORT-CALIBRATED tercile cuts (2026-08-11, frozen-cohort
+# calibration probe, artifact
+# /mnt/nas-ai-models/research/stratum/hand-face-ratio-calibration-probe.json:
+# 10/24 measured, 14 honest abstains (no hand / no face detected — hands
+# turned away, occluded, or out of frame on this portrait/crop-heavy cohort;
+# consistent with the hand-gesture #109 probe), measured ratio range
+# 0.4146-0.8387). The probe's p33/p66 cuts split the measured cohort
+# 3 small / 3 typical / 4 large (max_share 0.40); the provisional canon cuts
+# (0.65/1.00) were non-degenerate (0.50) but no measured item clears 1.00,
+# so the "large" band could never fire. Authoritative cuts below are the
+# measured cohort terciles, following the nose-geometry #121 pattern
+# (measured 7/7/7 at p33/p66 cuts). Bands are corpus-relative within the
+# frozen cohort; the qualification gate (no band >= 75%) passes at max_share
+# 0.40. Coverage disclosure: only 10/24 (41.7%) items are measurable; the
+# axis abstains honestly elsewhere.
 # ---------------------------------------------------------------------------
-SMALL_MAX = 0.65   # palm-length/face-width below this -> small / delicate hands
-LARGE_MIN = 1.00   # above this -> large hands
+SMALL_MAX = 0.571   # palm-length/face-width below this -> small / delicate hands (cohort p33)
+LARGE_MIN = 0.690   # above this -> large hands (cohort p66)
 
 
 def set_band_floors(small_max: float, large_min: float) -> None:
