@@ -23,7 +23,7 @@
       "top_p": 1.0
     },
     "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
-    "git_commit": "cb8f7f23993d24a91425c54ca092ebc1450766d0",
+    "git_commit": "66df9abd18fc7e70756a8bf060ec6a08bc238c38",
     "launcher_source_sha256": "a05b0ea273cab2dffee66cb1072a88c6f336119dfe8caf003b4753cd5400cbd5",
     "model_digest": "a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203",
     "model_name": "gemma3:27b",
@@ -36,7 +36,7 @@
   "manifest_state": "approved",
   "maximum_duration": "2h",
   "output_root": "/mnt/nas-ai-models/research/stratum/stage-b-eyebrow-position-v1",
-  "requested_vram_gb": 22,
+  "requested_vram_gb": 21.0,
   "scheduler_lifecycle": [
     "request",
     "poll_and_claim",
