@@ -1,0 +1,720 @@
+{
+  "adversarial_review": {
+    "checks": [
+      "metric_definition_stable",
+      "fresh_process_or_second_review",
+      "edge_case_inspection"
+    ],
+    "planned": true
+  },
+  "candidate_manifest_fingerprint": "b18843c759a8b93165a1261350ac46feea7cc62df787d44d4beb0ef9bc4b132d",
+  "comparison_plan_fingerprint": "e9b6a4dea920e2da98d277bc9dd73084e8ae64b3b9316c0a91cd8405a36b1286",
+  "comparison_plan_id": "stage-b-first500-garment-type-v1",
+  "conditions": [
+    {
+      "aggregator": {
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
+        "local_only": true,
+        "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
+      },
+      "evidence": {
+        "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
+        "id": "no-specialist-evidence-v1",
+        "kind": "none"
+      },
+      "id": "legacy-bucketed-no-evidence",
+      "input_view": {
+        "fingerprint": "cec37582ecdd8eafbd8a035087afc7c9ebf224be40b098bea881741976ca0370",
+        "id": "legacy-bucketed-crop-view-v1"
+      },
+      "pilot_manifest_id": "first500-coverage-balanced-candidate-v1",
+      "prompt": {
+        "fingerprint": "f876d8f8ddb1106cbd7f7042b9aacc5bd08d382039794a8cd76051c09217f10c",
+        "id": "legacy-caption-prompt-v1"
+      }
+    },
+    {
+      "aggregator": {
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
+        "local_only": true,
+        "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
+      },
+      "evidence": {
+        "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
+        "id": "no-specialist-evidence-v1",
+        "kind": "none"
+      },
+      "id": "legacy-raw-no-evidence",
+      "input_view": {
+        "fingerprint": "a1d07de4f5543f36946197dbe37ddb94f71b2213006fc866763de754535b0281",
+        "id": "raw-source-view-v1"
+      },
+      "pilot_manifest_id": "first500-coverage-balanced-candidate-v1",
+      "prompt": {
+        "fingerprint": "f876d8f8ddb1106cbd7f7042b9aacc5bd08d382039794a8cd76051c09217f10c",
+        "id": "legacy-caption-prompt-v1"
+      }
+    },
+    {
+      "aggregator": {
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
+        "local_only": true,
+        "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
+      },
+      "evidence": {
+        "fingerprint": "cd9c3f158ea86513eddc8d1e2e3a77bc55c1dc94b59b092154c384b2259e2a80",
+        "id": "no-specialist-evidence-v1",
+        "kind": "none"
+      },
+      "id": "context-raw-no-evidence",
+      "input_view": {
+        "fingerprint": "a1d07de4f5543f36946197dbe37ddb94f71b2213006fc866763de754535b0281",
+        "id": "raw-source-view-v1"
+      },
+      "pilot_manifest_id": "first500-coverage-balanced-candidate-v1",
+      "prompt": {
+        "fingerprint": "7242c5af5d81fc824d2ca86c3c711cd8bd7ccf4dc774e08ef83baa306f97b344",
+        "id": "context-grounded-prompt-v1"
+      }
+    },
+    {
+      "aggregator": {
+        "generation_fingerprint": "151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec",
+        "local_only": true,
+        "model_id": "local-ollama-gemma3-27b-a418f5838eaf",
+        "provenance": "Already-installed local Ollama model gemma3:27b digest a418f5838eaf7fe2cfe0a3046c8384b68ba43a4435542c942f9db00a5f342203; loopback endpoint http://127.0.0.1:11434/api/generate; fixed request settings fingerprint 151ece16891bc55bf0f98b1ab9a3d8375df1e05138e053ec90c632f7a27c1cec."
+      },
+      "evidence": {
+        "fingerprint": "ad13b476221df3adc382d1956874559b911f05c5cdfb8c1a0b81c18888addecd",
+        "id": "in-memory-garment-type-v1",
+        "kind": "specialist_bundle",
+        "specialists": [
+          {
+            "abstention_policy": "Abort the selected item before model generation if required artifacts are missing, unreadable, or detector count is not exactly one; abstain when clothing/apparel classes are absent or degenerate (e.g. fully unclothed subject with no garment classes); never fabricate a garment type; detector disagreement remains a quality anomaly, never prompt content.",
+            "id": "in-memory-garment-type-v1",
+            "inputs": "Frozen selected-item seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing + skin classes); recomputed in memory during this bounded run with no crawlr/stratum write; no new model (CPU).",
+            "known_failure_modes": "24/24 frozen items measured (band-dominant distribution upper-lower-covered 7 / upper-only 3 / lower-only 4 / skin-dominant 10, max_share 0.42). Apparel is ambiguous (dress vs top): its lower-half pixels count toward the lower garment (dress reaching the lower body); a tight crop that excludes the lower body cannot assert lower coverage. The band is a coarse silhouette category, not ground truth: 'skin-dominant' means no garment region cleared the calibrated floor, not that the subject is nude.",
+            "output_semantics": "Provenance-bearing coarse garment-type band (upper-lower-covered / upper-only / lower-only / skin-dominant) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw class-coverage ratios stay in the machine-readable payload.",
+            "provenance": "research_harness.garment_type.compute_garment_type SHA-256 e84371e229240b607dc6a8be98548ded776379e94ced23d010312cefb4cbf12e; computed in memory during this bounded run with no crawlr/stratum write.",
+            "qualification_gate": "Candidate evidence only; no effectiveness claim is permitted until the frozen comparison receives completed rubric and adversarial reviews.",
+            "scope": "Scale-invariant garment-type / silhouette-category measurement from seg2 DOME-29 clothing classes only: upper garment present / lower garment present / skin-dominant coarse band (upper-lower-covered / upper-only / lower-only / skin-dominant), or an honest abstention. Never color, identity, or absolute-pixel claims; only the scale-invariant coarse band in prose. Band-degeneracy recovery: on-paper presence floors were calibrated from the frozen-cohort probe (2026-08-08) so no single band takes >=75% of measured items."
+          }
+        ]
+      },
+      "id": "context-raw-garment-type",
+      "input_view": {
+        "fingerprint": "a1d07de4f5543f36946197dbe37ddb94f71b2213006fc866763de754535b0281",
+        "id": "raw-source-view-v1"
+      },
+      "pilot_manifest_id": "first500-coverage-balanced-candidate-v1",
+      "prompt": {
+        "fingerprint": "7242c5af5d81fc824d2ca86c3c711cd8bd7ccf4dc774e08ef83baa306f97b344",
+        "id": "context-grounded-prompt-v1"
+      }
+    }
+  ],
+  "contrasts": [
+    {
+      "baseline_condition": "legacy-bucketed-no-evidence",
+      "changed_axes": [
+        "input_view"
+      ],
+      "id": "input-view-only",
+      "variant_condition": "legacy-raw-no-evidence"
+    },
+    {
+      "baseline_condition": "legacy-raw-no-evidence",
+      "changed_axes": [
+        "prompt"
+      ],
+      "id": "prompt-only",
+      "variant_condition": "context-raw-no-evidence"
+    },
+    {
+      "baseline_condition": "context-raw-no-evidence",
+      "changed_axes": [
+        "evidence"
+      ],
+      "id": "evidence-only",
+      "variant_condition": "context-raw-garment-type"
+    }
+  ],
+  "evidence_input_artifact_sha256": {
+    "03r1r5psuxprfkhomitcz5vh9w1c": {
+      "seg2.npy": "701e3bd3523a441a6751f7b99355dfd0bface2d4c39835bba0eb4844951506e3"
+    },
+    "058v0mg1bbxthvatdw324k8j4b0s": {
+      "seg2.npy": "57b1f14ed1d5f009ba25415805020082497acc11106316d32f2e0ab7951f6611"
+    },
+    "07hyx5wjk5rc339v2s3e2orcoorr": {
+      "seg2.npy": "c7b851daa4ba1a603121e07d3fc6bd6f7e93610472937c334ae0d440c873d4ff"
+    },
+    "08v25q5524t2u0zl0xtnzi6bd22f": {
+      "seg2.npy": "a78074c5ee24da66a5ace12fdd9f29044ca5124f37739ba12e244640e0dd1aed"
+    },
+    "0f3fdmh6iackl6049wmrm9n2p4i5": {
+      "seg2.npy": "f43f988df0c492dda6bbf2f1608ba312773937f83160808392e5ed6a360a7a44"
+    },
+    "0fcfqt21vy71t8ab83m6ger5qa51": {
+      "seg2.npy": "dd2bb2879dc82e20a4af674b92ea0621e235dee5daca8eaed6e909d8da410808"
+    },
+    "0g2l5m9heji4toxrgg3r97h1nvtx": {
+      "seg2.npy": "629ec1d53ef2d6d0815fe39a59f3a7cc9cc11020e03698a8cb28952300be867a"
+    },
+    "0g8kxl6udr09ikglg4c10kop6tpk": {
+      "seg2.npy": "9d1f577969b8f1f969dd937ebd0794ac4afd6705d8302837a8632f82451b781e"
+    },
+    "0kan9rng11ac89ydvwn2dvkdhhc0": {
+      "seg2.npy": "8b293fdc00c5a62ba2ba24acd4f44fd63e87c96e71f59d19447c3f68098ed0c2"
+    },
+    "0mel7e9c4295kqblhq2t1m3tapia": {
+      "seg2.npy": "e82ce4a3f4d55ddeb37eb5ebb04fbd6e237487b653017f154d0e810605036125"
+    },
+    "0pz1w3vec9zjl6j5lfvksmweylfi": {
+      "seg2.npy": "53e5ace6e36ba099ce3fab4ed6dd7f0bc71df784cbe40c160c5e0d3dbd949111"
+    },
+    "0qubde29fvqxk0409yyob0n1gzt6": {
+      "seg2.npy": "9be456c85f6da1dc0a213f3d5967fc2e1035890a94755bf40d2656057fabb521"
+    },
+    "0r8dpy33jjo3i1zy2cslr4hczcjc": {
+      "seg2.npy": "a2abdb1d49de5b6d697cc155cbe2a230ad74e7e47916b77a36b52473ee4ff8fa"
+    },
+    "0sfwjiibx5au08096c1q2hm7b3b0": {
+      "seg2.npy": "034f6965bc1db520b7008c916b934f679f0877c30a6d89a10e1cca33ce911a00"
+    },
+    "0unynvnbmepp7i2eluidlex23ljv": {
+      "seg2.npy": "f4439934e1dc7873b407c36137e6776c661209e972a3c3498ef113ced239d539"
+    },
+    "0wl1eel9qnbqryxdc9mnsug2tl1h": {
+      "seg2.npy": "faf991efbc8bcfa664e8bba2b5cbef65ae50619f1ca23ebde0b22acbf8f703c0"
+    },
+    "0yo0gxbfflugqp205k128kktigl5": {
+      "seg2.npy": "924539f3f64ab9a9c88de57dec418d3ca721244a066dbc60b5ed5eaa1e0dc5f5"
+    },
+    "0yoko8kx3qlne0zvyj6n6xio5ybk": {
+      "seg2.npy": "c9dadf391ef2cf7456ea07e15f91795f08b9b7f2ac2eefc0289a490bb2fa2ec2"
+    },
+    "0yruw87yrt13y2x34cd9axa30rpf": {
+      "seg2.npy": "c0d83da409a43bef5b2bd4a9352c8f52e5b5c4d4a07fbbe6ba0950c837966163"
+    },
+    "13geqw0wbpj5xn7s039s19b3nr8c": {
+      "seg2.npy": "fa2ccb8c49a6966cb61e11a0c9880890953d3c2eb913f5431f3a0cbbd1b5b4a0"
+    },
+    "1528uwbe625j5vxxawhj1kl3xehq": {
+      "seg2.npy": "1a66609c075aa39088bc16783ff07d2f046828f3aa2c761de5d68300e66c8eec"
+    },
+    "16sig69gmpxqhj6etqmacae9wy6m": {
+      "seg2.npy": "2d9e76f79eda6fe629f37712d3490ecff63875a51e8ae9f8023141688136698a"
+    },
+    "18lqopa4mhwrj0abx8dehy4zka60": {
+      "seg2.npy": "737d76d506c66870f26644d84a91da05cb07eb1901c7c826d138b3c0b9c1bb99"
+    },
+    "1dkimn0kiybqt81w9apn0on6ccuq": {
+      "seg2.npy": "53aa6ffac61c4efe722f1c99467ed428d261d448ed30eae27c8ce140c91d06d9"
+    }
+  },
+  "falsified_if": "The garment-type evidence condition does not reduce unsupported garment-category claims or increase supported claims versus its matched no-evidence baseline, or the garment-type bands collapse (a single band taking >=75% of measured items), or the axis is redundant with clothing #29 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+  "hypothesis": "For the frozen coverage-balanced first-500 cohort, declared deterministic garment-type / silhouette-category measurement (scale-invariant upper/lower garment split from seg2 DOME-29 clothing classes; CPU, no new model) may reduce unsupported 'wearing a top / dressed / leggings' garment-category claims in captions versus its matched no-evidence baseline when the source item, view, prompt template, local model, and generation settings are controlled.",
+  "kind": "comparison-parity-plan",
+  "metric_self_audit": {
+    "before_comparative_inference": true,
+    "evaluator_version": "claim-support-rubric-v1",
+    "known_case_item_id": "0yo0gxbfflugqp205k128kktigl5",
+    "null_output_id": "empty-caption-null-v1"
+  },
+  "metric_version": "claim-support-rubric-v1",
+  "parent_issue": 4,
+  "pilot_manifest": {
+    "coverage_notes": "All frozen rows have readable existing core artifacts; existing determinations/caption2/t52 files are not used as evidence inputs. Garment type is computed in memory from the frozen selected seg2.npy (DOME-29 Apparel + Upper/Lower_Clothing + skin classes) only \u2014 no new model, CPU only. Only the scale-invariant coarse band (upper-lower-covered / upper-only / lower-only / skin-dominant) is verbalized; raw class-coverage ratios stay in evidence_payload and are never caption claims. Band calibration (measured 2026-08-08 frozen-cohort probe): 24/24 measured, distribution upper-lower-covered 7 / upper-only 3 / lower-only 4 / skin-dominant 10 (max_share 0.42, no band >= 75%).",
+    "frozen": true,
+    "id": "first500-coverage-balanced-candidate-v1",
+    "items": [
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0yo0gxbfflugqp205k128kktigl5",
+        "source_relative_path": "0yo0gxbfflugqp205k128kktigl5.jpg",
+        "source_sha256": "380ea071346fd398680fc60adf2c2a1f4d6fc2baf0346cec69a19441ae3d0326"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0yruw87yrt13y2x34cd9axa30rpf",
+        "source_relative_path": "0yruw87yrt13y2x34cd9axa30rpf.jpg",
+        "source_sha256": "0b033f7a98ce9f754b504c881d4f6a223587762150252c6d9adb35f01c432260"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "18lqopa4mhwrj0abx8dehy4zka60",
+        "source_relative_path": "18lqopa4mhwrj0abx8dehy4zka60.jpg",
+        "source_sha256": "ecec0dcd7c17bf647cfc6cc6c447f2d65c2af81202304d0d031cd55a14158e0a"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0wl1eel9qnbqryxdc9mnsug2tl1h",
+        "source_relative_path": "0wl1eel9qnbqryxdc9mnsug2tl1h.jpg",
+        "source_sha256": "990d1ec8a5c5b68f2a3e6f370084e3a1f603bd4025ed48ce9f186c138f47277e"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0qubde29fvqxk0409yyob0n1gzt6",
+        "source_relative_path": "0qubde29fvqxk0409yyob0n1gzt6.jpg",
+        "source_sha256": "0045f59cc433cbdf18cd879464aba5e50ecc1d402e3944c8a9dc337911d32ab0"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0fcfqt21vy71t8ab83m6ger5qa51",
+        "source_relative_path": "0fcfqt21vy71t8ab83m6ger5qa51.jpg",
+        "source_sha256": "920cbf9211ef1719f1fe6464a7e2c7afc361a56fa26506a82b4b4fc20da0179c"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0sfwjiibx5au08096c1q2hm7b3b0",
+        "source_relative_path": "0sfwjiibx5au08096c1q2hm7b3b0.jpg",
+        "source_sha256": "1651ea76bf38a27c17323238d16ad84891dcf1a22bed445b6eab950b35aa1956"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0r8dpy33jjo3i1zy2cslr4hczcjc",
+        "source_relative_path": "0r8dpy33jjo3i1zy2cslr4hczcjc.jpg",
+        "source_sha256": "439e0a0f9e63c2718e5a614558ba1ac476714d96029e651bf44d5c13bced8619"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "1528uwbe625j5vxxawhj1kl3xehq",
+        "source_relative_path": "1528uwbe625j5vxxawhj1kl3xehq.jpg",
+        "source_sha256": "51b4d0c3d4c4a0332d70d539dc576a05007a94f5aebdce2aa1000691fe2bb6c1"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0yoko8kx3qlne0zvyj6n6xio5ybk",
+        "source_relative_path": "0yoko8kx3qlne0zvyj6n6xio5ybk.jpg",
+        "source_sha256": "80d5d7adb4049d2c0166a32a7b8faacf1b02a008775ace44d404d8771abef4d0"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "13geqw0wbpj5xn7s039s19b3nr8c",
+        "source_relative_path": "13geqw0wbpj5xn7s039s19b3nr8c.jpg",
+        "source_sha256": "91bc0b097e1dfb0803f5c34a8e6fae08c237ce26223e36fabf3b604b09d309cd"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0unynvnbmepp7i2eluidlex23ljv",
+        "source_relative_path": "0unynvnbmepp7i2eluidlex23ljv.webp",
+        "source_sha256": "0fd6f019ed648d5270805a78ea803862c575f488ae54c27186fd292979f50321"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "1dkimn0kiybqt81w9apn0on6ccuq",
+        "source_relative_path": "1dkimn0kiybqt81w9apn0on6ccuq.jpg",
+        "source_sha256": "d38cc34667d2e9d995702f8b1e8740fbd4e4a97eea46009b8b3006fcb4c91c32"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0g2l5m9heji4toxrgg3r97h1nvtx",
+        "source_relative_path": "0g2l5m9heji4toxrgg3r97h1nvtx.jpg",
+        "source_sha256": "4c621a00472827c33477a8a4f7edcaf767c0879a30a8bd21c3fbc2fe23af9b95"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0f3fdmh6iackl6049wmrm9n2p4i5",
+        "source_relative_path": "0f3fdmh6iackl6049wmrm9n2p4i5.jpg",
+        "source_sha256": "ddf160ef122e097203887482486a31fa22cbe013241b4304e249eec8a2f43f58"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0pz1w3vec9zjl6j5lfvksmweylfi",
+        "source_relative_path": "0pz1w3vec9zjl6j5lfvksmweylfi.jpg",
+        "source_sha256": "4dff8a8cdf742331dfcb2146701c06b0ed2626ad357f765d812be3dae69debee"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "03r1r5psuxprfkhomitcz5vh9w1c",
+        "source_relative_path": "03r1r5psuxprfkhomitcz5vh9w1c.jpg",
+        "source_sha256": "39f9451b09205c8d35b476bfb0d3cfdd984b7908b05965f21c8bc49213b28694"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0g8kxl6udr09ikglg4c10kop6tpk",
+        "source_relative_path": "0g8kxl6udr09ikglg4c10kop6tpk.jpg",
+        "source_sha256": "4c18447bc66ab8467b175baae60304a3b215edbd7b25b1312cab38574d16e4a1"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "07hyx5wjk5rc339v2s3e2orcoorr",
+        "source_relative_path": "07hyx5wjk5rc339v2s3e2orcoorr.jpg",
+        "source_sha256": "ee09ef63f813f94fdf043dd7add86f4fd4dd6dfc35d236312e693ba34c02a8d6"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "058v0mg1bbxthvatdw324k8j4b0s",
+        "source_relative_path": "058v0mg1bbxthvatdw324k8j4b0s.png",
+        "source_sha256": "eb1eb7d2d297a0891fc4b01bc992d62c19a66067233a7f236af3a2f5e8f3527c"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "16sig69gmpxqhj6etqmacae9wy6m",
+        "source_relative_path": "16sig69gmpxqhj6etqmacae9wy6m.jpg",
+        "source_sha256": "e249dd4aee84d27d32f0bc36ee1ce0020ba37e94b0665872da426d00f87f2e36"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0mel7e9c4295kqblhq2t1m3tapia",
+        "source_relative_path": "0mel7e9c4295kqblhq2t1m3tapia.jpg",
+        "source_sha256": "24a99681bf2f93a17fdaf48281cb4cdfdccc1826eb791b535443c793131ed0be"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "08v25q5524t2u0zl0xtnzi6bd22f",
+        "source_relative_path": "08v25q5524t2u0zl0xtnzi6bd22f.jpg",
+        "source_sha256": "ed7dc84715512457ddab6b36643f02272ecda1fd23e9dbbf5c78d10bd07c2a93"
+      },
+      {
+        "artifact_availability": {
+          "caption.txt": true,
+          "caption2.txt": false,
+          "determinations.json": false,
+          "matting.npy": true,
+          "normal2.npy": true,
+          "pointmap.npy": true,
+          "pose2.npy": true,
+          "seg2.npy": true,
+          "t52_hidden.npy": false,
+          "t52_mask.npy": false,
+          "t5_hidden.npy": true,
+          "t5_mask.npy": true
+        },
+        "image_id": "0kan9rng11ac89ydvwn2dvkdhhc0",
+        "source_relative_path": "0kan9rng11ac89ydvwn2dvkdhhc0.jpg",
+        "source_sha256": "2b8b56b714c003216359f22d98389fe31512004471f3ace902c8422534c0b4b1"
+      }
+    ],
+    "selection_rationale": "The pre-frozen first-500 coverage-balanced 12 portrait / 6 squareish / 6 landscape cohort removes missing core geometry availability as a confound without claiming population representativeness.",
+    "source_root": "/mnt/nas-ai-models/training-data/crawlr/approved"
+  },
+  "program_id": "stratum-contextual-specialist-research",
+  "representation_boundary": {
+    "compact_context_routing": "out_of_scope",
+    "legacy_text_encoder_max_tokens": 512,
+    "no_silent_legacy_routing": true
+  },
+  "review_protocol": {
+    "detector_disagreement_handling": "quality_anomaly_not_caption_content",
+    "fields": [
+      "supported_claims",
+      "unsupported_claims",
+      "omissions",
+      "contradictions",
+      "abstentions"
+    ],
+    "human_review_required": true,
+    "sequence": [
+      "selected_input_view",
+      "provenance_evidence",
+      "candidate_output_or_context",
+      "decision_rubric"
+    ]
+  },
+  "schema_version": 1,
+  "status": "PENDING"
+}
