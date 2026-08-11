@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Research contract
+    url: https://github.com/timlawrenz/stratum-hq/blob/main/RESEARCH_CONTRACT.md
+    about: Read the evidence, GPU, autonomy, and hold requirements before filing an issue.
