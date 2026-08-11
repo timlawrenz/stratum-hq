@@ -55,6 +55,7 @@ from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
 from .nose_geometry import NoseGeometryError, compute_nose_geometry
+from .lip_fullness import LipFullnessError, compute_lip_fullness
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
@@ -1353,6 +1354,101 @@ def _serialize_nose_geometry(config: Mapping[str, Any] | None) -> str:
             lines.append("- the nose reads long (prominent bridge-to-tip length relative to the eyes)")
         elif lband == "average":
             lines.append("- the nose reads of average length relative to the eyes")
+    return "\n".join(lines)
+
+
+def _lip_fullness_evidence() -> dict[str, Any]:
+    """Declared deterministic lip-fullness specialist (arm #122)."""
+    module_path = Path(compute_lip_fullness.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-lip-fullness-v1",
+        "specialists": [
+            {
+                "id": "in-memory-lip-fullness-v1",
+                "scope": ("Scale-invariant lip-fullness (vertical vermilion extent / "
+                          "mouth width) of the single subject from the already-qualified "
+                          "MediaPipe FaceLandmarker 478-point mesh (same model as "
+                          "face-geometry #60 / gaze-head #68 / eyebrow-position #111 / "
+                          "nose-geometry #121): total vermilion height / outer mouth-corner "
+                          "width, banded thin/medium/full at canon-derived provisional cuts "
+                          "pending the frozen-cohort calibration probe, with honest "
+                          "abstention on no-face / occluded-mouth / implausible geometry. "
+                          "Never color, expression, or identity claims; only the coarse "
+                          "band in prose; raw ratios stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant lip-fullness band "
+                                     "(thin / medium / full) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse "
+                                     "band is verbalized; raw normalized ratios / per-item "
+                                     "mouth width stay in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.lip_fullness.compute_lip_fullness "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no hosted third-party inference of the sensitive "
+                    "corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop (measured union policy) "
+                                      "or the mouth width / fullness ratio is degenerate; never "
+                                      "fabricate a lip read; detector disagreement remains a "
+                                      "quality anomaly, never prompt content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection on the "
+                                        "facemesh arms bounds it); turned heads / occluded mouths "
+                                        "/ extreme DOF abstain; the band cuts are canon-derived "
+                                        "provisionals pending the frozen-cohort calibration "
+                                        "probe (deferred behind hold #132 — 2 of 24 frozen "
+                                        "sources purged from approved/) and will be re-cut at "
+                                        "the cohort terciles exactly as nose-geometry #121 did; "
+                                        "a tight closed-mouth smile compresses vermilion height "
+                                        "and reads thinner, which the probe audit must "
+                                        "characterize."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_lip_fullness(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a lip-fullness dict.
+
+    Verbalizes ONLY the coarse band (thin / medium / full). Raw normalized
+    ratios stay in the machine-readable evidence_payload JSON and are never
+    caption claims.
+    """
+    lines = ["LIP-FULLNESS (vertical vermilion extent vs mouth width, scale-invariant):"]
+    if not config:
+        lines.append("- lip-fullness not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "lip fullness not measurable"
+        lines.append(f"- lip-fullness abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- lip-fullness measured but not banded (payload)")
+        return "\n".join(lines)
+    band = config.get("lip_fullness_band")
+    if band == "thin":
+        lines.append("- the lips are thin (short vermilion relative to mouth width)")
+    elif band == "full":
+        lines.append("- the lips are full (tall vermilion relative to mouth width)")
+    elif band == "medium":
+        lines.append("- the lips are of medium fullness relative to mouth width")
     return "\n".join(lines)
 
 
@@ -3163,6 +3259,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "nose-geometry": ("seg2.npy",),
+    # Arm #122 lip-fullness: deterministic vermilion-extent band from the
+    # LOCAL MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "lip-fullness": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
     # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
     # full-frame source RGB (SHA-bound via the item's source_sha256). No
@@ -3350,6 +3453,7 @@ def build_stage_b_plan(
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "eyebrow-position",
         "nose-geometry",
+        "lip-fullness",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
@@ -3748,6 +3852,50 @@ def build_stage_b_plan(
             "length bands 7/7/7 at the cohort tercile cuts (max_share 0.3333, no band >= "
             "75%), the 3 abstains are the same turned-head / no-face-region items the "
             "facemesh cohort already reports."
+        )
+    elif evidence_kind == "lip-fullness":
+        evidence = _lip_fullness_evidence()
+        evidence_condition_id = "context-raw-lip-fullness"
+        comparison_plan_id = "stage-b-first500-lip-fullness-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "lip-fullness measurement (scale-invariant vertical vermilion extent / outer "
+            "mouth-corner width from the local open-weight MediaPipe FaceLandmarker "
+            "478-point mesh over the full frame / seg2 Face_Neck crop, union detection "
+            "policy, banded thin/medium/full at canon-derived provisional cuts pending "
+            "the frozen-cohort calibration probe; NEW evidence part registered 2026-08-11 "
+            "via the gated propose-dimensions channel, exploitative selection; CPU, "
+            "reuses the already-qualified arm #60 model) may reduce unsupported "
+            "lip-shape claims ('full lips', 'thin lips', 'pouty lips') that the "
+            "facial-expression #81 axis (mouth-corner spread/smile) and the blocked "
+            "lip-color #107 axis (band homogeneity) cannot ground, versus the matched "
+            "no-evidence baseline when the source item, view, prompt template, local "
+            "model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The lip-fullness evidence condition does not reduce unsupported lip claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the "
+            "lip bands collapse (a single band taking >=75% of measured items), or the "
+            "axis is redundant with facial-expression #81 / lip-color #107 (degenerate), "
+            "or an apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence inputs for "
+            "the lip-fullness measurement (pose2 stays a validation-only read for the "
+            "exactly-one-subject invariant). Lip fullness is computed in memory from the "
+            "frozen selected seg2.npy (DOME-29 Face_Neck mask) + the already-decoded source "
+            "RGB via the local open-weight MediaPipe FaceLandmarker (Apache-2.0, owned "
+            "hardware, CPU, tasks API; model face_landmarker.task sha256 64184e229b..., the "
+            "same model as arm #60). Only the coarse scale-invariant band (thin / medium / "
+            "full) is verbalized; raw normalized ratios / per-item mouth width stay in "
+            "evidence_payload and are never caption claims. Band calibration: PROVISIONAL "
+            "canon-derived cuts (THIN_MAX 0.35 / FULL_MIN 0.50 on vermilion-height / "
+            "mouth-width) pending the frozen-cohort calibration probe — deferred behind "
+            "hold #132 (2 of 24 frozen sources purged from approved/, every Stage-B arm's "
+            "preflight gated); the probe will set cohort-tercile cuts via "
+            "set_band_floors()/constant update exactly as nose-geometry #121 did, and the "
+            "round trip runs only after the gate clears."
         )
     elif evidence_kind == "object-relations":
         evidence = _object_relations_evidence()
@@ -4777,6 +4925,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "eyebrow-position"
     elif "context-raw-nose-geometry" in condition_ids:
         rebuild_kind = "nose-geometry"
+    elif "context-raw-lip-fullness" in condition_ids:
+        rebuild_kind = "lip-fullness"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
@@ -4890,6 +5040,7 @@ def _load_selected_item(
     include_face_geometry: bool = False,
     include_eyebrow_position: bool = False,
     include_nose_geometry: bool = False,
+    include_lip_fullness: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_image_quality: bool = False,
@@ -5049,6 +5200,17 @@ def _load_selected_item(
         except NoseGeometryError as exc:
             raise StageBRunError(
                 f"nose-geometry abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    lip_fullness = None
+    if include_lip_fullness:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            lip_fullness = compute_lip_fullness(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except LipFullnessError as exc:
+            raise StageBRunError(
+                f"lip-fullness abort for frozen selected item {image_id}: {exc}"
             ) from exc
     object_relations = None
     if include_object_relations:
@@ -5275,6 +5437,7 @@ def _load_selected_item(
         "face_geometry": face_geometry,
         "eyebrow_position": eyebrow_position,
         "nose_geometry": nose_geometry,
+        "lip_fullness": lip_fullness,
         "object_relations": object_relations,
         "scene_category": scene_category,
         "image_quality": image_quality,
@@ -5485,6 +5648,10 @@ def _render_condition(
         nose_geometry = prepared.get("nose_geometry")
         evidence_text = _serialize_nose_geometry(nose_geometry)
         return raw.copy(), _context_prompt(evidence_text), nose_geometry
+    if condition_id == "context-raw-lip-fullness":
+        lip_fullness = prepared.get("lip_fullness")
+        evidence_text = _serialize_lip_fullness(lip_fullness)
+        return raw.copy(), _context_prompt(evidence_text), lip_fullness
     if condition_id == "context-raw-object-relations":
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
@@ -5769,6 +5936,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-nose-geometry"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #122: only the lip-fullness run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_lip_fullness = any(
+        str(condition.get("id")) == "context-raw-lip-fullness"
+        for condition in (plan.get("conditions") or [])
+    )
     include_object_relations = any(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
@@ -5927,6 +6101,7 @@ def execute_stage_b(
             include_face_geometry=include_face_geometry,
             include_eyebrow_position=include_eyebrow_position,
             include_nose_geometry=include_nose_geometry,
+            include_lip_fullness=include_lip_fullness,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_image_quality=include_image_quality,
