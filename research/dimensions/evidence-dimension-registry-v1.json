@@ -1126,7 +1126,7 @@
       "id": "eyebrow-position",
       "name": "Eyebrow elevation / position (neutral, raised, furrowed)",
       "arm_issue": 111,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A deterministic eyebrow-position measurement (NEW evidence part eyebrow-position, from the already-validated open-weight MediaPipe FaceLandmarker 478-point mesh eyebrow landmarks, local CPU, normalized to the eye-line) that emits a scale-invariant neutral / raised / furrowed band reduces unsupported 'raised eyebrows / furrowed brow' expression-adjacent claims that the validated facial-expression #81 axis (mouth-corner based) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The eyebrow-position evidence condition does not reduce unsupported brow claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with facial-expression #81 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
@@ -1155,7 +1155,7 @@
       "id": "jewelry",
       "name": "Jewelry presence (earrings, necklace) via CLIP zero-shot on ear/neck crops",
       "arm_issue": 112,
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A jewelry-presence measurement (NEW evidence part jewelry + NEW MODEL CLASS CLIP ViT-L/14 zero-shot over seg2-defined ear/neck crop regions, openai/clip-vit-large-patch14, MIT, local CPU) that emits a scale-invariant earrings/necklace present-or-absent band reduces unsupported 'wearing earrings / a necklace / jewelry' accessory claims that the validated object-relations #61 axis (closed-scene vocab) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The jewelry evidence condition does not reduce unsupported accessory claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (e.g. 0/24 earrings — a single band >=75%), or the axis is redundant with object-relations #61 or garment-type #97 (degenerate), or the CLIP specialist fails qualification, or an apparent difference is attributable to an uncontrolled change.",
@@ -1224,7 +1224,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 34,
+  "selection_progress": 35,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1405,6 +1405,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 30
+    },
+    {
+      "arm_id": "eyebrow-position",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 31
     }
   ]
 }
