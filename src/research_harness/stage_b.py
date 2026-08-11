@@ -57,6 +57,7 @@ from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
 from .nose_geometry import NoseGeometryError, compute_nose_geometry
 from .lip_fullness import LipFullnessError, compute_lip_fullness
 from .eye_shape import EyeShapeError, compute_eye_shape
+from .eyebrow_thickness import EyebrowThicknessError, compute_eyebrow_thickness
 from .hand_face_ratio import (
     HandFaceRatioError,
     compute_hand_face_ratio,
@@ -1558,6 +1559,111 @@ def _serialize_eye_shape(config: Mapping[str, Any] | None) -> str:
         lines.append("- the eyes are round (tall fissure relative to width)")
     elif band == "medium":
         lines.append("- the eyes are of medium roundness (typical fissure aspect)")
+    return "\n".join(lines)
+
+
+def _eyebrow_thickness_evidence() -> dict[str, Any]:
+    """Declared deterministic eyebrow-thickness specialist (arm #127)."""
+    module_path = Path(compute_eyebrow_thickness.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-eyebrow-thickness-v1",
+        "specialists": [
+            {
+                "id": "in-memory-eyebrow-thickness-v1",
+                "scope": ("Scale-invariant eyebrow-thickness (vertical extent of the "
+                          "brow band — upper arc above the eye line minus lower edge "
+                          "above the eye line, normalized by the ipsilateral eye width) "
+                          "of the single subject from the already-qualified MediaPipe "
+                          "FaceLandmarker 478-point mesh (same model as face-geometry "
+                          "#60 / gaze-head #68 / eyebrow-position #111 / nose-geometry "
+                          "#121 / lip-fullness #122 / eye-shape #123): mean over the "
+                          "brow arc positions, banded thin/medium/thick at "
+                          "canon-derived provisional cuts pending the frozen-cohort "
+                          "calibration probe, with honest abstention on no-face / "
+                          "degenerate-occluded brow landmarks (including bangs-hair "
+                          "coverage) / implausible extents. Never elevation, identity, "
+                          "or expression claims; only the coarse band in prose; raw "
+                          "ratios stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant eyebrow-thickness band "
+                                     "(thin / medium / thick) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse "
+                                     "band is verbalized; raw normalized ratios / per-side "
+                                     "payloads stay in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.eyebrow_thickness.compute_eyebrow_thickness "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no hosted third-party inference of the sensitive "
+                    "corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop (measured union policy) "
+                                      "or the eye width / brow landmarks are degenerate-occluded "
+                                      "(bangs-hair coverage included) or the per-pair extents are "
+                                      "implausible; never fabricate a thickness read; detector "
+                                      "disagreement remains a quality anomaly, never prompt "
+                                      "content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection on the "
+                                        "facemesh arms bounds it); bangs-forehead #110 overlap "
+                                        "can occlude the brow landmarks and is surfaced as an "
+                                        "honest abstention (never guessed); the registry wording "
+                                        "says 'eye height' but the normalizer is the ipsilateral "
+                                        "eye WIDTH (the same face-anchored scale as "
+                                        "eyebrow-position #111) — fissure height collapses with "
+                                        "eyelid state (eye-openness #113) and would couple the "
+                                        "read to eyelid aperture (disclosed, not a silent "
+                                        "deviation); the band cuts are canon-derived provisionals "
+                                        "pending the frozen-cohort calibration probe (deferred "
+                                        "behind hold #132 — 2 of 24 frozen sources purged from "
+                                        "approved/) and will be re-cut at the cohort terciles "
+                                        "exactly as eyebrow-position #111 did."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_eyebrow_thickness(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an eyebrow-thickness dict.
+
+    Verbalizes ONLY the coarse band (thin / medium / thick). Raw normalized
+    ratios / per-side payloads stay in the machine-readable evidence_payload
+    JSON and are never caption claims.
+    """
+    lines = ["EYEBROW-THICKNESS (brow vertical extent vs eye width, scale-invariant):"]
+    if not config:
+        lines.append("- eyebrow-thickness not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "brow thickness not measurable"
+        lines.append(f"- eyebrow-thickness abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- eyebrow-thickness measured but not banded (payload)")
+        return "\n".join(lines)
+    band = config.get("eyebrow_thickness_band")
+    if band == "thin":
+        lines.append("- the eyebrows are thin (small vertical extent)")
+    elif band == "thick":
+        lines.append("- the eyebrows are thick (large vertical extent)")
+    elif band == "medium":
+        lines.append("- the eyebrows are of medium thickness (typical vertical extent)")
     return "\n".join(lines)
 
 
@@ -3465,6 +3571,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "eye-shape": ("seg2.npy",),
+    # Arm #127 eyebrow-thickness: deterministic brow-vertical-extent band from
+    # the LOCAL MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "eyebrow-thickness": ("seg2.npy",),
     # Arm #124 hand-face-ratio: deterministic relational hand-size band from
     # the LOCAL MediaPipe HandLandmarker (arm #109) + FaceLandmarker (arm
     # #60) over the full frame + seg2 Face_Neck crop fallback + the
@@ -3660,6 +3773,7 @@ def build_stage_b_plan(
         "nose-geometry",
         "lip-fullness",
         "eye-shape",
+        "eyebrow-thickness",
         "hand-face-ratio",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
@@ -4154,6 +4268,58 @@ def build_stage_b_plan(
             "validated — eye_spacing 0.445/0.475) and is NOT claimed by this arm "
             "(falsified_if non-redundance); the verbalized set is almond / medium / "
             "round on the fissure aspect."
+        )
+    elif evidence_kind == "eyebrow-thickness":
+        evidence = _eyebrow_thickness_evidence()
+        evidence_condition_id = "context-raw-eyebrow-thickness"
+        comparison_plan_id = "stage-b-first500-eyebrow-thickness-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "eyebrow-thickness measurement (scale-invariant vertical extent of the brow "
+            "band — upper brow arc above the eye line minus lower brow edge above the "
+            "eye line, normalized by the ipsilateral eye width — per side from the local "
+            "open-weight MediaPipe FaceLandmarker 478-point mesh over the full frame / "
+            "seg2 Face_Neck crop, union detection policy, banded thin/medium/thick at "
+            "canon-derived provisional cuts pending the frozen-cohort calibration probe; "
+            "NEW evidence part registered 2026-08-11 via the gated propose-dimensions "
+            "channel, exploitative selection; CPU, reuses the already-qualified arm #60 "
+            "model) may reduce unsupported brow-thickness claims ('thick brows', 'thin "
+            "brows') that the eyebrow-position #111 axis (brow ELEVATION) cannot ground, "
+            "versus the matched no-evidence baseline when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The eyebrow-thickness evidence condition does not reduce unsupported "
+            "brow-thickness claims or increase supported claims versus its matched "
+            "no-evidence baseline, or the bands collapse (a single band taking >=75% of "
+            "measured items), or the axis is redundant with eyebrow-position #111 "
+            "(degenerate), or an apparent difference is attributable to an uncontrolled "
+            "change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs for the eyebrow-thickness measurement (pose2 stays a validation-only "
+            "read for the exactly-one-subject invariant). Brow thickness is computed in "
+            "memory from the frozen selected seg2.npy (DOME-29 Face_Neck mask) + the "
+            "already-decoded source RGB via the local open-weight MediaPipe "
+            "FaceLandmarker (Apache-2.0, owned hardware, CPU, tasks API; model "
+            "face_landmarker.task sha256 64184e229b..., the same model as arm #60). "
+            "Only the coarse scale-invariant band (thin / medium / thick) is verbalized; "
+            "raw normalized ratios / per-side payloads / eye widths stay in "
+            "evidence_payload and are never caption claims. Normalizer disclosure: the "
+            "registry wording says 'eye height', but the ipsilateral eye WIDTH (the "
+            "same face-anchored scale as eyebrow-position #111) is the normalizer — "
+            "fissure height collapses with eyelid state (eye-openness #113) and would "
+            "couple the read to eyelid aperture, so it is not used. Abstention surfaced "
+            "for bangs-forehead #110 overlap (occluded brow landmarks), never guessed. "
+            "Band calibration: PROVISIONAL canon-derived cuts (THIN_MAX 0.15 / THICK_MIN "
+            "0.25 on brow vertical extent / eye width) pending the frozen-cohort "
+            "calibration probe — deferred behind hold #132 (2 of 24 frozen sources "
+            "purged from approved/, every Stage-B arm's preflight gated); the probe "
+            "will set cohort-tercile cuts via set_band_floors()/constant update exactly "
+            "as eyebrow-position #111 did, and the round trip runs only after the gate "
+            "clears."
         )
     elif evidence_kind == "hand-face-ratio":
         evidence = _hand_face_ratio_evidence()
@@ -5238,6 +5404,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "lip-fullness"
     elif "context-raw-eye-shape" in condition_ids:
         rebuild_kind = "eye-shape"
+    elif "context-raw-eyebrow-thickness" in condition_ids:
+        rebuild_kind = "eyebrow-thickness"
     elif "context-raw-hand-face-ratio" in condition_ids:
         rebuild_kind = "hand-face-ratio"
     elif "context-raw-object-relations" in condition_ids:
@@ -5355,6 +5523,7 @@ def _load_selected_item(
     include_nose_geometry: bool = False,
     include_lip_fullness: bool = False,
     include_eye_shape: bool = False,
+    include_eyebrow_thickness: bool = False,
     include_hand_face_ratio: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
@@ -5537,6 +5706,17 @@ def _load_selected_item(
         except EyeShapeError as exc:
             raise StageBRunError(
                 f"eye-shape abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    eyebrow_thickness = None
+    if include_eyebrow_thickness:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            eyebrow_thickness = compute_eyebrow_thickness(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except EyebrowThicknessError as exc:
+            raise StageBRunError(
+                f"eyebrow-thickness abort for frozen selected item {image_id}: {exc}"
             ) from exc
     hand_face_ratio = None
     if include_hand_face_ratio:
@@ -5778,6 +5958,7 @@ def _load_selected_item(
         "nose_geometry": nose_geometry,
         "lip_fullness": lip_fullness,
         "eye_shape": eye_shape,
+        "eyebrow_thickness": eyebrow_thickness,
         "hand_face_ratio": hand_face_ratio,
         "object_relations": object_relations,
         "scene_category": scene_category,
@@ -5997,6 +6178,10 @@ def _render_condition(
         eye_shape = prepared.get("eye_shape")
         evidence_text = _serialize_eye_shape(eye_shape)
         return raw.copy(), _context_prompt(evidence_text), eye_shape
+    if condition_id == "context-raw-eyebrow-thickness":
+        eyebrow_thickness = prepared.get("eyebrow_thickness")
+        evidence_text = _serialize_eyebrow_thickness(eyebrow_thickness)
+        return raw.copy(), _context_prompt(evidence_text), eyebrow_thickness
     if condition_id == "context-raw-hand-face-ratio":
         hand_face_ratio = prepared.get("hand_face_ratio")
         evidence_text = _serialize_hand_face_ratio(hand_face_ratio)
@@ -6299,6 +6484,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eye-shape"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #127: only the eyebrow-thickness run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_eyebrow_thickness = any(
+        str(condition.get("id")) == "context-raw-eyebrow-thickness"
+        for condition in (plan.get("conditions") or [])
+    )
     # Arm #124: only the hand-face-ratio run invokes the local MediaPipe
     # HandLandmarker + FaceLandmarker (arms #109 + #60 meshes, CPU) — gate on
     # the frozen plan's conditions.
@@ -6466,6 +6658,7 @@ def execute_stage_b(
             include_nose_geometry=include_nose_geometry,
             include_lip_fullness=include_lip_fullness,
             include_eye_shape=include_eye_shape,
+            include_eyebrow_thickness=include_eyebrow_thickness,
             include_hand_face_ratio=include_hand_face_ratio,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
