@@ -1155,7 +1155,7 @@
       "id": "jewelry",
       "name": "Jewelry presence (earrings, necklace) via CLIP zero-shot on ear/neck crops",
       "arm_issue": 112,
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0,
       "hypothesis": "A jewelry-presence measurement (NEW evidence part jewelry + NEW MODEL CLASS CLIP ViT-L/14 zero-shot over seg2-defined ear/neck crop regions, openai/clip-vit-large-patch14, MIT, local CPU) that emits a scale-invariant earrings/necklace present-or-absent band reduces unsupported 'wearing earrings / a necklace / jewelry' accessory claims that the validated object-relations #61 axis (closed-scene vocab) cannot ground, versus the matched no-evidence baseline on the frozen 24-item cohort.",
       "falsified_if": "The jewelry evidence condition does not reduce unsupported accessory claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (e.g. 0/24 earrings — a single band >=75%), or the axis is redundant with object-relations #61 or garment-type #97 (degenerate), or the CLIP specialist fails qualification, or an apparent difference is attributable to an uncontrolled change.",
@@ -1210,6 +1210,203 @@
       "feeds": [
         "dossier-context4k"
       ]
+    },
+    {
+      "id": "nose-geometry",
+      "name": "Nose geometry / width-length proportions via MediaPipe facemesh",
+      "arm_issue": 121,
+      "hypothesis": "A deterministic nose-geometry measurement (NEW evidence part nose-geometry, from the already-validated MediaPipe FaceLandmarker 478-point mesh nose landmarks, local CPU, normalized to inter-eye distance) that emits a scale-invariant nose-width / nose-length band (narrow / average / wide) reduces unsupported nose-shape caption claims, versus the matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The nose-geometry evidence condition does not reduce unsupported nose claims or increase supported claims versus its matched no-evidence baseline, or the nose bands collapse (a single band taking >=75% of measured items), or the axis is redundant with face-geometry #60 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (nose-geometry): nose width / inter-eye distance + nose length / face height from facemesh nose landmarks, banded narrow/average/wide at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "face-geometry #60 covers eye-spacing, mouth, jaw, midface vertical share — NOT nose proportions. Nose shape is a recurring portrait caption claim ('delicate nose', 'broad nose') with no evidence axis. Reuses the already-qualified facemesh model for a genuinely-new measurement part.",
+      "scope": "Scale-invariant nose width / length proportions of the single subject from the already-qualified MediaPipe FaceLandmarker 478-point mesh nose landmarks, normalized to the inter-eye distance / face height, banded narrow / average / wide, with honest abstention on no-face or degenerate nose landmarks. Never identity, eye-color, or facial-expression claims; only the coarse band in prose; raw ratios stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck mask); local open-weight face_landmarker.task (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant nose-geometry band (narrow / average / wide) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw normalized ratios stay in the machine-readable payload.",
+      "provenance": "research_harness.nose_geometry module (to be written); face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff (Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop (measured union policy), or the nose landmarks are degenerate/occluded (turned head, extreme DOF); never fabricate a nose band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "nose-geometry"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "lip-fullness",
+      "name": "Lip fullness / vertical vermilion extent via MediaPipe facemesh",
+      "arm_issue": 122,
+      "hypothesis": "A deterministic lip-fullness measurement (NEW evidence part lip-fullness, from facemesh mouth landmarks, normalized to mouth width) that emits a scale-invariant thin/medium/full upper-lip band reduces unsupported lip-shape claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The lip-fullness evidence condition does not reduce unsupported lip claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with facial-expression #81 / lip-color #107 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (lip-fullness): vertical vermilion extent / mouth width from facemesh mouth landmarks, banded thin/medium/full at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "facial-expression #81 covers smile spread/openness via mouth-corner geometry; lip-color #107 is BLOCKED (cohort homogeneous natural lips). Lip FULLNESS (vertical vermilion extent) is an unbound axis orthogonal to both. Reuses the already-qualified facemesh model.",
+      "scope": "Scale-invariant upper-lip fullness (vertical vermilion extent normalized by mouth width) of the single subject from the already-qualified MediaPipe FaceLandmarker mouth landmarks, banded thin / medium / full, with honest abstention on no-face or occluded mouth. Never color, expression, or identity claims; only the coarse band in prose; raw ratios stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck mask); local open-weight face_landmarker.task (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant lip-fullness band (thin / medium / full) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw ratios stay in the machine-readable payload.",
+      "provenance": "research_harness.lip_fullness module (to be written); face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff (Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop (measured union policy), or the mouth is occluded / landmarks degenerate; never fabricate a fullness band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "lip-fullness"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "eye-shape",
+      "name": "Eye shape / fissure aspect via MediaPipe facemesh",
+      "arm_issue": 123,
+      "hypothesis": "A deterministic eye-shape measurement (NEW evidence part eye-shape, from facemesh eye landmarks, normalized to eye width) that emits a scale-invariant almond/round/wide-set band reduces unsupported eye-shape caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The eye-shape evidence condition does not reduce unsupported eye-shape claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with eye-openness #113 / face-geometry #60 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (eye-shape): palpebral fissure aspect (height/width) + corner angle from facemesh eye landmarks, banded almond/round/wide-set at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "eye-openness #113 covers eyelid aperture STATE; iris-eye-color #80 covers hue; face-geometry #60 covers eye SPACING. Eye SHAPE (fissure aspect + curvature) is an unbound static axis. Reuses the already-qualified facemesh model.",
+      "scope": "Scale-invariant eye-shape (palpebral fissure aspect ratio + corner orientation) of the single subject from the already-qualified MediaPipe FaceLandmarker eye landmarks, banded almond / round / wide-set, with honest abstention on no-face, closed eyes (unmeasurable fissure), or degenerate landmarks. Never eye-color, openness, or identity claims; only the coarse band in prose; raw ratios stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck mask); local open-weight face_landmarker.task (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant eye-shape band (almond / round / wide-set) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw ratios stay in the machine-readable payload.",
+      "provenance": "research_harness.eye_shape module (to be written); face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff (Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop (measured union policy), the eyes are closed (fissure unmeasurable), or the landmarks are degenerate; never fabricate an eye-shape band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "eye-shape"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "hand-face-ratio",
+      "name": "Hand size relative to face (MediaPipe Hands + FaceLandmarker fusion)",
+      "arm_issue": 124,
+      "hypothesis": "A relational hand-size measurement (NEW evidence part hand-face-ratio, hand span normalized by face width from the concurrent MediaPipe Hands + FaceLandmarker detections) that emits a scale-invariant small/typical/large band reduces unsupported hand-size caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The hand-face-ratio evidence condition does not reduce unsupported hand-size claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with hand-gesture #109 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (hand-face-ratio): hand span / face width from the concurrent MediaPipe Hands 21-point mesh + FaceLandmarker 478-point mesh, banded small/typical/large at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "hand-gesture #109 covers gesture CLASS; face-geometry #60 covers face proportions. Hand SIZE relative to face is an unbound RELATIONAL axis (the brainstorm mandate explicitly wants relational/interaction axes). Both models are already validated locally.",
+      "scope": "Scale-invariant hand-size band (small / typical / large) of the single subject computed as hand span normalized by face width, fusing the already-qualified MediaPipe Hands 21-point mesh and FaceLandmarker 478-point mesh, with honest abstention when either detection is absent or the ratio is implausible. Never gesture, identity, or absolute-size claims; only the coarse band in prose; raw ratio stays payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256); local open-weight hand_landmarker.task (MediaPipe, CPU, tasks API, sha256 fbc2a300...) + face_landmarker.task (MediaPipe, CPU, tasks API, sha256 64184e229b...), both owned hardware. Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant hand-size band (small / typical / large) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw span ratio stays in the machine-readable payload.",
+      "provenance": "research_harness.hand_face_ratio module (to be written); hand_landmarker.task sha256 fbc2a300... + face_landmarker.task sha256 64184e229b... (Open-weight MediaPipe, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when either the hand or the face is not detected (full-frame ∪ crop union policy), or the fused ratio is implausible (degenerate alignment); never fabricate a hand-size band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) capability probe on the local stack (coverage floor pre-registered, e.g. >=14/24 with a usable hand+face pair), (b) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains), (c) controlled claim-support round-trip, (d) calibration on known cases + null, (e) independent adversarial review + abstention audit, (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "hand-face-ratio"
+      ],
+      "model_candidates": [
+        "mediapipe-hands",
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "skin-clarity",
+      "name": "Skin clarity / blemish unevenness from source RGB + seg2 skin",
+      "arm_issue": 125,
+      "hypothesis": "A deterministic skin-clarity measurement (NEW evidence part skin-clarity, high-frequency blemish/unevenness energy over the seg2 skin region, normalized by region area) that emits a scale-invariant clear/even/blemished band reduces unsupported skin-texture caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The skin-clarity evidence condition does not reduce unsupported skin-texture claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with skin-color #31 / texture #35 / image-quality #95 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (skin-clarity): high-frequency deviation energy over the seg2 skin/Face_Neck region (interior, eroded) normalized by region area, banded clear/even/blemished at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "skin-color #31 covers TONE; image-quality #95 covers whole-image IQA; texture #35 measures material deviance over garment classes. Region-specific skin CLARITY (freckle/blemish density) is an unbound axis. Deterministic, no new model.",
+      "scope": "Scale-invariant skin-clarity band (clear / even / blemished) of the single subject measured as high-frequency luminance deviation energy over the seg2 skin region interior (eroded, silhouette-halo-free), normalized by region area, with honest abstention on tiny/unreliable skin regions. Never skin-tone, identity, or whole-image claims; only the coarse band in prose; raw energy stays payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck / skin classes). Computed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant skin-clarity band (clear / even / blemished) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw region energy stats stay in the machine-readable payload.",
+      "provenance": "research_harness.skin_clarity module (to be written); deterministic from the SHA-bound decoded source RGB + frozen seg2.npy; computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when the skin region is too small for reliable statistics or the region is degenerate (flat/featureless); never fabricate a clarity band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) capability probe on the frozen cohort (coverage floor pre-registered), (b) band-calibration probe (no band >= 75%, honest abstains), (c) controlled claim-support round-trip, (d) calibration on known cases + null, (e) independent adversarial review + abstention audit, (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "skin-clarity"
+      ],
+      "model_candidates": [],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "background-color",
+      "name": "Background dominant hue family from seg2 Background + source RGB",
+      "arm_issue": 126,
+      "hypothesis": "A deterministic background-color measurement (NEW evidence part background-color, dominant hue family + lightness over the seg2 Background region, scale-invariant) that emits a coarse warm/cool/neutral + light/dark band reduces unsupported background-color caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The background-color evidence condition does not reduce unsupported background-color claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with scene-category #69 / setting #34 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (background-color): dominant hue family (warm/cool/neutral) + lightness (light/dark) over the seg2 Background region from the decoded source RGB, banded at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "scene-category #69 covers semantic place; setting #34 covers pattern/busyness; environment-clearance #85 covers negative SPACE. Background HUE/COLOR is an unbound axis ('blue backdrop', 'warm beige wall'). Deterministic, no new model.",
+      "scope": "Scale-invariant background-color band (warm / cool / neutral, light / dark) of the single subject measured from the dominant hue family + lightness over the seg2 Background region, with honest abstention on full-bleed subjects (zero Background) or degenerate color statistics. Never scene-category, pattern, or identity claims; only the coarse band in prose; raw mean hue/sat/val stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Background class). Computed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant background-color band (warm / cool / neutral × light / dark) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw region color stats stay in the machine-readable payload.",
+      "provenance": "research_harness.background_color module (to be written); deterministic from the SHA-bound decoded source RGB + frozen seg2.npy; computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when the Background region is absent (full-bleed subject) or the color statistics are degenerate (near-zero variance); never fabricate a background-color band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) capability probe on the frozen cohort (coverage floor pre-registered), (b) band-calibration probe (no band >= 75%, honest abstains), (c) controlled claim-support round-trip, (d) calibration on known cases + null, (e) independent adversarial review + abstention audit, (f) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "background-color"
+      ],
+      "model_candidates": [],
+      "state": "active",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "eyebrow-thickness",
+      "name": "Eyebrow thickness / vertical brow extent via MediaPipe facemesh",
+      "arm_issue": 127,
+      "hypothesis": "A deterministic eyebrow-thickness measurement (NEW evidence part eyebrow-thickness, brow vertical extent / eye height from facemesh brow + eye landmarks, scale-invariant) that emits a thin/medium/thick band reduces unsupported brow-thickness caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The eyebrow-thickness evidence condition does not reduce unsupported brow-thickness claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with eyebrow-position #111 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (eyebrow-thickness): brow vertical extent / ipsilateral eye height from facemesh brow + eye landmarks, banded thin/medium/thick at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "eyebrow-position #111 (validated cycle 34) covers brow ELEVATION; brow THICKNESS (vertical mass) is an orthogonal unbound axis ('thick brows' is a common claim). Reuses the already-qualified facemesh model.",
+      "scope": "Scale-invariant eyebrow-thickness band (thin / medium / thick) of the single subject measured as brow vertical extent normalized by the ipsilateral eye height from the already-qualified MediaPipe FaceLandmarker brow + eye landmarks, with honest abstention on no-face or degenerate brow landmarks. Never elevation, identity, or expression claims; only the coarse band in prose; raw ratios stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck mask); local open-weight face_landmarker.task (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant eyebrow-thickness band (thin / medium / thick) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw ratios stay in the machine-readable payload.",
+      "provenance": "research_harness.eyebrow_thickness module (to be written); face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff (Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop (measured union policy), or the brow landmarks are degenerate/occluded; never fabricate a thickness band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "eyebrow-thickness"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
+    },
+    {
+      "id": "cheek-prominence",
+      "name": "Cheekbone prominence from MediaPipe facemesh zygomatic width",
+      "arm_issue": 128,
+      "hypothesis": "A deterministic cheek-prominence measurement (NEW evidence part cheek-prominence, cheekbone width / jaw width from facemesh zygomatic + jaw landmarks, scale-invariant) that emits a subtle/moderate/prominent band reduces unsupported cheekbone caption claims, versus matched no-evidence baseline on the frozen 24-item cohort.",
+      "falsified_if": "The cheek-prominence evidence condition does not reduce unsupported cheekbone claims or increase supported claims versus its matched no-evidence baseline, or the bands collapse (a single band >=75% of measured items), or the axis is redundant with face-geometry #60 (degenerate), or an apparent difference is attributable to an uncontrolled change.",
+      "deterministic_signal": "NEW EVIDENCE PART (cheek-prominence): zygomatic cheekbone width / jaw width from facemesh landmarks, banded subtle/moderate/prominent at cohort-calibrated cuts",
+      "metric_version": "claim-support-rubric-v1",
+      "data_snapshot": "frozen first500-coverage-balanced-candidate-v1 (24 items)",
+      "selection_rationale": "face-geometry #60 covers eye-spacing/mouth/jaw/midface; facial-expression #81 covers smile. Cheekbone PROMINENCE (zygomatic width vs jaw width) is an unbound facial-mass axis ('high cheekbones'). Reuses the already-qualified facemesh model.",
+      "scope": "Scale-invariant cheek-prominence band (subtle / moderate / prominent) of the single subject measured as zygomatic cheekbone width normalized by jaw width from the already-qualified MediaPipe FaceLandmarker landmarks, with honest abstention on no-face, profile-view (zygomatic occlusion), or degenerate landmarks. Never identity, expression, or face-geometry claims; only the coarse band in prose; raw ratios stay payload-only.",
+      "inputs": "Already-decoded source RGB (SHA-bound via source_sha256) + the frozen selected seg2.npy (DOME-29 Face_Neck mask); local open-weight face_landmarker.task (MediaPipe, CPU, tasks API, owned hardware). Recomputed in memory during this bounded run with no crawlr/stratum write.",
+      "output_semantics": "Provenance-bearing scale-invariant cheek-prominence band (subtle / moderate / prominent) or explicit abstention, not semantic ground truth or caption claims; only the coarse band is verbalized; raw ratios stay in the machine-readable payload.",
+      "provenance": "research_harness.cheek_prominence module (to be written); face_landmarker.task sha256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff (Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned hardware); computed in memory during this bounded run with no crawlr/stratum write, no hosted third-party inference of the sensitive corpus.",
+      "abstention_policy": "Abstain (emit None with a surfaced reason) when FaceLandmarker finds no face on the full frame or the seg2 Face_Neck crop (measured union policy), the head is in profile (zygomatic occlusion), or the landmarks are degenerate; never fabricate a prominence band; detector disagreement remains a quality anomaly, never prompt content.",
+      "qualification_gate": "Candidate evidence only; PASS only after: (a) band-calibration probe on the frozen cohort (no band >= 75%, honest abstains; coverage floor pre-registered), (b) controlled claim-support round-trip, (c) calibration on known cases + null, (d) independent adversarial review + abstention audit, (e) no corpus mutation, local-first, sensitive-corpus boundary kept.",
+      "evidence_parts": [
+        "cheek-prominence"
+      ],
+      "model_candidates": [
+        "mediapipe-facemesh-3d"
+      ],
+      "state": "proposal",
+      "valid_non_improving_experiments": 0
     }
   ],
   "goal_arm": "dossier-context4k",
@@ -1224,7 +1421,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 35,
+  "selection_progress": 36,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1411,6 +1608,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 31
+    },
+    {
+      "arm_id": "jewelry",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 32
     }
   ]
 }
