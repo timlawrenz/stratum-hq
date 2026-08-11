@@ -1332,7 +1332,7 @@
         "skin-clarity"
       ],
       "model_candidates": [],
-      "state": "proposal",
+      "state": "active",
       "valid_non_improving_experiments": 0
     },
     {
@@ -1355,7 +1355,7 @@
         "background-color"
       ],
       "model_candidates": [],
-      "state": "active",
+      "state": "validated",
       "valid_non_improving_experiments": 0
     },
     {
@@ -1421,7 +1421,7 @@
     "deterministic_max_tokens_per_item": 3489,
     "honest_ceiling_max_tokens_per_item": 13500
   },
-  "selection_progress": 36,
+  "selection_progress": 37,
   "conclusion_history": [
     {
       "arm_id": "dossier-context4k",
@@ -1614,6 +1614,12 @@
       "verdict": "BETTER",
       "state": "validated",
       "cycle": 32
+    },
+    {
+      "arm_id": "background-color",
+      "verdict": "BETTER",
+      "state": "validated",
+      "cycle": 33
     }
   ]
 }
