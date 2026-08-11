@@ -219,6 +219,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sync.add_argument("registry", type=Path)
     sync.add_argument("--apply", action="store_true",
                       help="actually run gh; otherwise print planned operations")
+
+    verify = sub.add_parser(
+        "verify-cohort-sources",
+        help="check a frozen plan's cohort sources against the canonical root "
+             "(presence + SHA-256, read-only)",
+    )
+    verify.add_argument("plan", type=Path,
+                        help="frozen comparison plan JSON (pilot_manifest.items)")
+    verify.add_argument("--json", action="store_true",
+                        help="machine-readable JSON report")
     return parser.parse_args(argv)
 
 
@@ -431,6 +441,29 @@ def main(argv: list[str] | None = None) -> int:
                 "registry_written": bool(args.write),
             }, sort_keys=True))
             return 0
+
+        if args.command == "verify-cohort-sources":
+            from .cohort_verify import CohortVerifyError, verify_plan_sources
+
+            try:
+                report = verify_plan_sources(args.plan)
+            except CohortVerifyError as exc:
+                raise ContractError(str(exc)) from exc
+            if args.json:
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                print(
+                    f"{report['present']}/{report['checked']} cohort sources present "
+                    f"(missing {report['missing']}, sha_mismatch {report['sha_mismatch']})"
+                )
+                for entry in report["items"]:
+                    if entry["status"] != "present-match":
+                        print(
+                            f"  {entry['status']}: {entry['image_id']} "
+                            f"({entry['relative_path']})"
+                        )
+                print("cohort intact" if report["all_intact"] else "cohort NOT intact")
+            return 0 if report["all_intact"] else 1
 
         if args.command == "program-overview":
             from .dimension_registry import load_registry, program_overview
