@@ -71,6 +71,11 @@ from .background_color import (
     compute_background_color,
     render_background_color,
 )
+from .skin_clarity import (
+    SkinClarityError,
+    compute_skin_clarity,
+    render_skin_clarity,
+)
 from .image_quality import ImageQualityError, compute_image_quality
 from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
 from .eye_openness import EyeOpennessError, compute_eye_openness
@@ -1701,6 +1706,101 @@ def _serialize_background_color(config: Mapping[str, Any] | None) -> str:
     )
 
 
+def _skin_clarity_evidence() -> dict[str, Any]:
+    """Declared deterministic skin-clarity specialist (arm #125).
+
+    NEW evidence part `skin-clarity` (no new model, CPU): illumination-
+    invariant high-frequency blemish/unevenness energy density over the seg2
+    DOME-29 exposed-skin region (mean |Laplacian| / skin-luminance-std at
+    canonical 512). Registered 2026-08-11 via the gated propose-dimensions
+    channel (brainstorm-new-data), selected by the SELECTOR EXPLOIT slot.
+    """
+    module_path = Path(compute_skin_clarity.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-skin-clarity-v1",
+        "specialists": [
+            {
+                "id": "in-memory-skin-clarity-v1",
+                "scope": ("Scale-invariant skin-clarity band (clear / even / blemished) "
+                          "of the single subject's exposed skin from the high-frequency "
+                          "blemish/unevenness energy density (mean |Laplacian| divided by "
+                          "the skin-interior luminance std, canonical long side 512) over "
+                          "the seg2 DOME-29 exposed-skin region, with honest abstention on "
+                          "fully-covered subjects (zero exposed skin), tiny eroded interiors, "
+                          "or degenerate contrast (near-flat luminance). NEW evidence part "
+                          "registered 2026-08-11 (brainstorm-new-data via the gated "
+                          "propose-dimensions channel). Emits ONE coarse band or a surfaced "
+                          "abstention; never skin-color, garment, whole-image quality, or "
+                          "focus/DOF claims; only the coarse band in prose; raw HP density / "
+                          "percentiles / tail-ratio / spot-fraction / luma-std / region "
+                          "coverage stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 exposed-skin classes) + "
+                           "the already-decoded source RGB (SHA-bound via source_sha256). "
+                           "Computed in memory during this bounded run with no crawl/stratum "
+                           "write, no hosted third-party inference of the sensitive corpus."),
+                "output_semantics": ("Provenance-bearing scale-invariant skin-clarity band "
+                                     "(clear / even / blemished) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the "
+                                     "coarse band is verbalized; raw density / percentiles / "
+                                     "luma-std stay in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.skin_clarity.compute_skin_clarity "
+                    f"SHA-256 {code_hash}; deterministic from the SHA-bound decoded source "
+                    "RGB + frozen seg2.npy; computed in memory during this bounded run with "
+                    "no crawl/stratum write, no hosted third-party inference of the "
+                    "sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit None "
+                                      "with a surfaced reason) when the exposed-skin region "
+                                      "is absent (fully covered subject) or below the "
+                                      "presence gates, the eroded skin interior is too "
+                                      "small, or the luminance variance is degenerate "
+                                      "(blown-out / pitch-black skin has no resolvable "
+                                      "blemish texture); never fabricate a clarity band; "
+                                      "detector disagreement remains a quality anomaly, "
+                                      "never prompt content."),
+                "known_failure_modes": ("The clear/even/blemished cuts are scale-invariant "
+                                        "and illumination-invariant but were CALIBRATED on "
+                                        "the frozen 24-item cohort (2026-08-11 probe: 24/24 "
+                                        "measured, clear 8 / even 8 / blemished 8, max_share "
+                                        "0.3333); the NAIVE mean-|Laplacian| collapsed "
+                                        "(24/24 blemished — global illumination/focus "
+                                        "dominate the absolute Laplacian), so the verbalized "
+                                        "metric is the contrast-normalized density "
+                                        "(HP energy per unit luminance contrast). Band "
+                                        "shares may shift on other cohorts. The "
+                                        "axis is deliberately NOT skin-color #31 (tone), "
+                                        "image-quality #95 (whole-image IQA), texture #35 "
+                                        "(garment material), or image-focus #75 (optical "
+                                        "acutance)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives "
+                                       "completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_skin_clarity(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a skin-clarity dict.
+
+    Verbalizes ONLY the coarse scale-invariant clear/even/blemished band. Raw
+    HP density, percentiles, tail-ratio, spot-fraction, luma-std and region
+    coverage stay in the machine-readable evidence_payload JSON and are never
+    caption claims.
+    """
+    rendered = render_skin_clarity(config)
+    return "\n".join(
+        ["SKIN-CLARITY (blemish / unevenness of the exposed skin, scale-invariant):"]
+        + [f"- {line}" for line in rendered.splitlines()]
+    )
+
+
 def _bangs_forehead_evidence() -> dict[str, Any]:
     """Declared deterministic bangs / forehead-hair-coverage specialist
     (arm #110, NEW evidence part, no new model, CPU)."""
@@ -3044,6 +3144,12 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # source RGB (SHA-bound via source_sha256). Only seg2 shows as a named
     # evidence artifact; the source RGB is decoded in-memory during the run.
     "background-color": ("seg2.npy",),
+    # Arm #125 skin-clarity: deterministic illumination-invariant HP-energy
+    # density (mean |Laplacian| / skin-luminance-std) over the seg2 DOME-29
+    # exposed-skin region from the decoded source RGB (SHA-bound via
+    # source_sha256). Only seg2 shows as a named evidence artifact; the source
+    # RGB is decoded in-memory during the run.
+    "skin-clarity": ("seg2.npy",),
 }
 
 
@@ -3141,7 +3247,7 @@ def build_stage_b_plan(
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
         "bangs-forehead", "eye-openness", "hand-gesture", "jewelry",
-        "background-color",
+        "background-color", "skin-clarity",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -4194,6 +4300,53 @@ def build_stage_b_plan(
             "redundant (registration falsified_if guards the setting/scene-category "
             "redundance too)."
         )
+    elif evidence_kind == "skin-clarity":
+        evidence = _skin_clarity_evidence()
+        evidence_condition_id = "context-raw-skin-clarity"
+        comparison_plan_id = "stage-b-first500-skin-clarity-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "skin-clarity measurement (illumination-invariant high-frequency "
+            "blemish/unevenness energy density — mean |Laplacian| divided by the "
+            "skin-interior luminance std at canonical long side 512 — over the seg2 "
+            "DOME-29 exposed-skin region; NEW evidence part registered 2026-08-11 via the "
+            "gated propose-dimensions channel, exploitative selection; CPU, no new model) "
+            "may reduce unsupported skin-texture / blemish / evenness caption claims "
+            "('blemish-free skin', 'smooth even complexion', 'spotty skin') that the "
+            "validated skin-color #31 (tone), image-quality #95 (whole-image IQA), "
+            "texture #35 (garment material) and image-focus #75 (optical acutance) axes "
+            "cannot ground, or increase supported clarity claims in captions versus its "
+            "matched no-evidence baseline when the source item, view, prompt template, "
+            "local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The skin-clarity evidence condition does not reduce unsupported "
+            "skin-texture/blemish claims or increase supported claims versus its matched "
+            "no-evidence baseline, or the clarity bands collapse (a single band taking "
+            ">=75% of measured items), or the axis is redundant with skin-color #31 / "
+            "texture #35 / image-quality #95 / image-focus #75 (degenerate), or an "
+            "apparent difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs (pose2 stays a validation-only read for the exactly-one-subject "
+            "invariant). Skin clarity is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 exposed-skin classes, same MIN_CLASS_PX / MIN_COVERAGE "
+            "gates as skin-color #31) + the already-decoded source RGB (SHA-bound via "
+            "source_sha256), resampled to a canonical long side of 512 px so HP-energy "
+            "density is comparable across native resolutions. Capability probe "
+            "(2026-08-11, /mnt/nas-ai-models/research/stratum/"
+            "skin-clarity-calibration-probe.json): 24/24 measured, clear 8 / even 8 / "
+            "blemished 8 (max_share 0.3333 < 0.75 NON-degenerate), coverage floor 8/24 "
+            "MET, 0 abstentions. The NAIVE mean-|Laplacian| collapsed (24/24 "
+            "blemished — global illumination/focus dominate the absolute Laplacian); "
+            "the verbalized metric is the contrast-normalized density (HP energy per "
+            "unit luminance contrast), which is ILLUMINATION-INVARIANT and "
+            "scale-invariant. Only the coarse scale-invariant band is verbalized; raw "
+            "density, percentiles, tail-ratio, spot-fraction, luma-std and region "
+            "coverage stay in evidence_payload and are never caption claims."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -4515,6 +4668,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "jewelry"
     elif "context-raw-background-color" in condition_ids:
         rebuild_kind = "background-color"
+    elif "context-raw-skin-clarity" in condition_ids:
+        rebuild_kind = "skin-clarity"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -4604,6 +4759,7 @@ def _load_selected_item(
     include_hand_gesture: bool = False,
     include_jewelry: bool = False,
     include_background_color: bool = False,
+    include_skin_clarity: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4914,6 +5070,17 @@ def _load_selected_item(
             raise StageBRunError(
                 f"background-color abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    skin_clarity = None
+    if include_skin_clarity:
+        try:
+            skin_clarity = compute_skin_clarity(
+                seg2,
+                np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8)),
+            )
+        except SkinClarityError as exc:
+            raise StageBRunError(
+                f"skin-clarity abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4965,6 +5132,7 @@ def _load_selected_item(
         "hand_gesture": hand_gesture,
         "jewelry": jewelry,
         "background_color": background_color,
+        "skin_clarity": skin_clarity,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -5233,6 +5401,10 @@ def _render_condition(
         background_color = prepared.get("background_color")
         evidence_text = _serialize_background_color(background_color)
         return raw.copy(), _context_prompt(evidence_text), background_color
+    if condition_id == "context-raw-skin-clarity":
+        skin_clarity = prepared.get("skin_clarity")
+        evidence_text = _serialize_skin_clarity(skin_clarity)
+        return raw.copy(), _context_prompt(evidence_text), skin_clarity
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -5561,6 +5733,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-background-color"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #125 skin-clarity: only the skin-clarity run computes the
+    # deterministic clarity band (NEW evidence part, CPU, no new model) —
+    # gate on the frozen plan's conditions.
+    include_skin_clarity = any(
+        str(condition.get("id")) == "context-raw-skin-clarity"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -5593,6 +5772,7 @@ def execute_stage_b(
             include_hand_gesture=include_hand_gesture,
             include_jewelry=include_jewelry,
             include_background_color=include_background_color,
+            include_skin_clarity=include_skin_clarity,
         )
         for item in items
     ]
