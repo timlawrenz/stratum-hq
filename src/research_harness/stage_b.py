@@ -54,6 +54,7 @@ from .pointmap_depth import PointmapDepthError, compute_pointmap_depth
 from .matting_alpha import MattingAlphaError, compute_matting_alpha
 from .face_geometry import FaceGeometryError, compute_face_geometry
 from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
+from .nose_geometry import NoseGeometryError, compute_nose_geometry
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
@@ -1253,6 +1254,105 @@ def _serialize_eyebrow_position(config: Mapping[str, Any] | None) -> str:
         lines.append("- eyebrows are furrowed / drawn low toward the eye line")
     elif band == "neutral":
         lines.append("- eyebrows are neutral (at a typical height above the eye line)")
+    return "\n".join(lines)
+
+
+def _nose_geometry_evidence() -> dict[str, Any]:
+    """Declared deterministic nose-geometry specialist (arm #121)."""
+    module_path = Path(compute_nose_geometry.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-nose-geometry-v1",
+        "specialists": [
+            {
+                "id": "in-memory-nose-geometry-v1",
+                "scope": ("Scale-invariant nose-width / nose-length proportions of the "
+                          "single subject from the already-qualified MediaPipe FaceLandmarker "
+                          "478-point mesh (same model as face-geometry #60 / gaze-head #68 / "
+                          "eyebrow-position #111): alar width / inter-eye distance (IPD) and "
+                          "bridge-to-tip length / IPD, banded narrow/average/wide and "
+                          "short/average/long at cohort-calibrated cuts, with honest abstention "
+                          "on no-face / degenerate detection. Never identity, eye-color, or "
+                          "facial-expression claims; only the coarse bands in prose; raw ratios "
+                          "stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant nose-geometry bands "
+                                     "(width narrow/average/wide; length short/average/long) or "
+                                     "explicit abstention, not semantic ground truth or caption "
+                                     "claims; only the coarse bands are verbalized; raw "
+                                     "normalized ratios / per-item IPD stay in the "
+                                     "machine-readable payload."),
+                "provenance": (
+                    "research_harness.nose_geometry.compute_nose_geometry "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no crawlr/stratum "
+                    "write, no hosted third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop (measured union policy) "
+                                      "or IPD / nose landmarks are degenerate; never fabricate a "
+                                      "nose read; detector disagreement remains a quality "
+                                      "anomaly, never prompt content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection bounds it); "
+                                        "turned heads / extreme DOF / occlusion abstain; width/"
+                                        "length cuts are cohort-calibrated on the frozen 24-item "
+                                        "cohort and may shift on other cohorts; the length ratio "
+                                        "is pitch-sensitive so a generous human-plausibility band "
+                                        "plus the width plauisibility gate bound it."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_nose_geometry(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a nose-geometry dict.
+
+    Verbalizes ONLY the coarse calibrated bands (width + length). Raw
+    normalized ratios stay in the machine-readable evidence_payload JSON and
+    are never caption claims.
+    """
+    lines = ["NOSE-GEOMETRY (alar width and bridge-to-tip length vs the inter-eye distance, scale-invariant):"]
+    if not config:
+        lines.append("- nose-geometry not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "nose geometry not measurable"
+        lines.append(f"- nose-geometry abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- nose-geometry measured but not banded (payload)")
+        return "\n".join(lines)
+    wband = config.get("nose_width_band")
+    if wband:
+        if wband == "narrow":
+            lines.append("- the nose is narrow (alar width small relative to the eyes)")
+        elif wband == "wide":
+            lines.append("- the nose is wide (broad alar width relative to the eyes)")
+        elif wband == "average":
+            lines.append("- the nose is of average width relative to the eyes")
+    lband = config.get("nose_length_band")
+    if lband:
+        if lband == "short":
+            lines.append("- the nose reads short (bridge-to-tip short relative to the eyes)")
+        elif lband == "long":
+            lines.append("- the nose reads long (prominent bridge-to-tip length relative to the eyes)")
+        elif lband == "average":
+            lines.append("- the nose reads of average length relative to the eyes")
     return "\n".join(lines)
 
 
@@ -3056,6 +3156,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "eyebrow-position": ("seg2.npy",),
+    # Arm #121 nose-geometry: deterministic nose-width / nose-length bands from
+    # the LOCAL MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "nose-geometry": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
     # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
     # full-frame source RGB (SHA-bound via the item's source_sha256). No
@@ -3242,6 +3349,7 @@ def build_stage_b_plan(
         "geometry", "body-type", "clothing", "hair", "skin-color", "lighting", "setting", "texture", "context4k",
         "vlm-dense", "pose-articulation", "pointmap-depth", "matting-alpha", "face-geometry",
         "eyebrow-position",
+        "nose-geometry",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
@@ -3599,6 +3707,47 @@ def build_stage_b_plan(
             "already reports. The inner-brow (furrow) composite rule was rejected on probe review "
             "as threshold-fitting; the inner-brow elevation remains a corroborating payload "
             "signal."
+        )
+    elif evidence_kind == "nose-geometry":
+        evidence = _nose_geometry_evidence()
+        evidence_condition_id = "context-raw-nose-geometry"
+        comparison_plan_id = "stage-b-first500-nose-geometry-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "nose-geometry measurement (scale-invariant alar width / inter-eye distance "
+            "and bridge-to-tip length / inter-eye distance from the local open-weight "
+            "MediaPipe FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck "
+            "crop, union detection policy, banded narrow/average/wide and short/average/"
+            "long at cohort-calibrated cuts; NEW evidence part registered 2026-08-11 via "
+            "the gated propose-dimensions channel, exploitative selection; CPU, reuses the "
+            "already-qualified arm #60 model) may reduce unsupported nose-shape claims "
+            "('delicate nose', 'broad nose', 'long nose') that the face-geometry #60 axis "
+            "cannot ground, versus the matched no-evidence baseline when the source item, "
+            "view, prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The nose-geometry evidence condition does not reduce unsupported nose claims "
+            "or increase supported claims versus its matched no-evidence baseline, or the "
+            "nose bands collapse (a single band taking >=75% of measured items), or the "
+            "axis is redundant with face-geometry #60 (degenerate), or an apparent "
+            "difference is attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence inputs for "
+            "the nose-geometry measurement (pose2 stays a validation-only read for the "
+            "exactly-one-subject invariant). Nose geometry is computed in memory from the "
+            "frozen selected seg2.npy (DOME-29 Face_Neck mask) + the already-decoded source "
+            "RGB via the local open-weight MediaPipe FaceLandmarker (Apache-2.0, owned "
+            "hardware, CPU, tasks API; model face_landmarker.task sha256 64184e229b..., the "
+            "same model as arm #60). Only the coarse scale-invariant bands (width "
+            "narrow/average/wide; length short/average/long) are verbalized; raw normalized "
+            "ratios / per-item IPD stay in evidence_payload and are never caption claims. "
+            "Band calibration (measured 2026-08-11 frozen-cohort probe, "
+            "nose-geometry-calibration-probe.json): 21/24 measured, width bands 7/7/7 and "
+            "length bands 7/7/7 at the cohort tercile cuts (max_share 0.3333, no band >= "
+            "75%), the 3 abstains are the same turned-head / no-face-region items the "
+            "facemesh cohort already reports."
         )
     elif evidence_kind == "object-relations":
         evidence = _object_relations_evidence()
@@ -4626,6 +4775,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "face-geometry"
     elif "context-raw-eyebrow-position" in condition_ids:
         rebuild_kind = "eyebrow-position"
+    elif "context-raw-nose-geometry" in condition_ids:
+        rebuild_kind = "nose-geometry"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
@@ -4738,6 +4889,7 @@ def _load_selected_item(
     *,
     include_face_geometry: bool = False,
     include_eyebrow_position: bool = False,
+    include_nose_geometry: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_image_quality: bool = False,
@@ -4886,6 +5038,17 @@ def _load_selected_item(
         except EyebrowPositionError as exc:
             raise StageBRunError(
                 f"eyebrow-position abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    nose_geometry = None
+    if include_nose_geometry:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            nose_geometry = compute_nose_geometry(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except NoseGeometryError as exc:
+            raise StageBRunError(
+                f"nose-geometry abort for frozen selected item {image_id}: {exc}"
             ) from exc
     object_relations = None
     if include_object_relations:
@@ -5111,6 +5274,7 @@ def _load_selected_item(
         "matting_alpha": matting_alpha,
         "face_geometry": face_geometry,
         "eyebrow_position": eyebrow_position,
+        "nose_geometry": nose_geometry,
         "object_relations": object_relations,
         "scene_category": scene_category,
         "image_quality": image_quality,
@@ -5317,6 +5481,10 @@ def _render_condition(
         eyebrow_position = prepared.get("eyebrow_position")
         evidence_text = _serialize_eyebrow_position(eyebrow_position)
         return raw.copy(), _context_prompt(evidence_text), eyebrow_position
+    if condition_id == "context-raw-nose-geometry":
+        nose_geometry = prepared.get("nose_geometry")
+        evidence_text = _serialize_nose_geometry(nose_geometry)
+        return raw.copy(), _context_prompt(evidence_text), nose_geometry
     if condition_id == "context-raw-object-relations":
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
@@ -5594,6 +5762,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eyebrow-position"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #121: only the nose-geometry run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_nose_geometry = any(
+        str(condition.get("id")) == "context-raw-nose-geometry"
+        for condition in (plan.get("conditions") or [])
+    )
     include_object_relations = any(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
@@ -5751,6 +5926,7 @@ def execute_stage_b(
             evidence_hashes[_safe_output_segment(item.get("image_id"), "candidate item image_id")],
             include_face_geometry=include_face_geometry,
             include_eyebrow_position=include_eyebrow_position,
+            include_nose_geometry=include_nose_geometry,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_image_quality=include_image_quality,

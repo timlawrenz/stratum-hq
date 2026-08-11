@@ -1233,8 +1233,10 @@
       "model_candidates": [
         "mediapipe-facemesh-3d"
       ],
-      "state": "active",
-      "valid_non_improving_experiments": 0
+      "state": "blocked",
+      "valid_non_improving_experiments": 0,
+      "blocked_reason": "DATA-AUTHORITY GATE (not a measurement): 2 of the 24 frozen cohort source images (0g8kxl6udr09ikglg4c10kop6tpk, 0kan9rng11ac89ydvwn2dvkdhhc0) were purged from the canonical approved/ tree by a crawl-r re-sync at ~12:34Z 2026-08-11 because crawl-r Photo #1783749 / #1757869 are now status=blocked. The capability probe PASSED (21/24 measured, bands 7/7/7 width and length, non-degenerate) but the GPU round-trip and the reconstruction check preflight ALL 24 approved/ sources (stage_b_launcher._snapshot_selected_inputs + recon.py), so no Stage-B arm on the frozen 24-item cohort can run until the sources are restored or a cohort decision is made. Raw bytes exist and SHA-match the frozen manifest. Decision recorded on issue #132.",
+      "blocked_by_issue": 132
     },
     {
       "id": "lip-fullness",
