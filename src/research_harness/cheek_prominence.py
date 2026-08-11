@@ -48,15 +48,17 @@ Measurement (scale-invariant, from the 2D mesh, canonical 478 indices):
       pose).
 
 Verbalized band (item level, coarse): subtle / moderate / prominent, read
-from the item-level zygomatic/jaw ratio. The thresholds are PROVISIONAL
-canon-derived cuts (SUBTLE_MAX / PROMINENT_MIN below): canonical adult
-bizygomatic breadth ~135–145 mm vs bigonial ~95–110 mm puts the typical ratio
-near 1.25–1.45, so subtle < 1.25 and prominent > 1.45. They are disclosed as
-placeholders pending the frozen-cohort calibration probe (deferred behind
-hold #132: 2 of 24 frozen sources are currently purged from approved/); the
-probe will set the authoritative cohort-calibrated cuts via set_band_floors(),
-exactly as nose-geometry #121 and eyebrow-position #111 did. Raw ratios stay
-in the machine-readable evidence_payload and are never caption claims.
+from the item-level zygomatic/jaw ratio. The thresholds are COHORT-CALIBRATED
+tercile cuts (SUBTLE_MAX / PROMINENT_MIN below, set 2026-08-11 from the
+frozen-cohort calibration probe artifact
+/mnt/nas-ai-models/research/stratum/cheek-prominence-calibration-probe.json;
+15/24 measured, split 5/5/5, max_share 0.3333). The provisional canon cuts
+(subtle < 1.25, prominent > 1.45) measured DEGENERATE on this cohort (15/15
+"subtle", max_share 1.00 — no item clears 1.25), so the authoritative cuts
+are the cohort terciles; bands are corpus-relative within the frozen cohort
+for this round-trip, exactly as nose-geometry #121 and eyebrow-position #111
+calibrated. Raw ratios stay in the machine-readable evidence_payload and are
+never caption claims.
 
 Abstention: no face detected (measured UNION policy: full frame then seg2
 Face_Neck crop), degenerate spans, implausible ratio (profile / zygomatic
@@ -249,18 +251,22 @@ def compute_cheek_prominence(
 
 
 # ---------------------------------------------------------------------------
-# Band floors — PROVISIONAL canon-derived cuts (2026-08-11), disclosed as
-# placeholder pending the frozen-cohort calibration probe (deferred behind
-# hold #132: 2 of 24 frozen sources are purged from approved/, so the probe
-# cannot run on the full cohort yet). Canonical adult bizygomatic breadth
-# ~135-145 mm vs bigonial ~95-110 mm -> typical zygomatic/jaw ratio ~1.25-1.45;
-# subtle < 1.25, prominent > 1.45. The probe will set the authoritative
-# cohort tercile cuts via set_band_floors() / a constant update, following
-# the eyebrow-position #111 pattern. Until the probe runs, no effectiveness
-# claim is permitted (qualification gate unopened).
+# Band floors — COHORT-CALIBRATED tercile cuts (2026-08-11, frozen-cohort
+# calibration probe, artifact
+# /mnt/nas-ai-models/research/stratum/cheek-prominence-calibration-probe.json:
+# 15/24 measured, 9 honest abstains (facemesh non-detection / spans below the
+# px floor / ratio outside the human-plausible band), measured ratio range
+# 1.0807-1.2420. The provisional canon cuts (1.25/1.45) were DEGENERATE
+# (15/15 all "subtle", max_share 1.00) — no measured item clears 1.25. The
+# probe's p33/p66 cuts split the measured cohort 5 subtle / 5 moderate /
+# 5 prominent (max_share 0.3333). Authoritative cuts below are the measured
+# cohort terciles, following the nose-geometry #121 pattern (measured 7/7/7
+# at p33/p66 cuts). Bands are corpus-relative within the frozen cohort (the
+# observed ratio spread is narrow, 1.08-1.24); the qualification gate (no
+# band >= 75%) passes at max_share 0.3333.
 # ---------------------------------------------------------------------------
-SUBTLE_MAX = 1.25    # zygomatic/jaw ratio below this -> subtle cheekbones
-PROMINENT_MIN = 1.45  # above this -> prominent cheekbones
+SUBTLE_MAX = 1.133    # zygomatic/jaw ratio below this -> subtle cheekbones (cohort p33)
+PROMINENT_MIN = 1.176  # above this -> prominent cheekbones (cohort p66)
 
 
 def set_band_floors(subtle_max: float, prominent_min: float) -> None:
