@@ -33,12 +33,11 @@ Measurement (scale-invariant, from the 2D mesh, canonical 478 indices):
   human-plausible band; otherwise abstain with a surfaced reason.
 
 Verbalized band (item level, coarse): thin / medium / full. The thresholds
-are PROVISIONAL canon-derived floors (THIN_MAX / FULL_MIN below) pending the
-frozen-cohort band-calibration probe (deferred behind hold #132: the probe
-needs the full 24-item cohort and 2 sources are currently purged from
-approved/); the probe will set the authoritative cohort-calibrated cuts via
-set_band_floors() / a constant update, exactly as nose-geometry #121 did.
-Raw normalized ratios stay in the machine-readable evidence_payload and are
+are COHORT-CALIBRATED tercile cuts (THIN_MAX / FULL_MIN below, set 2026-08-11
+from the frozen-cohort calibration probe artifact
+/mnt/nas-ai-models/research/stratum/lip-fullness-calibration-probe.json;
+19/24 measured, split 6/7/6, max_share 0.3684), exactly as nose-geometry #121
+did. Raw normalized ratios stay in the machine-readable evidence_payload and are
 never caption claims.
 
 Abstention: no face detected (measured UNION policy: full frame then seg2
@@ -220,17 +219,20 @@ def compute_lip_fullness(
 
 
 # ---------------------------------------------------------------------------
-# Band floors — PROVISIONAL canon-derived cuts (2026-08-11), disclosed as
-# placeholder pending the frozen-cohort calibration probe (deferred behind
-# hold #132: 2 of 24 frozen sources are purged from approved/, so the probe
-# cannot run on the full cohort yet). The probe will set the authoritative
-# cohort tercile cuts via set_band_floors() / a constant update, following
-# the nose-geometry #121 pattern (measured 7/7/7 at p33/p66 cuts). Until the
-# probe runs, no effectiveness claim is permitted (qualification gate
-# unopened).
+# Band floors — COHORT-CALIBRATED tercile cuts (2026-08-11, frozen-cohort
+# calibration probe, artifact
+# /mnt/nas-ai-models/research/stratum/lip-fullness-calibration-probe.json:
+# 19/24 measured, 5 honest abstains (3 no-face, 2 vermilion/mouth ratio outside
+# the human-plausible band), measured ratio range 0.3741-0.9881). The probe's
+# p33/p66 cuts split the measured cohort 6 thin / 7 medium / 6 full (max_share
+# 0.3684); the provisional canon cuts (0.35/0.50) were non-degenerate (0.6316)
+# but left the "thin" band unobserved on this cohort. Authoritative cuts below
+# are the measured cohort terciles, following the nose-geometry #121 pattern
+# (measured 7/7/7 at p33/p66 cuts). Bands are corpus-relative within the frozen
+# cohort; the qualification gate (no band >= 75%) passes at max_share 0.3684.
 # ---------------------------------------------------------------------------
-THIN_MAX = 0.35  # vermilion height / mouth width below this -> thin lips
-FULL_MIN = 0.50  # above this -> full lips
+THIN_MAX = 0.434  # vermilion height / mouth width below this -> thin lips (cohort p33)
+FULL_MIN = 0.507  # above this -> full lips (cohort p66)
 
 
 def set_band_floors(thin_max: float, full_min: float) -> None:
