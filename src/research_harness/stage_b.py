@@ -66,6 +66,11 @@ from .garment_type import GarmentTypeError, compute_garment_type
 from .scene_category import SceneCategoryError, compute_scene_category
 from .hair_texture import HairTextureError, compute_hair_texture, HAIR_TEXTURE_MODEL_ASSET
 from .jewelry import JewelryError, compute_jewelry, render_jewelry, JEWELRY_MODEL_ASSET
+from .background_color import (
+    BackgroundColorError,
+    compute_background_color,
+    render_background_color,
+)
 from .image_quality import ImageQualityError, compute_image_quality
 from .bangs_forehead import BangsForeheadError, compute_bangs_forehead
 from .eye_openness import EyeOpennessError, compute_eye_openness
@@ -1614,6 +1619,88 @@ def _serialize_jewelry(config: Mapping[str, Any] | None) -> str:
     return render_jewelry(config)
 
 
+def _background_color_evidence() -> dict[str, Any]:
+    """Declared deterministic background-color specialist (arm #126).
+
+    NEW evidence part `background-color` (no new model, CPU): dominant hue
+    family (warm / cool / neutral) over the seg2 DOME-29 Background region
+    from the decoded source RGB. Registered 2026-08-11 via the gated
+    propose-dimensions channel, selected by the SELECTOR EXPLOIT slot.
+    """
+    module_path = Path(compute_background_color.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-background-color-v1",
+        "specialists": [
+            {
+                "id": "in-memory-background-color-v1",
+                "scope": ("Scale-invariant background-color band (warm / cool / neutral "
+                          "hue family of the single subject's backdrop) measured from the "
+                          "dominant per-pixel hue-family share over the seg2 DOME-29 "
+                          "Background region, with honest abstention on full-bleed subjects "
+                          "(zero Background) or degenerate color statistics. NEW evidence "
+                          "part registered 2026-08-11. Emits ONE coarse band or a surfaced "
+                          "abstention; never scene-category, pattern, or identity claims; "
+                          "only the coarse hue-family band in prose; raw mean RGB / HSV / "
+                          "shares / lightness stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Background class) + the "
+                           "already-decoded source RGB (SHA-bound via source_sha256). "
+                           "Computed in memory during this bounded run with no "
+                           "crawl/stratum write, no hosted third-party inference of the "
+                           "sensitive corpus."),
+                "output_semantics": ("Provenance-bearing scale-invariant background-color "
+                                     "band (warm / cool / neutral) or explicit abstention, "
+                                     "not semantic ground truth or caption claims; only the "
+                                     "coarse band is verbalized; raw region color stats stay "
+                                     "in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.background_color.compute_background_color "
+                    f"SHA-256 {code_hash}; deterministic from the SHA-bound decoded source "
+                    "RGB + frozen seg2.npy; computed in memory during this bounded run with "
+                    "no crawl/stratum write, no hosted third-party inference of the "
+                    "sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit None "
+                                      "with a surfaced reason) when the Background region is "
+                                      "absent (full-bleed subject) or the color statistics "
+                                      "are degenerate; never fabricate a background-color "
+                                      "band; detector disagreement remains a quality anomaly, "
+                                      "never prompt content."),
+                "known_failure_modes": ("The warm/cool/neutral hue-family cut is a coarse "
+                                        "temperature taxonomy; the 0.60 neutral-share floor "
+                                        "was calibrated on the frozen cohort (24/24 "
+                                        "measured, warm 11 / cool 6 / neutral 7, max_share "
+                                        "0.4583); band shares may shift on other cohorts; "
+                                        "lightness is deliberately payload-only because "
+                                        "setting #34 already grounds a light/mid/dark tone "
+                                        "band and a second verbalized lightness axis would "
+                                        "be redundant."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives "
+                                       "completed rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_background_color(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a background-color dict.
+
+    Verbalizes ONLY the coarse scale-invariant warm/cool/neutral hue-family
+    band. Raw family shares, mean luma, and mean RGB stay in the
+    machine-readable evidence_payload JSON and are never caption claims.
+    """
+    rendered = render_background_color(config)
+    return "\n".join(
+        ["BACKGROUND-COLOR (dominant hue family of the backdrop, scale-invariant):"]
+        + [f"- {line}" for line in rendered.splitlines()]
+    )
+
+
 def _bangs_forehead_evidence() -> dict[str, Any]:
     """Declared deterministic bangs / forehead-hair-coverage specialist
     (arm #110, NEW evidence part, no new model, CPU)."""
@@ -2952,6 +3039,11 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # (SHA-bound via source_sha256). Only seg2 shows as a named evidence
     # artifact; the source RGB is decoded in-memory during the run.
     "jewelry": ("seg2.npy",),
+    # Arm #126 background-color: deterministic dominant hue-family band (warm /
+    # cool / neutral) over the seg2 DOME-29 Background region from the decoded
+    # source RGB (SHA-bound via source_sha256). Only seg2 shows as a named
+    # evidence artifact; the source RGB is decoded in-memory during the run.
+    "background-color": ("seg2.npy",),
 }
 
 
@@ -3049,6 +3141,7 @@ def build_stage_b_plan(
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
         "facial-expression", "image-quality", "garment-type", "hair-texture",
         "bangs-forehead", "eye-openness", "hand-gesture", "jewelry",
+        "background-color",
     ):
         raise StageBRunError(f"unsupported Stage-B evidence_kind: {evidence_kind}")
     try:
@@ -4057,6 +4150,50 @@ def build_stage_b_plan(
             "probabilities/logits and the per-sub-axis bands stay in evidence_payload and are "
             "never caption claims."
         )
+    elif evidence_kind == "background-color":
+        evidence = _background_color_evidence()
+        evidence_condition_id = "context-raw-background-color"
+        comparison_plan_id = "stage-b-first500-background-color-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "background-color measurement (scale-invariant dominant hue-family band — "
+            "warm / cool / neutral — of the backdrop over the seg2 DOME-29 Background "
+            "region from the decoded source RGB; NEW evidence part registered 2026-08-11 "
+            "via the gated propose-dimensions channel, exploitative selection; CPU, no "
+            "new model) may reduce unsupported background-color claims ('blue backdrop', "
+            "'warm beige wall') that the validated setting #34 (semantic pattern/tone/"
+            "vibrancy/named-palette), scene-category #69 (semantic place) and "
+            "environment-clearance #85 (negative space) axes cannot ground, or increase "
+            "supported background claims in captions versus its matched no-evidence "
+            "baseline when the source item, view, prompt template, local model, and "
+            "generation settings are controlled."
+        )
+        falsified_if = (
+            "The background-color evidence condition does not reduce unsupported "
+            "background-color claims or increase supported claims versus its matched "
+            "no-evidence baseline, or the hue-family bands collapse (a single band taking "
+            ">=75% of measured items), or the axis is redundant with scene-category #69 / "
+            "setting #34 (degenerate), or an apparent difference is attributable to an "
+            "uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs (pose2 stays a validation-only read for the exactly-one-subject "
+            "invariant). Background color is computed in memory from the frozen selected "
+            "seg2.npy (DOME-29 Background class, same MIN_BG_PX / MIN_BG_COVERAGE gates "
+            "as setting #34) + the already-decoded source RGB (SHA-bound via "
+            "source_sha256). Capability probe (2026-08-11, "
+            "/mnt/nas-ai-models/research/stratum/background-color-calibration-probe.json): "
+            "24/24 measured, warm 11 / cool 6 / neutral 7 (max_share 0.4583 < 0.75 "
+            "NON-degenerate), coverage floor 8/24 MET, 0 abstentions. Only the coarse "
+            "scale-invariant hue-family band is verbalized; raw family shares, mean luma, "
+            "and mean RGB stay in evidence_payload and are never caption claims. "
+            "Lightness is deliberately PAYLOAD-only because setting #34 already grounds a "
+            "light/mid/dark tone band and a second verbalized lightness axis would be "
+            "redundant (registration falsified_if guards the setting/scene-category "
+            "redundance too)."
+        )
     elif evidence_kind == "context4k":
         evidence = _context4k_evidence()
         evidence_condition_id = "context-raw-context4k"
@@ -4376,6 +4513,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "hand-gesture"
     elif "context-raw-jewelry" in condition_ids:
         rebuild_kind = "jewelry"
+    elif "context-raw-background-color" in condition_ids:
+        rebuild_kind = "background-color"
     elif "context-raw-vlm-dense" in condition_ids:
         rebuild_kind = "vlm-dense"
     elif "context-raw-context4k" in condition_ids:
@@ -4464,6 +4603,7 @@ def _load_selected_item(
     include_eye_openness: bool = False,
     include_hand_gesture: bool = False,
     include_jewelry: bool = False,
+    include_background_color: bool = False,
 ) -> dict[str, Any]:
     relative_path = _safe_relative_path(item.get("source_relative_path"), "candidate item source_relative_path")
     source_path = _require_contained(source_root / relative_path, source_root, "selected source")
@@ -4763,6 +4903,17 @@ def _load_selected_item(
             raise StageBRunError(
                 f"jewelry abort for frozen selected item {image_id}: {exc}"
             ) from exc
+    background_color = None
+    if include_background_color:
+        try:
+            background_color = compute_background_color(
+                seg2,
+                np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8)),
+            )
+        except BackgroundColorError as exc:
+            raise StageBRunError(
+                f"background-color abort for frozen selected item {image_id}: {exc}"
+            ) from exc
     lighting = None
     if "normal2.npy" in expected_evidence_hashes:
         normal2 = artifact("normal2.npy", required=True)
@@ -4813,6 +4964,7 @@ def _load_selected_item(
         "eye_openness": eye_openness,
         "hand_gesture": hand_gesture,
         "jewelry": jewelry,
+        "background_color": background_color,
         "evidence_input_artifact_sha256": dict(expected_evidence_hashes),
         "source_byte_read_count": 1,
         "derived_reads": derived_reads,
@@ -5077,6 +5229,10 @@ def _render_condition(
         jewelry = prepared.get("jewelry")
         evidence_text = _serialize_jewelry(jewelry)
         return raw.copy(), _context_prompt(evidence_text), jewelry
+    if condition_id == "context-raw-background-color":
+        background_color = prepared.get("background_color")
+        evidence_text = _serialize_background_color(background_color)
+        return raw.copy(), _context_prompt(evidence_text), background_color
     if condition_id == "context-raw-context4k":
         evidence_text, meta = _rendered_context4k(prepared)
         return raw.copy(), _context_prompt(evidence_text), meta
@@ -5398,6 +5554,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-jewelry"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #126 background-color: only the background-color run computes the
+    # deterministic hue-family band (NEW evidence part, CPU, no new model) —
+    # gate on the frozen plan's conditions.
+    include_background_color = any(
+        str(condition.get("id")) == "context-raw-background-color"
+        for condition in (plan.get("conditions") or [])
+    )
 
     # Preflight all frozen inputs before model invocation so an input epoch cannot
     # silently split a paired comparison halfway through the cohort.
@@ -5429,6 +5592,7 @@ def execute_stage_b(
             include_eye_openness=include_eye_openness,
             include_hand_gesture=include_hand_gesture,
             include_jewelry=include_jewelry,
+            include_background_color=include_background_color,
         )
         for item in items
     ]
