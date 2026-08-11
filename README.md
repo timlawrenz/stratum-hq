@@ -1,6 +1,21 @@
 # stratum-hq
 
+> **Research agents:** read [AGENTS.md](AGENTS.md) before acting. The active research program, autonomy boundary, evidence rules, and current next action are in [PROJECT_STATUS.md](PROJECT_STATUS.md), [RESEARCH_CONTRACT.md](RESEARCH_CONTRACT.md), and [`research/program.json`](research/program.json).
+
 A dataset-agnostic image enrichment pipeline. Given any directory of images, stratum produces per-image artifact directories containing multi-modal embeddings, captions, pose keypoints, body-part segmentation, depth maps, and surface normals — ready for publishing to HuggingFace or training diffusion models.
+
+## Research orientation
+
+The repository also contains a reusable, GitHub-centered autonomous-research harness. It treats issues as a branching evidence tree—not a FIFO product backlog—and requires pre-registration, provenance, negative-result preservation, controlled comparisons, draft-PR-only work, and GPU-scheduler integration.
+
+For the active Stratum program, `crawlr/approved` is the canonical source corpus. Research explores open-world specialist evidence and contextual aggregation: a rich provenance-bearing evidence dossier may be compressed into a first-class long-context representation without silently replacing the legacy 512-token T5 paths. See:
+
+- [Project status](PROJECT_STATUS.md)
+- [Research contract](RESEARCH_CONTRACT.md)
+- [Experiment tree](docs/EXPERIMENT_TREE.md)
+- [Results ledger](docs/EXPERIMENTS_AND_RESULTS.md)
+- [Research control plane](research/README.md)
+
 
 **stratum** uses Sapiens-1B TorchScript models (v1).  
 **stratum2** uses Sapiens2 specialized safetensors checkpoints (v2) — higher quality, more modalities.
