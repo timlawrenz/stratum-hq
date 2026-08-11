@@ -57,6 +57,11 @@ from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
 from .nose_geometry import NoseGeometryError, compute_nose_geometry
 from .lip_fullness import LipFullnessError, compute_lip_fullness
 from .eye_shape import EyeShapeError, compute_eye_shape
+from .hand_face_ratio import (
+    HandFaceRatioError,
+    compute_hand_face_ratio,
+    render_hand_face_ratio as _render_hand_face_ratio,
+)
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
@@ -1554,6 +1559,89 @@ def _serialize_eye_shape(config: Mapping[str, Any] | None) -> str:
     elif band == "medium":
         lines.append("- the eyes are of medium roundness (typical fissure aspect)")
     return "\n".join(lines)
+
+
+def _serialize_hand_face_ratio(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a hand-face-ratio dict.
+
+    Verbalizes ONLY the coarse band (small / typical / large). Raw
+    normalized ratios / per-hand payloads stay in the machine-readable
+    evidence_payload JSON and are never caption claims.
+    """
+    return "\n".join(_render_hand_face_ratio(config))
+
+
+def _hand_face_ratio_evidence() -> dict[str, Any]:
+    """Declared deterministic hand-face-ratio specialist (arm #124)."""
+    module_path = Path(compute_hand_face_ratio.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    face_model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    face_model_sha = _sha256(face_model_path.read_bytes()) if face_model_path.exists() else "MISSING"
+    hand_model_path = Path(HAND_GESTURE_MODEL_ASSET)
+    hand_model_sha = _sha256(hand_model_path.read_bytes()) if hand_model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-hand-face-ratio-v1",
+        "specialists": [
+            {
+                "id": "in-memory-hand-face-ratio-v1",
+                "scope": ("Scale-invariant relational hand-size band (small / typical / "
+                          "large) of the single subject's hands relative to her face, fusing "
+                          "two already-qualified MediaPipe models on owned hardware: the "
+                          "21-point HandLandmarker (arm #109) for palm length / face width, "
+                          "and the 478-point FaceLandmarker (arm #60) for the face-width "
+                          "denominator, both projected to full-frame pixel coordinates. NEW "
+                          "relational evidence part registered 2026-08-11 via the gated "
+                          "propose-dimensions channel; NO new model class (reuses #109 + "
+                          "#60 models). Only the coarse band in prose; raw ratios / "
+                          "per-hand payloads stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask for the "
+                           "face crop fallback) + the already-decoded source RGB; local "
+                           "open-weight hand_landmarker.task + face_landmarker.task "
+                           "(MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant hand-face-ratio "
+                                     "band (small / typical / large) or explicit abstention, "
+                                     "not semantic ground truth or caption claims; only the "
+                                     "coarse band is verbalized; raw normalized ratios / "
+                                     "per-hand payloads stay in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.hand_face_ratio.compute_hand_face_ratio "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {face_model_sha} "
+                    f"(arm #60) + hand_landmarker.task sha256 {hand_model_sha} (arm #109), "
+                    "Open-weight MediaPipe, Apache-2.0, local CPU, owned hardware; computed "
+                    "in memory during this bounded run with no crawlr/stratum write, no hosted "
+                    "third-party inference of the sensitive corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop, or HandLandmarker finds "
+                                      "no hand on the full frame or the 2x upscale (arm-#109 "
+                                      "policy), or the measured ratio is outside the "
+                                      "human-plausible depth band; never fabricate a hand-size "
+                                      "read; detector disagreement remains a quality anomaly, "
+                                      "never prompt content."),
+                "known_failure_modes": ("Fusion depends on BOTH detectors firing on the same "
+                                        "item: items with no visible hand (cohort-measured ~14/24 "
+                                        "for hand-gesture #109) or no face (facemesh union abstains "
+                                        "3/24) abstain honestly; a hand held at very different "
+                                        "depth than the face confounds the ratio and is gated by "
+                                        "the plausibility band; the band cuts are canon-derived "
+                                        "provisionals pending the frozen-cohort calibration probe "
+                                        "(deferred behind hold #132 — 2 of 24 frozen sources purged "
+                                        "from approved/) and will be re-cut at the cohort terciles "
+                                        "exactly as nose-geometry #121 did; the max-pairwise 'span' "
+                                        "is gesture-dependent and reported payload-only (primary "
+                                        "band reads the gesture-robust palm length)."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
 
 
 def _object_relations_evidence() -> dict[str, Any]:
@@ -3377,6 +3465,12 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "eye-shape": ("seg2.npy",),
+    # Arm #124 hand-face-ratio: deterministic relational hand-size band from
+    # the LOCAL MediaPipe HandLandmarker (arm #109) + FaceLandmarker (arm
+    # #60) over the full frame + seg2 Face_Neck crop fallback + the
+    # already-decoded source RGB. Only seg2 shows as a named evidence
+    # artifact; the source RGB is SHA-bound via the item's source_sha256.
+    "hand-face-ratio": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
     # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
     # full-frame source RGB (SHA-bound via the item's source_sha256). No
@@ -3566,6 +3660,7 @@ def build_stage_b_plan(
         "nose-geometry",
         "lip-fullness",
         "eye-shape",
+        "hand-face-ratio",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
@@ -4059,6 +4154,57 @@ def build_stage_b_plan(
             "validated — eye_spacing 0.445/0.475) and is NOT claimed by this arm "
             "(falsified_if non-redundance); the verbalized set is almond / medium / "
             "round on the fissure aspect."
+        )
+    elif evidence_kind == "hand-face-ratio":
+        evidence = _hand_face_ratio_evidence()
+        evidence_condition_id = "context-raw-hand-face-ratio"
+        comparison_plan_id = "stage-b-first500-hand-face-ratio-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared relational "
+            "hand-size measurement (scale-invariant palm-length / face-width ratio, "
+            "fusing the local open-weight MediaPipe 21-point HandLandmarker (arm "
+            "#109) + 478-point FaceLandmarker (arm #60) on the full frame / seg2 "
+            "Face_Neck crop, banded small/typical/large at canon-derived provisional "
+            "cuts pending the frozen-cohort calibration probe; NEW relational evidence "
+            "part registered 2026-08-11 via the gated propose-dimensions channel, "
+            "exploitative selection; CPU, reuses the already-qualified #109 + #60 "
+            "models, NO new model class) may reduce unsupported hand-size claims "
+            "('small/delicate hands', 'large hands') that hand-gesture #109 (gesture "
+            "class) and face-geometry #60 (face-internal proportions) cannot ground, "
+            "versus the matched no-evidence baseline when the source item, view, "
+            "prompt template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The hand-face-ratio evidence condition does not reduce unsupported "
+            "hand-size claims or increase supported claims versus its matched "
+            "no-evidence baseline, or the hands bands collapse (a single band taking "
+            ">=75% of measured items), or the axis is redundant with hand-gesture "
+            "#109 / face-geometry #60 (degenerate), or an apparent difference is "
+            "attributable to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs for the hand-face-ratio measurement (pose2 stays a validation-only "
+            "read for the exactly-one-subject invariant). Hand-face-ratio is computed "
+            "in memory from the frozen selected seg2.npy (DOME-29 Face_Neck mask for "
+            "the crop fallback) + the already-decoded source RGB via the local "
+            "open-weight MediaPipe HandLandmarker + FaceLandmarker (Apache-2.0, owned "
+            "hardware, CPU, tasks API; models hand_landmarker.task sha256 "
+            "fbc2a300... (arm #109) + face_landmarker.task sha256 64184e229b... (arm "
+            "#60)). Only the coarse scale-invariant band (small / typical / large) is "
+            "verbalized; raw palm-length/face-width ratios, palmar-span and palm-width "
+            "payload corroborations, per-hand payloads and detection-grade notes stay "
+            "in evidence_payload and are never caption claims. Band calibration: "
+            "PROVISIONAL canon-derived cuts (SMALL_MAX 0.65 / LARGE_MIN 1.00 on "
+            "palm-length / face-width) pending the frozen-cohort calibration probe — "
+            "deferred behind hold #132 (2 of 24 frozen sources purged from approved/, "
+            "every Stage-B arm's preflight gated); the probe will set cohort-tercile "
+            "cuts via set_band_floors()/constant update exactly as nose-geometry #121 "
+            "did, and the round trip runs only after the gate clears. The primary "
+            "verbalized metric is the GESTURE-ROBUST palm length (wrist->middle-MCP); "
+            "the max-pairwise 'span' is gesture-dependent (collapses under a fist) "
+            "and reported payload-only, disclosed in the module declaration."
         )
     elif evidence_kind == "object-relations":
         evidence = _object_relations_evidence()
@@ -5092,6 +5238,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "lip-fullness"
     elif "context-raw-eye-shape" in condition_ids:
         rebuild_kind = "eye-shape"
+    elif "context-raw-hand-face-ratio" in condition_ids:
+        rebuild_kind = "hand-face-ratio"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
@@ -5207,6 +5355,7 @@ def _load_selected_item(
     include_nose_geometry: bool = False,
     include_lip_fullness: bool = False,
     include_eye_shape: bool = False,
+    include_hand_face_ratio: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_image_quality: bool = False,
@@ -5388,6 +5537,19 @@ def _load_selected_item(
         except EyeShapeError as exc:
             raise StageBRunError(
                 f"eye-shape abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    hand_face_ratio = None
+    if include_hand_face_ratio:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            hand_face_ratio = compute_hand_face_ratio(
+                seg2, rgb,
+                face_model_asset_path=FACE_GEOMETRY_MODEL_ASSET,
+                hand_model_asset_path=HAND_GESTURE_MODEL_ASSET,
+            )
+        except HandFaceRatioError as exc:
+            raise StageBRunError(
+                f"hand-face-ratio abort for frozen selected item {image_id}: {exc}"
             ) from exc
     object_relations = None
     if include_object_relations:
@@ -5616,6 +5778,7 @@ def _load_selected_item(
         "nose_geometry": nose_geometry,
         "lip_fullness": lip_fullness,
         "eye_shape": eye_shape,
+        "hand_face_ratio": hand_face_ratio,
         "object_relations": object_relations,
         "scene_category": scene_category,
         "image_quality": image_quality,
@@ -5834,6 +5997,10 @@ def _render_condition(
         eye_shape = prepared.get("eye_shape")
         evidence_text = _serialize_eye_shape(eye_shape)
         return raw.copy(), _context_prompt(evidence_text), eye_shape
+    if condition_id == "context-raw-hand-face-ratio":
+        hand_face_ratio = prepared.get("hand_face_ratio")
+        evidence_text = _serialize_hand_face_ratio(hand_face_ratio)
+        return raw.copy(), _context_prompt(evidence_text), hand_face_ratio
     if condition_id == "context-raw-object-relations":
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
@@ -6132,6 +6299,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eye-shape"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #124: only the hand-face-ratio run invokes the local MediaPipe
+    # HandLandmarker + FaceLandmarker (arms #109 + #60 meshes, CPU) — gate on
+    # the frozen plan's conditions.
+    include_hand_face_ratio = any(
+        str(condition.get("id")) == "context-raw-hand-face-ratio"
+        for condition in (plan.get("conditions") or [])
+    )
     include_object_relations = any(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
@@ -6292,6 +6466,7 @@ def execute_stage_b(
             include_nose_geometry=include_nose_geometry,
             include_lip_fullness=include_lip_fullness,
             include_eye_shape=include_eye_shape,
+            include_hand_face_ratio=include_hand_face_ratio,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_image_quality=include_image_quality,
