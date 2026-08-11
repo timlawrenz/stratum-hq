@@ -58,6 +58,7 @@ from .nose_geometry import NoseGeometryError, compute_nose_geometry
 from .lip_fullness import LipFullnessError, compute_lip_fullness
 from .eye_shape import EyeShapeError, compute_eye_shape
 from .eyebrow_thickness import EyebrowThicknessError, compute_eyebrow_thickness
+from .cheek_prominence import CheekProminenceError, compute_cheek_prominence
 from .hand_face_ratio import (
     HandFaceRatioError,
     compute_hand_face_ratio,
@@ -1664,6 +1665,114 @@ def _serialize_eyebrow_thickness(config: Mapping[str, Any] | None) -> str:
         lines.append("- the eyebrows are thick (large vertical extent)")
     elif band == "medium":
         lines.append("- the eyebrows are of medium thickness (typical vertical extent)")
+    return "\n".join(lines)
+
+
+def _cheek_prominence_evidence() -> dict[str, Any]:
+    """Declared deterministic cheek-prominence specialist (arm #128)."""
+    module_path = Path(compute_cheek_prominence.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-cheek-prominence-v1",
+        "specialists": [
+            {
+                "id": "in-memory-cheek-prominence-v1",
+                "scope": ("Scale-invariant cheekbone prominence (zygomatic-arch "
+                          "span 116-345 / lower-jaw span 172-397) of the single "
+                          "subject from the already-qualified MediaPipe "
+                          "FaceLandmarker 478-point mesh (same model as "
+                          "face-geometry #60 / gaze-head #68 / eyebrow-position "
+                          "#111 / nose-geometry #121 / lip-fullness #122 / "
+                          "eye-shape #123 / eyebrow-thickness #127), banded "
+                          "subtle/moderate/prominent at canon-derived provisional "
+                          "cuts pending the frozen-cohort calibration probe, with "
+                          "honest abstention on no-face / degenerate spans / "
+                          "implausible ratios (profile-view or zygomatic "
+                          "occlusion) / mid-sagittal misalignment. ANTI-REDUNDANCY "
+                          "disclosure: the primary pair is the zygomatic-arch pair "
+                          "116/345, NOT face-geometry #60's face-width cheek pair "
+                          "234/454 — reusing 234/454 would make cheek/jaw the "
+                          "exact reciprocal of the already-validated jaw/face-width "
+                          "axis (degenerate redundancy); the jaw pair 172/397 is "
+                          "shared with #60 so the axes compose on a common anchor. "
+                          "Never identity, expression, or face-geometry claims; "
+                          "only the coarse band in prose; raw ratios stay "
+                          "payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant cheek-prominence band "
+                                     "(subtle / moderate / prominent) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse "
+                                     "band is verbalized; raw zygomatic/jaw spans and ratios stay "
+                                     "in the machine-readable payload."),
+                "provenance": (
+                    "research_harness.cheek_prominence.compute_cheek_prominence "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no hosted third-party inference of the sensitive "
+                    "corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop (measured union policy) "
+                                      "or either span is degenerate-small or the zygomatic/jaw "
+                                      "ratio is outside the human-plausible band (profile view / "
+                                      "zygomatic occlusion / landmark failure) or the mid-sagittal "
+                                      "alignment check fails; never fabricate a prominence read; "
+                                      "detector disagreement remains a quality anomaly, never "
+                                      "prompt content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection on the "
+                                        "facemesh arms bounds it); severe yaw collapses the "
+                                        "zygomatic span and is caught by the ratio band, surfacing "
+                                        "as honest abstention (never guessed); the band cuts are "
+                                        "canon-derived provisionals pending the frozen-cohort "
+                                        "calibration probe (deferred behind hold #132 — 2 of 24 "
+                                        "frozen sources purged from approved/) and will be re-cut "
+                                        "at the cohort terciles exactly as eyebrow-position #111 "
+                                        "did."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_cheek_prominence(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of a cheek-prominence dict.
+
+    Verbalizes ONLY the coarse band (subtle / moderate / prominent). Raw
+    zygomatic/jaw spans and ratios stay in the machine-readable
+    evidence_payload JSON and are never caption claims.
+    """
+    lines = ["CHEEK-PROMINENCE (zygomatic arch vs jaw width, scale-invariant):"]
+    if not config:
+        lines.append("- cheek-prominence not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "cheekbone prominence not measurable"
+        lines.append(f"- cheek-prominence abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- cheek-prominence measured but not banded (payload)")
+        return "\n".join(lines)
+    band = config.get("cheek_prominence_band")
+    if band == "subtle":
+        lines.append("- the cheekbones are subtle (zygomatic arch narrow relative to the jaw)")
+    elif band == "prominent":
+        lines.append("- the cheekbones are prominent (zygomatic arch wide relative to the jaw)")
+    elif band == "moderate":
+        lines.append("- the cheekbones are of moderate prominence (typical zygomatic-to-jaw ratio)")
     return "\n".join(lines)
 
 
@@ -3578,6 +3687,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "eyebrow-thickness": ("seg2.npy",),
+    # Arm #128 cheek-prominence: deterministic zygomatic/jaw-ratio band from
+    # the LOCAL MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "cheek-prominence": ("seg2.npy",),
     # Arm #124 hand-face-ratio: deterministic relational hand-size band from
     # the LOCAL MediaPipe HandLandmarker (arm #109) + FaceLandmarker (arm
     # #60) over the full frame + seg2 Face_Neck crop fallback + the
@@ -3774,6 +3890,7 @@ def build_stage_b_plan(
         "lip-fullness",
         "eye-shape",
         "eyebrow-thickness",
+        "cheek-prominence",
         "hand-face-ratio",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
@@ -4320,6 +4437,59 @@ def build_stage_b_plan(
             "will set cohort-tercile cuts via set_band_floors()/constant update exactly "
             "as eyebrow-position #111 did, and the round trip runs only after the gate "
             "clears."
+        )
+    elif evidence_kind == "cheek-prominence":
+        evidence = _cheek_prominence_evidence()
+        evidence_condition_id = "context-raw-cheek-prominence"
+        comparison_plan_id = "stage-b-first500-cheek-prominence-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "cheek-prominence measurement (scale-invariant zygomatic-arch span 116/345 / "
+            "lower-jaw span 172/397 from the local open-weight MediaPipe FaceLandmarker "
+            "478-point mesh over the full frame / seg2 Face_Neck crop, union detection "
+            "policy, banded subtle/moderate/prominent at canon-derived provisional cuts "
+            "pending the frozen-cohort calibration probe; NEW evidence part registered "
+            "2026-08-11 via the gated propose-dimensions channel, exploitative selection; "
+            "CPU, reuses the already-qualified arm #60 model) may reduce unsupported "
+            "cheekbone claims ('high cheekbones', 'sculpted cheekbones', 'soft "
+            "cheekbones') that face-geometry #60 (eye-spacing/mouth/jaw/midface) and "
+            "facial-expression #81 (smile geometry) cannot ground, versus the matched "
+            "no-evidence baseline when the source item, view, prompt template, local "
+            "model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The cheek-prominence evidence condition does not reduce unsupported "
+            "cheekbone claims or increase supported claims versus its matched "
+            "no-evidence baseline, or the bands collapse (a single band taking >=75% of "
+            "measured items), or the axis is redundant with face-geometry #60 "
+            "(degenerate), or an apparent difference is attributable to an uncontrolled "
+            "change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs for the cheek-prominence measurement (pose2 stays a validation-only "
+            "read for the exactly-one-subject invariant). Cheekbone prominence is "
+            "computed in memory from the frozen selected seg2.npy (DOME-29 Face_Neck "
+            "mask) + the already-decoded source RGB via the local open-weight MediaPipe "
+            "FaceLandmarker (Apache-2.0, owned hardware, CPU, tasks API; model "
+            "face_landmarker.task sha256 64184e229b..., the same model as arm #60). "
+            "Only the coarse scale-invariant band (subtle / moderate / prominent) is "
+            "verbalized; raw zygomatic/jaw spans and ratios stay in evidence_payload "
+            "and are never caption claims. ANTI-REDUNDANCY disclosure: the primary "
+            "zygomatic pair is 116/345, NOT face-geometry #60's face-width cheek pair "
+            "234/454 — reusing 234/454 would make cheek/jaw the exact reciprocal of the "
+            "validated jaw/face-width axis (degenerate redundancy); the jaw pair 172/397 "
+            "is shared with #60 so both axes compose on a common anchor. Abstention "
+            "surfaced for profile-view / zygomatic occlusion (ratio outside the "
+            "human-plausible band [0.9, 2.0]), degenerate spans, and mid-sagittal "
+            "misalignment — never guessed. Band calibration: PROVISIONAL canon-derived "
+            "cuts (SUBTLE_MAX 1.25 / PROMINENT_MIN 1.45 on zygomatic/jaw) pending the "
+            "frozen-cohort calibration probe — deferred behind hold #132 (2 of 24 frozen "
+            "sources purged from approved/, every Stage-B arm's preflight gated); the "
+            "probe will set cohort-tercile cuts via set_band_floors()/constant update "
+            "exactly as nose-geometry #121 did, and the round trip runs only after the "
+            "gate clears."
         )
     elif evidence_kind == "hand-face-ratio":
         evidence = _hand_face_ratio_evidence()
@@ -5406,6 +5576,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "eye-shape"
     elif "context-raw-eyebrow-thickness" in condition_ids:
         rebuild_kind = "eyebrow-thickness"
+    elif "context-raw-cheek-prominence" in condition_ids:
+        rebuild_kind = "cheek-prominence"
     elif "context-raw-hand-face-ratio" in condition_ids:
         rebuild_kind = "hand-face-ratio"
     elif "context-raw-object-relations" in condition_ids:
@@ -5524,6 +5696,7 @@ def _load_selected_item(
     include_lip_fullness: bool = False,
     include_eye_shape: bool = False,
     include_eyebrow_thickness: bool = False,
+    include_cheek_prominence: bool = False,
     include_hand_face_ratio: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
@@ -5717,6 +5890,17 @@ def _load_selected_item(
         except EyebrowThicknessError as exc:
             raise StageBRunError(
                 f"eyebrow-thickness abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    cheek_prominence = None
+    if include_cheek_prominence:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            cheek_prominence = compute_cheek_prominence(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except CheekProminenceError as exc:
+            raise StageBRunError(
+                f"cheek-prominence abort for frozen selected item {image_id}: {exc}"
             ) from exc
     hand_face_ratio = None
     if include_hand_face_ratio:
@@ -5959,6 +6143,7 @@ def _load_selected_item(
         "lip_fullness": lip_fullness,
         "eye_shape": eye_shape,
         "eyebrow_thickness": eyebrow_thickness,
+        "cheek_prominence": cheek_prominence,
         "hand_face_ratio": hand_face_ratio,
         "object_relations": object_relations,
         "scene_category": scene_category,
@@ -6182,6 +6367,10 @@ def _render_condition(
         eyebrow_thickness = prepared.get("eyebrow_thickness")
         evidence_text = _serialize_eyebrow_thickness(eyebrow_thickness)
         return raw.copy(), _context_prompt(evidence_text), eyebrow_thickness
+    if condition_id == "context-raw-cheek-prominence":
+        cheek_prominence = prepared.get("cheek_prominence")
+        evidence_text = _serialize_cheek_prominence(cheek_prominence)
+        return raw.copy(), _context_prompt(evidence_text), cheek_prominence
     if condition_id == "context-raw-hand-face-ratio":
         hand_face_ratio = prepared.get("hand_face_ratio")
         evidence_text = _serialize_hand_face_ratio(hand_face_ratio)
@@ -6491,6 +6680,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-eyebrow-thickness"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #128: only the cheek-prominence run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_cheek_prominence = any(
+        str(condition.get("id")) == "context-raw-cheek-prominence"
+        for condition in (plan.get("conditions") or [])
+    )
     # Arm #124: only the hand-face-ratio run invokes the local MediaPipe
     # HandLandmarker + FaceLandmarker (arms #109 + #60 meshes, CPU) — gate on
     # the frozen plan's conditions.
@@ -6659,6 +6855,7 @@ def execute_stage_b(
             include_lip_fullness=include_lip_fullness,
             include_eye_shape=include_eye_shape,
             include_eyebrow_thickness=include_eyebrow_thickness,
+            include_cheek_prominence=include_cheek_prominence,
             include_hand_face_ratio=include_hand_face_ratio,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
