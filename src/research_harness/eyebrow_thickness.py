@@ -43,14 +43,13 @@ Measurement (scale-invariant, per side, from the 2D mesh):
   (disclosed, asymmetry-flagged) fallback; no measurable side abstains.
 
 Verbalized band (item level, coarse): thin / medium / thick, read from the
-item-level mean brow thickness. The thresholds are PROVISIONAL canon-derived
-cuts (THIN_MAX / THICK_MIN below): canonical adult brow vertical extent is
-roughly 5-9 mm against an eye width of ~30 mm, so thin < 0.15, thick > 0.25
-of eye width. They are disclosed as placeholders pending the frozen-cohort
-calibration probe (deferred behind hold #132: 2 of 24 frozen sources are
-currently purged from approved/); the probe will set the authoritative
-cohort-calibrated cuts via set_band_floors(), exactly as nose-geometry #121
-and eyebrow-position #111 did. Raw normalized ratios stay in the
+item-level mean brow thickness. The thresholds are COHORT-CALIBRATED tercile
+cuts (THIN_MAX / THICK_MIN below, set 2026-08-11 from the frozen-cohort
+calibration probe artifact
+/mnt/nas-ai-models/research/stratum/eyebrow-thickness-calibration-probe.json;
+20/24 measured, split 6/7/7, max_share 0.35). Bands are corpus-relative
+within the frozen cohort, exactly as nose-geometry #121 and eyebrow-position
+#111 calibrated. Raw normalized ratios stay in the
 machine-readable evidence_payload and are never caption claims.
 
 Abstention: no face detected (measured UNION policy: full frame then seg2
@@ -250,18 +249,20 @@ def compute_eyebrow_thickness(
 
 
 # ---------------------------------------------------------------------------
-# Band floors — PROVISIONAL canon-derived cuts (2026-08-11), disclosed as
-# placeholder pending the frozen-cohort calibration probe (deferred behind
-# hold #132: 2 of 24 frozen sources are purged from approved/, so the probe
-# cannot run on the full cohort yet). Canonical adult brow vertical extent
-# ~5-9mm vs eye width ~30mm -> thin < 0.15, thick > 0.25 of eye width; the
-# probe will set the authoritative cohort tercile cuts via set_band_floors()
-# / a constant update, following the eyebrow-position #111 pattern. Until the
-# probe runs, no effectiveness claim is permitted (qualification gate
-# unopened).
+# Band floors — COHORT-CALIBRATED tercile cuts (2026-08-11, frozen-cohort
+# calibration probe, artifact
+# /mnt/nas-ai-models/research/stratum/eyebrow-thickness-calibration-probe.json:
+# 20/24 measured, 4 honest abstains, measured brow_thickness range
+# 0.0360-0.3411). The probe's p33/p66 cuts split the measured cohort
+# 6 thin / 7 medium / 7 thick (max_share 0.35); the provisional canon cuts
+# (0.15/0.25) were non-degenerate (0.70) but left the outer bands barely
+# populated (3/3). Authoritative cuts below are the measured cohort terciles,
+# following the nose-geometry #121 pattern (measured 7/7/7 at p33/p66 cuts).
+# Bands are corpus-relative within the frozen cohort; the qualification gate
+# (no band >= 75%) passes at max_share 0.35.
 # ---------------------------------------------------------------------------
-THIN_MAX = 0.15  # brow thickness below this -> thin
-THICK_MIN = 0.25  # brow thickness above this -> thick
+THIN_MAX = 0.183  # brow thickness below this -> thin (cohort p33)
+THICK_MIN = 0.217  # brow thickness above this -> thick (cohort p66)
 
 
 def set_band_floors(thin_max: float, thick_min: float) -> None:
