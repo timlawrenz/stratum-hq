@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--review-root", default=str(REVIEW_ROOT))
     parser.add_argument("--source-root", default=str(SOURCE_ROOT))
     parser.add_argument("--job-id", default=JOB_ID)
+    parser.add_argument("--vram", default="22", help="scheduler VRAM reservation GB (default %(default)s)")
     parser.add_argument("--request", action="store_true")
     args = parser.parse_args(argv)
 
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     review_root = Path(args.review_root)
     source_root = Path(args.source_root)
     job_id = args.job_id
+    vram_gb = args.vram
     request_if_missing = args.request
 
     candidate = json.loads(CANDIDATE_MANIFEST.read_text(encoding="utf-8"))
@@ -75,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         if request_if_missing:
             result = _scheduler("request", [
                 "--gpu", "4090", "--project", "stratum-contextual-specialist-research",
-                "--vram", "22", "--duration", "1h", "--job-id", job_id,
+                "--vram", vram_gb, "--duration", "1h", "--job-id", job_id,
             ])
             if result != job_id:
                 raise StageBReviewError(f"scheduler request returned unexpected job identity: {result}")
