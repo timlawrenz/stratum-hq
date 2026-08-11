@@ -56,6 +56,7 @@ from .face_geometry import FaceGeometryError, compute_face_geometry
 from .eyebrow_position import EyebrowPositionError, compute_eyebrow_position
 from .nose_geometry import NoseGeometryError, compute_nose_geometry
 from .lip_fullness import LipFullnessError, compute_lip_fullness
+from .eye_shape import EyeShapeError, compute_eye_shape
 from .object_relations import ObjectRelationsError, compute_object_relations
 from .affordance_contact import AffordanceContactError, compute_affordance_contact
 from .body_configuration import BodyConfigurationError, compute_body_configuration
@@ -1449,6 +1450,109 @@ def _serialize_lip_fullness(config: Mapping[str, Any] | None) -> str:
         lines.append("- the lips are full (tall vermilion relative to mouth width)")
     elif band == "medium":
         lines.append("- the lips are of medium fullness relative to mouth width")
+    return "\n".join(lines)
+
+
+def _eye_shape_evidence() -> dict[str, Any]:
+    """Declared deterministic eye-shape specialist (arm #123)."""
+    module_path = Path(compute_eye_shape.__code__.co_filename)
+    code_hash = _sha256(module_path.read_bytes())
+    model_path = Path(FACE_GEOMETRY_MODEL_ASSET)
+    model_sha = _sha256(model_path.read_bytes()) if model_path.exists() else "MISSING"
+    evidence: dict[str, Any] = {
+        "kind": "specialist_bundle",
+        "id": "in-memory-eye-shape-v1",
+        "specialists": [
+            {
+                "id": "in-memory-eye-shape-v1",
+                "scope": ("Scale-invariant eye-shape (palpebral fissure aspect — "
+                          "fissure height / fissure width — plus corner orientation) "
+                          "of the single subject from the already-qualified MediaPipe "
+                          "FaceLandmarker 478-point mesh (same model as face-geometry "
+                          "#60 / gaze-head #68 / eyebrow-position #111 / nose-geometry "
+                          "#121 / lip-fullness #122): per-eye fissure aspect mean, "
+                          "banded almond/medium/round at canon-derived provisional cuts "
+                          "pending the frozen-cohort calibration probe, with honest "
+                          "abstention on no-face / closed eyes (unmeasurable fissure) / "
+                          "implausible geometry. Never eye-color, openness, spacing, or "
+                          "identity claims; only the coarse band in prose; raw ratios "
+                          "stay payload-only."),
+                "inputs": ("Frozen selected-item seg2.npy (DOME-29 Face_Neck mask) + the "
+                           "already-decoded source RGB; local open-weight face_landmarker.task "
+                           "model (MediaPipe, CPU, tasks API, owned hardware). Recomputed in "
+                           "memory during this bounded run with no crawlr/stratum write."),
+                "output_semantics": ("Provenance-bearing scale-invariant eye-shape band "
+                                     "(almond / medium / round) or explicit abstention, not "
+                                     "semantic ground truth or caption claims; only the coarse "
+                                     "band is verbalized; raw normalized aspect ratios / "
+                                     "per-eye payloads / canthal tilt stay in the "
+                                     "machine-readable payload."),
+                "provenance": (
+                    "research_harness.eye_shape.compute_eye_shape "
+                    f"SHA-256 {code_hash}; model face_landmarker.task sha256 {model_sha} "
+                    "(Open-weight MediaPipe FaceLandmarker, Apache-2.0, local CPU, owned "
+                    "hardware); computed in memory during this bounded run with no "
+                    "crawlr/stratum write, no hosted third-party inference of the sensitive "
+                    "corpus."
+                ),
+                "abstention_policy": ("Abort the selected item before model generation if "
+                                      "required artifacts are missing; abstain (emit a surfaced "
+                                      "reason) when FaceLandmarker finds no face on the full "
+                                      "frame or the seg2 Face_Neck crop (measured union policy) "
+                                      "or the eye width / fissure aspect is degenerate (closed "
+                                      "eye / severe pose / occlusion); never fabricate an "
+                                      "eye-shape read; detector disagreement remains a quality "
+                                      "anomaly, never prompt content."),
+                "known_failure_modes": ("FaceLandmarker is resolution-sensitive on this cohort "
+                                        "(the union policy + measured 21/24 detection on the "
+                                        "facemesh arms bounds it); the eye-openness #113 "
+                                        "abstainees (0yo0gx..., 0mel7e..., 08v25q...) have "
+                                        "collapsed fissures that this arm also abstains on; the "
+                                        "band cuts are canon-derived provisionals pending the "
+                                        "frozen-cohort calibration probe (deferred behind hold "
+                                        "#132 — 2 of 24 frozen sources purged from approved/) "
+                                        "and will be re-cut at the cohort terciles exactly as "
+                                        "nose-geometry #121 did; the registered 'wide-set' "
+                                        "third band is the inter-eye-span reading of "
+                                        "face-geometry #60 (already validated) and is NOT "
+                                        "claimed by this arm (non-redundance), so the "
+                                        "verbalized set is almond / medium / round on the "
+                                        "fissure aspect."),
+                "qualification_gate": ("Candidate evidence only; no effectiveness claim is "
+                                       "permitted until the frozen comparison receives completed "
+                                       "rubric and adversarial reviews."),
+            }
+        ],
+    }
+    evidence["fingerprint"] = _evidence_fingerprint(evidence)
+    return evidence
+
+
+def _serialize_eye_shape(config: Mapping[str, Any] | None) -> str:
+    """Deterministic natural-language rendering of an eye-shape dict.
+
+    Verbalizes ONLY the coarse band (almond / medium / round). Raw normalized
+    aspect ratios / per-eye payloads stay in the machine-readable
+    evidence_payload JSON and are never caption claims.
+    """
+    lines = ["EYE-SHAPE (palpebral fissure aspect vs width, scale-invariant):"]
+    if not config:
+        lines.append("- eye-shape not measured for this item")
+        return "\n".join(lines)
+    if config.get("abstained"):
+        reason = config.get("abstention_reason") or "eye shape not measurable"
+        lines.append(f"- eye-shape abstained ({reason})")
+        return "\n".join(lines)
+    if config.get("banding_unavailable"):
+        lines.append("- eye-shape measured but not banded (payload)")
+        return "\n".join(lines)
+    band = config.get("eye_shape_band")
+    if band == "almond":
+        lines.append("- the eyes are almond-shaped (elongated fissure relative to height)")
+    elif band == "round":
+        lines.append("- the eyes are round (tall fissure relative to width)")
+    elif band == "medium":
+        lines.append("- the eyes are of medium roundness (typical fissure aspect)")
     return "\n".join(lines)
 
 
@@ -3266,6 +3370,13 @@ _EVIDENCE_INPUT_NAMES: dict[str, tuple[str, ...]] = {
     # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
     # the item's source_sha256.
     "lip-fullness": ("seg2.npy",),
+    # Arm #123 eye-shape: deterministic fissure-aspect band from the LOCAL
+    # MediaPipe FaceLandmarker mesh over seg2 Face_Neck crop + the
+    # already-decoded source RGB (reuses the arm #60 model; seg2 supplies the
+    # face-region mask, the RGB is decoded in-memory during the run). Only
+    # seg2 shows as a named evidence artifact; the source RGB is SHA-bound via
+    # the item's source_sha256.
+    "eye-shape": ("seg2.npy",),
     "object-relations": ("seg2.npy",),
     # Arm #69 scene-category: CLIP ViT-L/14 consumes ONLY the already-decoded
     # full-frame source RGB (SHA-bound via the item's source_sha256). No
@@ -3454,6 +3565,7 @@ def build_stage_b_plan(
         "eyebrow-position",
         "nose-geometry",
         "lip-fullness",
+        "eye-shape",
         "object-relations", "scene-category", "gaze-head-orientation", "camera-viewing-angle",
         "image-focus", "apparent-age", "affordance-contact", "body-configuration",
         "hairstyle", "face-visibility", "environment-clearance", "eye-color",
@@ -3896,6 +4008,57 @@ def build_stage_b_plan(
             "preflight gated); the probe will set cohort-tercile cuts via "
             "set_band_floors()/constant update exactly as nose-geometry #121 did, and the "
             "round trip runs only after the gate clears."
+        )
+    elif evidence_kind == "eye-shape":
+        evidence = _eye_shape_evidence()
+        evidence_condition_id = "context-raw-eye-shape"
+        comparison_plan_id = "stage-b-first500-eye-shape-v1"
+        hypothesis = (
+            "For the frozen coverage-balanced first-500 cohort, declared deterministic "
+            "eye-shape measurement (scale-invariant palpebral fissure aspect — fissure "
+            "height / fissure width — per eye from the local open-weight MediaPipe "
+            "FaceLandmarker 478-point mesh over the full frame / seg2 Face_Neck crop, "
+            "union detection policy, banded almond/medium/round at canon-derived "
+            "provisional cuts pending the frozen-cohort calibration probe; NEW evidence "
+            "part registered 2026-08-11 via the gated propose-dimensions channel, "
+            "exploitative selection; CPU, reuses the already-qualified arm #60 model) "
+            "may reduce unsupported eye-shape claims ('almond eyes', 'round eyes') that "
+            "the eye-openness #113 axis (aperture state), the iris-eye-color #80 axis "
+            "(hue), and the face-geometry #60 axis (eye SPACING) cannot ground, versus "
+            "the matched no-evidence baseline when the source item, view, prompt "
+            "template, local model, and generation settings are controlled."
+        )
+        falsified_if = (
+            "The eye-shape evidence condition does not reduce unsupported eye-shape "
+            "claims or increase supported claims versus its matched no-evidence "
+            "baseline, or the eye-shape bands collapse (a single band taking >=75% of "
+            "measured items), or the axis is redundant with eye-openness #113 / "
+            "face-geometry #60 (degenerate), or an apparent difference is attributable "
+            "to an uncontrolled change."
+        )
+        coverage_notes = (
+            "All frozen rows have readable existing core artifacts; existing "
+            "determinations/caption2/t52 files and pose2 are not used as evidence "
+            "inputs for the eye-shape measurement (pose2 stays a validation-only read "
+            "for the exactly-one-subject invariant). Eye shape is computed in memory "
+            "from the frozen selected seg2.npy (DOME-29 Face_Neck mask) + the "
+            "already-decoded source RGB via the local open-weight MediaPipe "
+            "FaceLandmarker (Apache-2.0, owned hardware, CPU, tasks API; model "
+            "face_landmarker.task sha256 64184e229b..., the same model as arm #60). "
+            "Only the coarse scale-invariant band (almond / medium / round) is "
+            "verbalized; raw normalized aspect ratios / per-eye payloads / canthal "
+            "tilt stay in evidence_payload and are never caption claims. Band "
+            "calibration: PROVISIONAL canon-derived cuts (ALMOND_MAX 0.30 / ROUND_MIN "
+            "0.42 on fissure-height / fissure-width) pending the frozen-cohort "
+            "calibration probe — deferred behind hold #132 (2 of 24 frozen sources "
+            "purged from approved/, every Stage-B arm's preflight gated); the probe "
+            "will set cohort-tercile cuts via set_band_floors()/constant update "
+            "exactly as nose-geometry #121 did, and the round trip runs only after "
+            "the gate clears. Band-set note: the registered 'wide-set' third band "
+            "would be the inter-eye-span reading of face-geometry #60 (already "
+            "validated — eye_spacing 0.445/0.475) and is NOT claimed by this arm "
+            "(falsified_if non-redundance); the verbalized set is almond / medium / "
+            "round on the fissure aspect."
         )
     elif evidence_kind == "object-relations":
         evidence = _object_relations_evidence()
@@ -4927,6 +5090,8 @@ def _validate_frozen_execution_plan(
         rebuild_kind = "nose-geometry"
     elif "context-raw-lip-fullness" in condition_ids:
         rebuild_kind = "lip-fullness"
+    elif "context-raw-eye-shape" in condition_ids:
+        rebuild_kind = "eye-shape"
     elif "context-raw-object-relations" in condition_ids:
         rebuild_kind = "object-relations"
     elif "context-raw-scene-category" in condition_ids:
@@ -5041,6 +5206,7 @@ def _load_selected_item(
     include_eyebrow_position: bool = False,
     include_nose_geometry: bool = False,
     include_lip_fullness: bool = False,
+    include_eye_shape: bool = False,
     include_object_relations: bool = False,
     include_scene_category: bool = False,
     include_image_quality: bool = False,
@@ -5211,6 +5377,17 @@ def _load_selected_item(
         except LipFullnessError as exc:
             raise StageBRunError(
                 f"lip-fullness abort for frozen selected item {image_id}: {exc}"
+            ) from exc
+    eye_shape = None
+    if include_eye_shape:
+        rgb = np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8))
+        try:
+            eye_shape = compute_eye_shape(
+                seg2, rgb, model_asset_path=FACE_GEOMETRY_MODEL_ASSET
+            )
+        except EyeShapeError as exc:
+            raise StageBRunError(
+                f"eye-shape abort for frozen selected item {image_id}: {exc}"
             ) from exc
     object_relations = None
     if include_object_relations:
@@ -5438,6 +5615,7 @@ def _load_selected_item(
         "eyebrow_position": eyebrow_position,
         "nose_geometry": nose_geometry,
         "lip_fullness": lip_fullness,
+        "eye_shape": eye_shape,
         "object_relations": object_relations,
         "scene_category": scene_category,
         "image_quality": image_quality,
@@ -5652,6 +5830,10 @@ def _render_condition(
         lip_fullness = prepared.get("lip_fullness")
         evidence_text = _serialize_lip_fullness(lip_fullness)
         return raw.copy(), _context_prompt(evidence_text), lip_fullness
+    if condition_id == "context-raw-eye-shape":
+        eye_shape = prepared.get("eye_shape")
+        evidence_text = _serialize_eye_shape(eye_shape)
+        return raw.copy(), _context_prompt(evidence_text), eye_shape
     if condition_id == "context-raw-object-relations":
         object_relations = prepared["object_relations"]
         evidence_text = _serialize_object_relations(object_relations)
@@ -5943,6 +6125,13 @@ def execute_stage_b(
         str(condition.get("id")) == "context-raw-lip-fullness"
         for condition in (plan.get("conditions") or [])
     )
+    # Arm #123: only the eye-shape run invokes the local MediaPipe
+    # FaceLandmarker (reused arm #60 mesh, CPU) — gate on the frozen plan's
+    # conditions.
+    include_eye_shape = any(
+        str(condition.get("id")) == "context-raw-eye-shape"
+        for condition in (plan.get("conditions") or [])
+    )
     include_object_relations = any(
         str(condition.get("id")) == "context-raw-object-relations"
         for condition in (plan.get("conditions") or [])
@@ -6102,6 +6291,7 @@ def execute_stage_b(
             include_eyebrow_position=include_eyebrow_position,
             include_nose_geometry=include_nose_geometry,
             include_lip_fullness=include_lip_fullness,
+            include_eye_shape=include_eye_shape,
             include_object_relations=include_object_relations,
             include_scene_category=include_scene_category,
             include_image_quality=include_image_quality,
