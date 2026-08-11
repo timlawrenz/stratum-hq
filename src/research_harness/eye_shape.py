@@ -44,11 +44,11 @@ which is exactly face-geometry #60's already-validated eye-spacing axis
 (EYE_CLOSE 0.445 / EYE_WIDE 0.475). Claiming it again here would violate the
 arm's own falsified_if clause (redundancy with face-geometry #60 → degenerate).
 The eye-SHAPE axis is therefore verbalized as almond / medium / round from the
-fissure aspect at provisional canon-derived cuts (ALMOND_MAX / ROUND_MIN
-below) pending the frozen-cohort calibration probe (deferred behind hold #132:
-2 of 24 frozen sources are currently purged from approved/); the probe will
-set the authoritative cohort-calibrated cuts via set_band_floors(), exactly as
-nose-geometry #121 and lip-fullness #122 did. Inter-eye span stays payload-only
+fissure aspect at COHORT-CALIBRATED tercile cuts (ALMOND_MAX / ROUND_MIN
+below, set 2026-08-11 from the frozen-cohort calibration probe artifact
+/mnt/nas-ai-models/research/stratum/eye-shape-calibration-probe.json;
+20/24 measured, split 7/6/7, max_share 0.35), exactly as nose-geometry #121
+and lip-fullness #122 did. Inter-eye span stays payload-only
 corroboration, never a caption claim of this arm. No effectiveness claim is
 permitted (qualification gate unopened).
 
@@ -239,20 +239,23 @@ def compute_eye_shape(
 
 
 # ---------------------------------------------------------------------------
-# Band floors — PROVISIONAL canon-derived cuts (2026-08-11), disclosed as
-# placeholder pending the frozen-cohort calibration probe (deferred behind
-# hold #132: 2 of 24 frozen sources are purged from approved/, so the probe
-# cannot run on the full cohort yet). The probe will set the authoritative
-# cohort tercile cuts via set_band_floors() / a constant update, following
-# the nose-geometry #121 pattern (measured 7/7/7 at p33/p66 cuts). Until the
-# probe runs, no effectiveness claim is permitted (qualification gate
-# unopened). Band-set note: the registered third band name "wide-set" is the
+# Band floors — COHORT-CALIBRATED tercile cuts (2026-08-11, frozen-cohort
+# calibration probe, artifact
+# /mnt/nas-ai-models/research/stratum/eye-shape-calibration-probe.json:
+# 20/24 measured, 4 honest abstains, measured aspect range 0.0696-0.7048).
+# The probe's p33/p66 cuts split the measured cohort 7 almond / 6 medium /
+# 7 round (max_share 0.35); the provisional canon cuts (0.30/0.42) were
+# non-degenerate (0.55) but the cohort terciles give the fullest honest
+# three-way split, following the nose-geometry #121 pattern (measured 7/7/7
+# at p33/p66 cuts). Bands are corpus-relative within the frozen cohort;
+# the qualification gate (no band >= 75%) passes at max_share 0.35.
+# Band-set note: the registered third band name "wide-set" is the
 # inter-eye-span reading of face-geometry #60 (already validated) and is NOT
 # claimed here (see module docstring); the verbalized set is almond / medium /
 # round on the fissure aspect.
 # ---------------------------------------------------------------------------
-ALMOND_MAX = 0.30  # fissure aspect below this -> almond-shaped (elongated)
-ROUND_MIN = 0.42   # above this -> round (tall fissure relative to width)
+ALMOND_MAX = 0.329  # fissure aspect below this -> almond-shaped (elongated; cohort p33)
+ROUND_MIN = 0.411   # above this -> round (tall fissure relative to width; cohort p66)
 
 
 def set_band_floors(almond_max: float, round_min: float) -> None:
