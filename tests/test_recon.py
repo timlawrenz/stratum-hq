@@ -8,6 +8,8 @@ import pytest
 from research_harness.recon import (
     BASELINE_PROMPT,
     NULL_PROMPT,
+    CANONICAL_SOURCE_ROOT,
+    DOSSIER_V2_ROOT,
     ReconError,
     aggregate_deltas,
     build_frozen_plan,
@@ -17,6 +19,18 @@ from research_harness.recon import (
 )
 
 ITEMS = load_pilot_items()
+
+# Arm #37's reconstruction measurement reads the live evidence-linked
+# context4k compact artifacts and canonical source images from the
+# owned-hardware corpus (/mnt/nas-ai-models). That corpus is not present on
+# the neutral GitHub runner, so the tests that genuinely consume it are
+# skipped there while still running locally on owned hardware. The pure
+# unit tests (frozen manifest, seeds, delta math) run everywhere.
+_OWNED_HW_CORPUS = CANONICAL_SOURCE_ROOT.is_dir() and DOSSIER_V2_ROOT.is_dir()
+requires_owned_hardware_corpus = pytest.mark.skipif(
+    not _OWNED_HW_CORPUS,
+    reason="requires owned-hardware corpus under /mnt/nas-ai-models (not present in CI)",
+)
 
 
 def test_pilot_manifest_is_frozen_24():
@@ -34,6 +48,7 @@ def test_item_seed_deterministic_and_nonzero():
     assert 1 <= a < 2**32
 
 
+@requires_owned_hardware_corpus
 def test_build_items_pairs_conditions_and_same_seed():
     rows = build_items()
     assert len(rows) == 24
@@ -47,6 +62,7 @@ def test_build_items_pairs_conditions_and_same_seed():
         assert len(r["prompt_sha256"]["recon-ctx4k"]) == 64
 
 
+@requires_owned_hardware_corpus
 def test_context4k_artifact_is_evidence_linked():
     rows = build_items()
     for r in rows:
@@ -83,6 +99,7 @@ def test_aggregate_deltas_requires_24():
         aggregate_deltas([{"image_id": "x", "sim_ctx4k": 0.5, "sim_baseline": 0.4}])
 
 
+@requires_owned_hardware_corpus
 def test_build_frozen_plan_pins_everything(tmp_path):
     plan = build_frozen_plan(tmp_path, checkpoint_sha256="a" * 64)
     assert plan["status"] == "preregistered"
@@ -102,6 +119,7 @@ def test_build_frozen_plan_pins_everything(tmp_path):
     assert plan["conditions"][0]["prompt_text_sha256_fingerprint"] == plan["conditions"][0].get("prompt_text_sha256_fingerprint")
 
 
+@requires_owned_hardware_corpus
 def test_plan_roundtrips_json():
     plan = build_frozen_plan(__import__("pathlib").Path("/tmp"), checkpoint_sha256="b" * 64)
     blob = json.dumps(plan, sort_keys=True)

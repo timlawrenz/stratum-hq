@@ -14,6 +14,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pathlib import Path
+
 from research_harness.object_relations import (
     DENSE,
     MODERATE,
@@ -30,6 +32,10 @@ from research_harness.object_relations import (
 )
 
 MODEL_DIR = "/mnt/nas-ai-models/research/stratum/models/object-relations"
+requires_staged_model = pytest.mark.skipif(
+    not Path(MODEL_DIR).is_dir(),
+    reason="requires staged model on owned-hardware NAS (not present on neutral CI)",
+)
 
 
 def test_count_band_thresholds() -> None:
@@ -117,6 +123,7 @@ def test_render_bands() -> None:
     assert any("no scene objects" in line for line in none_lines)
 
 
+@requires_staged_model
 def test_compute_runs_on_synthetic_frame() -> None:
     """End-to-end pipeline smoke: detector over a tiny synthetic frame emits a
     well-formed structure (CPU, owned hardware, read-only)."""

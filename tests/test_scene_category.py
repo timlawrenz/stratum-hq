@@ -14,6 +14,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pathlib import Path
+
 from research_harness.scene_category import (
     ABSTAIN_CONFIDENCE,
     SceneCategoryError,
@@ -24,6 +26,10 @@ from research_harness.scene_category import (
 )
 
 MODEL_DIR = "/mnt/nas-ai-models/research/stratum/models/scene-category"
+requires_staged_model = pytest.mark.skipif(
+    not Path(MODEL_DIR).is_dir(),
+    reason="requires staged model on owned-hardware NAS (not present on neutral CI)",
+)
 
 
 def test_validate_arrays() -> None:
@@ -59,6 +65,7 @@ def test_render_below_floor_abstains() -> None:
     assert lines and "abstain" in lines[0]
 
 
+@requires_staged_model
 def test_zero_shot_probabilities_softmax_structure() -> None:
     """The probability vector is a non-negative normalized closed-set softmax."""
     rng = np.random.default_rng(1)
@@ -70,6 +77,7 @@ def test_zero_shot_probabilities_softmax_structure() -> None:
     assert len(logits) == len(probs)
 
 
+@requires_staged_model
 def test_compute_runs_on_synthetic_frame() -> None:
     """End-to-end pipeline smoke: the classifier over a synthetic frame emits a
     well-formed structure (CPU, owned hardware, read-only)."""
